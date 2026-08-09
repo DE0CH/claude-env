@@ -8,9 +8,14 @@ Goal was: transcript if it exists, otherwise audio → Whisper. What actually wo
 
 ### What worked
 
-- **Bot-walled videos:** the persistent Browserbase context is logged into YouTube — a
+- **Watch page via Browserbase:** the persistent context is logged into YouTube — a
   context-backed session gets `playabilityStatus: OK` on videos that bot-wall anonymous
-  sessions. Try this first (see browserbase.md).
+  sessions, and caption tracks/timedtext can be fetched from inside the page. Try this
+  first (see browserbase.md). Caveat: this covers page data and transcripts only —
+  `streamingData` is still SABR-only (no `url`, no `signatureCipher` on any format), and
+  non-web InnerTube clients (IOS, ANDROID_VR, TVHTML5, MWEB, *_EMBEDDED_PLAYER) still
+  return `LOGIN_REQUIRED`/`ERROR` even from the logged-in session, so audio/video files
+  can't be downloaded this way — use loader.to below for that.
 - **Transcript check, cheapest first:** ScrapingBee has a dedicated YouTube Subtitles API
   (`https://app.scrapingbee.com/api/v1/youtube/subtitles?video_id=<id>`, Bearer
   `$SCRAPINGBEE_TOKEN`, 5 credits). Returns `{"subtitles":{}}` when none exist. Note: fresh
@@ -36,15 +41,14 @@ Goal was: transcript if it exists, otherwise audio → Whisper. What actually wo
 
 ### What didn't work (don't retry these first)
 
-- **Browserbase (free plan) + YouTube without the logged-in context:** datacenter IP gets
-  "Sign in to confirm you're not a bot" (`LOGIN_REQUIRED`) on the watch page and all
-  InnerTube clients (WEB_EMBEDDED_PLAYER, TVHTML5*, IOS, MWEB, ANDROID). `--proxies` and
-  `--verified` are paid/Enterprise-gated; `--solve-captchas` does **not** solve Cloudflare
-  Turnstile on cobalt.tools.
-- **Non-web InnerTube clients from a residential IP (ScrapingBee js_scenario evaluate):**
-  still `LOGIN_REQUIRED` — YouTube now wants PO-token/attestation for non-web clients, and
-  visitorData doesn't rescue it. Web client from residential IP gets `playabilityStatus:
-  OK` but is SABR-only: no `url`, no `signatureCipher` in any format.
+- **Browserbase `--proxies` and `--verified`** are paid/Enterprise-gated on the current
+  plan; `--solve-captchas` does **not** solve Cloudflare Turnstile (tested on
+  cobalt.tools).
+- **Non-web InnerTube clients** (IOS, ANDROID_VR, TVHTML5, MWEB, embedded players):
+  `LOGIN_REQUIRED`/`ERROR` from every vantage point tried — Browserbase logged-in session,
+  ScrapingBee residential IP (js_scenario evaluate), with or without visitorData. YouTube
+  wants PO-token/attestation for non-web clients. The web client is SABR-only everywhere:
+  no `url`, no `signatureCipher` in any format.
 - **ScrapingBee YouTube Metadata API:** lists all formats but every `url` is `null`
   ("MISSING POT") — it's yt-dlp on their side, same wall.
 - **yt-dlp locally:** 429 + bot-check from the container IP.
