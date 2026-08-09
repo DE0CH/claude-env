@@ -28,3 +28,4 @@ explicitly asked to.
 
 @lobster.md
 @browserbase.md
+@lessons.md
