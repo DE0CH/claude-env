@@ -1,8 +1,8 @@
-== Where are the secrets? 
+## Where are the secrets?
 
 They are either in your environment variables or in `~/.secrets`.
 
-== Tools
+## Tools
 
 Use browserbase when you need a browser.
 
@@ -22,11 +22,11 @@ transcribe it.
 
 If audio transcription is required, use OpenAI Whisper through Openrouter.
 
-== Git
+## Git
 
 Always commit and push directly to `main` in general — don't create feature branches unless
 explicitly asked to.
 
-== Other files
+## Other files
 
 @lobster.md
