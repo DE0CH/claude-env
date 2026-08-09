@@ -4,21 +4,18 @@ They are either in your environment variables or in `~/.secrets`.
 
 ## Tools
 
-Use browserbase when you need a browser.
-
-Use Scrapingbee for getting ANY content from websites — this means all fetches from third-party
-sites, not just HTML scraping: media/file downloads, YouTube videos/audio/subtitles, search
-results, APIs. ScrapingBee has dedicated YouTube endpoints (metadata, subtitles, search) —
-check https://www.scrapingbee.com/llms.txt for the right endpoint BEFORE reaching for
-site-specific tools like yt-dlp.
+Use Browserbase for ANY content from websites — not just interactive browsing: media/file
+downloads, YouTube videos/audio/subtitles, search results, APIs. It covers three modes:
+the `browse` CLI for interactive browser sessions, the Fetch API for plain page/content
+retrieval, and the Search API for web search. There is a persistent logged-in browser
+context — see @browserbase.md.
 
 Avoid using direct connection to the internet if possible. Do not fall back to direct
-connections (yt-dlp, curl/wget against the target site, etc.) without trying Scrapingbee
+connections (yt-dlp, curl/wget against the target site, etc.) without trying Browserbase
 first — datacenter IPs get bot-blocked anyway.
 
-For YouTube videos, try to get the transcript directly from Scrapingbee's YouTube Subtitles
-API first. Only if no transcript exists, download the audio (through Scrapingbee) and
-transcribe it.
+For YouTube videos, try to get the transcript/subtitles first (through Browserbase). Only
+if no transcript exists, download the audio (through Browserbase) and transcribe it.
 
 If audio transcription is required, use OpenAI Whisper through Openrouter.
 
