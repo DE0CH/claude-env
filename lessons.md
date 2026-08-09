@@ -59,3 +59,5 @@ Goal was: transcript if it exists, otherwise audio → Whisper. What actually wo
   not a technique failure.
 - Browserbase Fetch API returns markdown (not raw HTML) for HTML pages — useless for
   script-embedded JSON like `ytInitialPlayerResponse`; use ScrapingBee for raw HTML.
+- Discord API returns 403 for python `urllib` requests (user-agent filtering); the
+  documented `curl` invocation in lobster.md works — don't switch it to urllib.
