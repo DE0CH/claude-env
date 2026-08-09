@@ -18,6 +18,11 @@ first — datacenter IPs get bot-blocked anyway.
 
 If audio transcription is required, use OpenAI Whisper through Openrouter.
 
+== Git
+
+Always commit and push directly to `main` in general — don't create feature branches unless
+explicitly asked to.
+
 == Other files
 
 @lobster.md
