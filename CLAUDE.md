@@ -16,6 +16,10 @@ Avoid using direct connection to the internet if possible. Do not fall back to d
 connections (yt-dlp, curl/wget against the target site, etc.) without trying Scrapingbee
 first — datacenter IPs get bot-blocked anyway.
 
+For YouTube videos, try to get the transcript directly from Scrapingbee's YouTube Subtitles
+API first. Only if no transcript exists, download the audio (through Scrapingbee) and
+transcribe it.
+
 If audio transcription is required, use OpenAI Whisper through Openrouter.
 
 == Git
