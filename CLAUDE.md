@@ -8,6 +8,8 @@ Use browserbase when you need a browser.
 
 Use Scrapingbee for getting content from websites.
 
+Avoid using direct connection to the internet if possible. 
+
 If audio transcription is required, use OpenAI Whisper through Openrouter.
 
 == Other files
