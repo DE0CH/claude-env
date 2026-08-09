@@ -30,3 +30,4 @@ explicitly asked to.
 ## Other files
 
 @lobster.md
+@browserbase.md
