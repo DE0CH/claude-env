@@ -33,11 +33,14 @@ Goal was: transcript if it exists, otherwise audio → Whisper. What actually wo
 
 ### What didn't work (don't retry these first)
 
-- **Browserbase (free plan) + YouTube:** datacenter IP gets "Sign in to confirm you're not
-  a bot" (`LOGIN_REQUIRED`) on the watch page and all InnerTube clients
+- **Browserbase (free plan) + YouTube, logged out:** datacenter IP gets "Sign in to
+  confirm you're not a bot" (`LOGIN_REQUIRED`) on the watch page and all InnerTube clients
   (WEB_EMBEDDED_PLAYER, TVHTML5*, IOS, MWEB, ANDROID). `--proxies` and `--verified` are
   paid/Enterprise-gated; `--solve-captchas` did **not** solve Cloudflare Turnstile on
-  cobalt.tools. The persistent context is not logged into YouTube/Google.
+  cobalt.tools. **Update 2026-08-09: the persistent context is now logged into
+  YouTube/Google** — with the context attached, the watch page returns `playabilityStatus:
+  OK` from Browserbase, so try the context-backed session first before any of the
+  fallbacks below (the logged-out failures above only apply without the context).
 - **Non-web InnerTube clients from a residential IP (ScrapingBee js_scenario evaluate):**
   still `LOGIN_REQUIRED` — YouTube now wants PO-token/attestation for non-web clients, and
   visitorData doesn't rescue it. Web client from residential IP gets `playabilityStatus:

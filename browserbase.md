@@ -6,6 +6,8 @@ signed in as me — do NOT create a new context.
 
 - **Context ID:** `c570c274-69c7-4b40-b550-5177982c13b4`
 - **Project:** `8f2c3e0b-53ae-4425-828e-79e5fd52a180` (Production project)
+- **Known logged-in accounts:** YouTube/Google (verified 2026-08-09 — youtube.com shows
+  `LOGGED_IN: true` and bot-walled videos become playable in context-backed sessions).
 
 ## How to use it
 
