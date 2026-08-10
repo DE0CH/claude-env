@@ -4,6 +4,13 @@ They are either in your environment variables or in `~/.secrets`.
 
 ## Tools
 
+Whenever a tool is not avaliable, the first priority is to fix the tooling, not to work around.
+Examples include, a tool is not installed, in which case you should install it in the proper way, 
+by either using brew, apt, pip depending on the environment. If there's a billing issue, for
+example I don't have credit anymore or I've ran out of free plan usage, you should ping me
+to ask me to recharge intead of working around it. If a workaround is reqruied, you should
+always ask me for permission first because using the workaround.
+
 Use Browserbase for ANY content from websites — not just interactive browsing: media/file
 downloads, YouTube videos/audio/subtitles, search results, APIs. It covers three modes:
 the `browse` CLI for interactive browser sessions, the Fetch API for plain page/content
