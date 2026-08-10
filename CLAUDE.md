@@ -2,6 +2,13 @@
 
 They are either in your environment variables or in `~/.secrets`.
 
+## Runner Environment
+
+Expect to find yourself being run in two places: 1. My own mac. 2. A github workspaces pod.
+For 1. This is my personal mac and I need you not to break it, and be conservative with making
+persistent config changes. They probabaly need explicit explanation and approval from me.
+For 2. you are modify the environment however you want because the pod is ephemeral.  
+
 ## Tools
 
 Whenever a tool is not avaliable, the first priority is to fix the tooling, not to work around.
