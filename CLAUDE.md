@@ -32,6 +32,13 @@ the `browse` CLI for interactive browser sessions, the Fetch API for plain page/
 retrieval, and the Search API for web search. There is a persistent logged-in browser
 context — see @browserbase.md.
 
+When Deyao is watching a Browserbase session via the live view (debugger URL): those URLs
+are pinned to a specific page/tab, so whenever the session is recreated, a new tab is
+opened, or the page the link points at otherwise changes, immediately send him the fresh
+`debuggerFullscreenUrl` (from `browse cloud sessions debug <session-id>`) without being
+asked. Also explicitly say when a session is intentionally stopped or has died, so a blank
+live view isn't mistaken for a bug.
+
 Avoid using direct connection to the internet if possible. Do not fall back to direct
 connections (yt-dlp, curl/wget against the target site, etc.) without trying Browserbase
 first — datacenter IPs get bot-blocked anyway.
