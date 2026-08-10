@@ -41,6 +41,14 @@ if no transcript exists, download the audio (through Browserbase) and transcribe
 
 If audio transcription is required, use OpenAI Whisper through Openrouter.
 
+## iPhone control
+
+My physical iPhone can be driven through the accessibility API (WebDriverAgent +
+pymobiledevice3 + Appium) — use the `drive-iphone` skill for bring-up, driving
+patterns, recovery, and teardown. Mac host only (USB + `~/.venvs/ios` tooling; not
+available in container pods). Build/signing infra lives in the private repo
+`DE0CH/wda-build`; hard-won pitfalls are in @lessons.md.
+
 ## Notification
 
 You should just assume that I am not paying attention to the text output that you are generating.
