@@ -19,6 +19,12 @@ if no transcript exists, download the audio (through Browserbase) and transcribe
 
 If audio transcription is required, use OpenAI Whisper through Openrouter.
 
+## Notification
+
+You should just assume that I am not paying attention to the text output that you are generating.
+So use discord to ping me whenever you need to get my attention (e.g. asking a question, waiting
+for my input, or when the task is done). 
+
 ## Git
 
 Always commit and push directly to `main` in general — don't create feature branches unless
