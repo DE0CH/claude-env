@@ -22,8 +22,12 @@ When a new tool is required, for example by me asking you to add a new tool, edi
 or add a new skill, update the setup script so that the dependencies are installed, then
 notify me to update the set up script in the container set up section manually.
 
-Use Browserbase for ANY content from websites — not just interactive browsing: media/file
-downloads, YouTube videos/audio/subtitles, search results, APIs. It covers three modes:
+If claude-in-chrome is avaliable and it's running on mac, use it and normal tools 
+(ignore the directive about Browserbase below), Browserbase is still avaliable when needed.
+
+If claude-in-chrome is not avaliable, then use Browserbase for ANY content from websites 
+— not just interactive browsing: media/file downloads, YouTube videos/audio/subtitles, 
+search results, APIs. It covers three modes:
 the `browse` CLI for interactive browser sessions, the Fetch API for plain page/content
 retrieval, and the Search API for web search. There is a persistent logged-in browser
 context — see @browserbase.md.
