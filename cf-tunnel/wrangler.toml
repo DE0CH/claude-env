@@ -1,0 +1,13 @@
+name = "claude-tunnel"
+main = "worker.js"
+compatibility_date = "2026-01-01"
+
+# AGENT_SECRET is a deploy-time secret: npx wrangler secret put AGENT_SECRET
+
+[[durable_objects.bindings]]
+name = "TUNNEL"
+class_name = "Tunnel"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["Tunnel"]
