@@ -144,7 +144,8 @@ Discord is one-way only (you send, I don't reply there): do NOT poll Discord wai
 reply from me. I will reply directly in the chat session.
 
 When I ask for a YouTube video summary, send the summary itself to me on Discord — not
-just a "done" ping. Split it across messages to fit Discord's 2000-character limit.
+just a "done" ping. Deliver Discord content (summaries, transcripts, etc.) as plain text
+messages split across Discord's 2000-character limit — never as file attachments.
 
 ## Git
 
