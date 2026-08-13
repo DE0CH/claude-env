@@ -129,6 +129,29 @@ else
   fi
 fi
 
+# --- cf-tunnel tooling: wrangler + ws (see ngrok.md / cf-tunnel/) ------------
+# The Cloudflare Worker tunnel edge is deployed with wrangler; the container
+# agent (cf-tunnel/agent.js) needs the `ws` package.
+
+if command -v npm >/dev/null 2>&1; then
+  if command -v wrangler >/dev/null 2>&1; then
+    log "wrangler already installed ($(wrangler --version 2>/dev/null))"
+  elif npm install -g wrangler >/dev/null 2>&1; then
+    log "installed wrangler"
+  else
+    warn "npm install -g wrangler failed"
+  fi
+  if node -e "require('ws')" >/dev/null 2>&1; then
+    log "ws already installed"
+  elif npm install -g ws >/dev/null 2>&1; then
+    log "installed ws"
+  else
+    warn "npm install -g ws failed"
+  fi
+else
+  warn "cf-tunnel tooling skipped (no npm)"
+fi
+
 # --- ngrok (see ngrok.md) ---------------------------------------------------
 
 if command -v ngrok >/dev/null 2>&1; then

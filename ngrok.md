@@ -90,8 +90,64 @@ Fallbacks that DO work from the container:
      relay (streaming, not stored, but still: prefer it for medium-sensitivity
      data; for highly sensitive secrets prefer a Mac session with ngrok).
 
+## cf-tunnel: a private, Access-gated tunnel that works from web containers
+
+`cf-tunnel/` is a Cloudflare Worker that DOES tunnel into a Claude-on-the-web
+container, because its transport is WebSocket-on-443 — the one thing the egress
+gateway relays (verified with a full WS data roundtrip). It replaces the
+cloudflared connector, which physically cannot connect from here (port 7844).
+
+How it works: a Worker + Durable Object (`cf-tunnel/worker.js`) holds a
+WebSocket opened *outbound* by a container agent (`cf-tunnel/agent.js`); every
+HTTP request to the Worker is forwarded over that socket to the local
+`content-server.py` and the response streamed back. **Cloudflare Access** sits
+in front of the public hostname `tunnel.deyaochen.com`, so only Deyao's email
+gets in via the browser; the agent authenticates with an Access **service
+token** (no login).
+
+### One-time deploy (needs a Cloudflare API token)
+
+Token permissions (create in dash → My Profile → API Tokens; the "Edit
+Cloudflare Workers" template + three extra perms covers it):
+- Account: Workers Scripts **Edit**, Access: Apps and Policies **Edit**,
+  Access: Service Tokens **Edit**, Account Settings **Read**
+- Zone `deyaochen.com`: DNS **Edit**, Workers Routes **Edit**, Zone **Read**
+
+Put the token in `~/drop/cftoken` (via the ppng.io drop, never the transcript),
+then:
+
+```bash
+cd cf-tunnel && ./deploy.sh
+```
+
+`deploy.sh` deploys the Worker, attaches the `tunnel.deyaochen.com` custom
+domain, creates the Access app + a policy allowing Deyao's email and the
+service token, mints the service token, and writes the agent's env to
+`~/drop/tunnel.env` (client id/secret included — local disk only, 0600).
+
+Account id `ee3b4deef856baf11e1a67b242438325`, zone id
+`f51ca95ee5e6c664372000f887c96a92` are baked into `deploy.sh`.
+
+### Each session (serve content through the tunnel)
+
+```bash
+# 1. content in ~/ngrok-share, drops land in ~/drop
+python3 scripts/content-server.py --port 8899 &
+# 2. bring up the agent with the saved env
+set -a; . ~/drop/tunnel.env; set +a
+node cf-tunnel/agent.js &
+# 3. the private URL is always the same: https://tunnel.deyaochen.com/
+#    Deyao logs in via Cloudflare Access once per device; discord him the link.
+```
+
+Cloudflare API mutations from the logged-in dashboard are CSRF-blocked (403),
+and the token-permission dropdowns are react-select widgets that are painful to
+drive via the accessibility tree — so create the API token in a real browser
+and drop it, rather than automating the dashboard.
+
 ## GitHub workspace pods
 
 Normal pods have unrestricted egress — the full ngrok workflow should work
 there as-is (`setup.sh` installs ngrok). If a pod turns out to be egress-
-filtered like the Claude container, fall back per the section above.
+filtered like the Claude container, fall back per the section above, or use
+`cf-tunnel/` (which works regardless of egress filtering).
