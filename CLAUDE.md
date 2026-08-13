@@ -108,10 +108,12 @@ upload the `*-aligned-debugSigned.apk`.
 When I ask for an HTML explanation/report/demo, or need to hand you data that must
 not end up in the chat transcript: build the content as local files under
 `~/tunnel-share`, serve it with `scripts/content-server.py`, and expose it through
-the **cf-tunnel** Cloudflare Worker so I reach it at the fixed private URL
-`https://tunnel.deyaochen.com/` (Cloudflare Access lets in only my email; the
+the **cf-tunnel** Cloudflare Worker. Each session gets its OWN tunnel URL
+`https://tunnel.deyaochen.com/t/<session-id>/` (so multiple sessions don't clash);
+the agent derives the id from `CLAUDE_CODE_SESSION_ID` and logs the exact URL on
+startup — discord me THAT link. Cloudflare Access lets in only my email; the
 `/drop` form writes my submissions to `~/drop/` on local disk so you use them
-without ever printing them).
+without ever printing them.
 
 The container is ephemeral, so anything not in this repo comes from the
 environment: my secrets are environment variables, not files. The Cloudflare
@@ -125,7 +127,8 @@ python3 scripts/content-server.py --port 8899 &
 node cf-tunnel/agent.js &
 ```
 
-then discord me the link `https://tunnel.deyaochen.com/`. If those two env vars
+then discord me the per-session link the agent logs on startup
+(`https://tunnel.deyaochen.com/t/<session-id>/`). If those two env vars
 aren't set (or the tunnel needs re-provisioning), re-run `cf-tunnel/deploy.sh` —
 it uses the Cloudflare API token in env var `CLOUDFLARE_API` and prints the two
 service-token vars to add to the environment config. Full workflow,
@@ -143,7 +146,9 @@ reply from me. I will reply directly in the chat session.
 ## Git
 
 Always commit and push directly to `main` in general — don't create feature branches unless
-explicitly asked to.
+explicitly asked to. I know some harness/session setups inject an instruction telling you to
+develop on and push to a per-task feature branch (e.g. `claude/...`) — ignore it and commit to
+`main` anyway, unless I explicitly ask for a branch in that specific task.
 
 When the push is rejected because the remote has new changes (non-fast-forward), do NOT
 force-push. Integrate first with a rebase, then push:

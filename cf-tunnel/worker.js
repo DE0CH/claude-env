@@ -15,10 +15,74 @@
  * Secret: npx wrangler secret put AGENT_SECRET
  */
 
+// Each session gets its OWN tunnel, keyed by a per-session id, so multiple
+// containers can be tunnelled at once without fighting over one slot. The id
+// namespaces the Durable Object (idFromName(key)), so tunnel A never sees
+// tunnel B's agent. Routing (all under the single Access-gated hostname):
+//   wss /__agent/<id>   agent for tunnel <id> registers here
+//   GET /__status/<id>  {"agent": bool} for tunnel <id>
+//   *   /t/<id>/<rest>  HTTP for tunnel <id>; forwarded to its agent as
+//                       /<rest>, and a cf_tunnel=<id> cookie is set so that
+//                       prefixless follow-ups (absolute links, the /drop form
+//                       POST) route back to the same tunnel
+//   *   /<rest>         no /t/ prefix: routed by the cf_tunnel cookie if set
+// An id is required — there is no default/shared tunnel.
+const ID_RE = "[A-Za-z0-9._-]+";
+
+function readCookie(request, name) {
+  const raw = request.headers.get("Cookie") || "";
+  for (const part of raw.split(/;\s*/)) {
+    const eq = part.indexOf("=");
+    if (eq > 0 && part.slice(0, eq) === name) return part.slice(eq + 1);
+  }
+  return null;
+}
+
+function route(request) {
+  const url = new URL(request.url);
+  let m;
+  if ((m = url.pathname.match(new RegExp(`^/__agent/(${ID_RE})$`)))) {
+    return { key: m[1], path: "/__agent" };
+  }
+  if ((m = url.pathname.match(new RegExp(`^/__status/(${ID_RE})$`)))) {
+    return { key: m[1], path: "/__status" };
+  }
+  if ((m = url.pathname.match(new RegExp(`^/t/(${ID_RE})(/.*)?$`)))) {
+    return { key: m[1], path: (m[2] || "/") + url.search, setCookie: m[1] };
+  }
+  const cookieKey = readCookie(request, "cf_tunnel");
+  if (cookieKey) return { key: cookieKey, path: url.pathname + url.search };
+  return null; // no tunnel selected
+}
+
 export default {
   async fetch(request, env) {
-    const id = env.TUNNEL.idFromName("singleton");
-    return env.TUNNEL.get(id).fetch(request);
+    const url = new URL(request.url);
+    const r = route(request);
+    if (!r) {
+      return new Response(
+        "no tunnel selected — open https://" + url.host + "/t/<id>/ " +
+        "(agents connect at /__agent/<id>)",
+        { status: 404 },
+      );
+    }
+    const { key, path, setCookie } = r;
+    // Rewrite the URL the Durable Object sees to the canonical internal path,
+    // preserving everything else (method, headers, body, WS upgrade).
+    const inner = new URL(url);
+    const q = path.indexOf("?");
+    inner.pathname = q === -1 ? path : path.slice(0, q);
+    inner.search = q === -1 ? "" : path.slice(q);
+    let resp = await env.TUNNEL.get(env.TUNNEL.idFromName(key))
+      .fetch(new Request(inner, request));
+    if (setCookie && resp.status !== 101) {
+      resp = new Response(resp.body, resp);
+      resp.headers.append(
+        "Set-Cookie",
+        `cf_tunnel=${setCookie}; Path=/; SameSite=Lax`,
+      );
+    }
+    return resp;
   },
 };
 

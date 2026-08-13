@@ -28,7 +28,25 @@ try {
 } catch {}
 const WebSocket = require("ws");
 
-const WORKER_URL = process.env.TUNNEL_WORKER_URL || "wss://tunnel.deyaochen.com/__agent";
+// Per-session tunnel id: each session tunnels under its own id so multiple
+// sessions/containers don't clash over one slot (see tunnel.md). Defaults to
+// the CCR session id; override with TUNNEL_ID. Empty id => legacy shared tunnel.
+const TUNNEL_HOST = process.env.TUNNEL_HOST || "tunnel.deyaochen.com";
+const TUNNEL_ID = (
+  process.env.TUNNEL_ID ||
+  process.env.CLAUDE_CODE_SESSION_ID ||
+  process.env.CLAUDE_CODE_CONTAINER_ID ||
+  ""
+).replace(/[^A-Za-z0-9._-]/g, "").slice(0, 64);
+if (!TUNNEL_ID && !process.env.TUNNEL_WORKER_URL) {
+  console.error(
+    "no tunnel id: set TUNNEL_ID (CLAUDE_CODE_SESSION_ID is used by default).",
+  );
+  process.exit(1);
+}
+const WORKER_URL = process.env.TUNNEL_WORKER_URL ||
+  `wss://${TUNNEL_HOST}/__agent/${TUNNEL_ID}`;
+const PUBLIC_URL = `https://${TUNNEL_HOST}/t/${TUNNEL_ID}/`;
 const TARGET = process.env.TUNNEL_TARGET || "http://127.0.0.1:8899";
 const AGENT_SECRET = process.env.TUNNEL_AGENT_SECRET; // optional
 const ACCESS_ID = process.env.CF_ACCESS_CLIENT_ID;
@@ -56,6 +74,7 @@ function connect() {
   ws.on("open", () => {
     backoff = 1000;
     console.log(`[agent] connected to ${WORKER_URL}, proxying to ${TARGET}`);
+    console.log(`[agent] public URL: ${PUBLIC_URL}`);
     // keep the socket warm through idle periods
     pingTimer = setInterval(() => {
       try { ws.send(JSON.stringify({ type: "ping" })); } catch {}

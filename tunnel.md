@@ -85,30 +85,47 @@ service token, mints the service token, and writes its creds to
 `ee3b4deef856baf11e1a67b242438325`, zone id
 `f51ca95ee5e6c664372000f887c96a92` are baked in.
 
+### Per-session tunnels (no clashing)
+
+Each session gets its **own** tunnel, keyed by a per-session id, so several
+containers can be tunnelled at once without fighting over one slot. The id
+namespaces the Worker's Durable Object, so session A's URL never reaches
+session B's agent. The agent derives the id from `CLAUDE_CODE_SESSION_ID`
+automatically (override with `TUNNEL_ID`), so **each session's URL is
+different** — the agent logs it on connect (`[agent] public URL: …`). Routing,
+all under the one Access-gated hostname:
+
+- `wss /__agent/<id>` — the agent registers here
+- `GET /__status/<id>` — `{"agent": true}` when that session's agent is up
+- `*   /t/<id>/<rest>` — content for that session; also sets a `cf_tunnel=<id>`
+  cookie so prefixless follow-ups (absolute links, the `/drop` form POST) route
+  back to the same tunnel
+- bare `/` with no id and no cookie → 404 (there is no shared/default tunnel)
+
 ### Each session (serve content through the tunnel)
 
-The agent reads `CF_ACCESS_CLIENT_ID` / `CF_ACCESS_CLIENT_SECRET` from the
-environment (and defaults `wss://tunnel.deyaochen.com/__agent` +
+The agent reads `CF_ACCESS_CLIENT_ID` / `CF_ACCESS_CLIENT_SECRET` and the
+session id from the environment (defaults: `wss://tunnel.deyaochen.com` +
 `http://127.0.0.1:8899`), so bring-up is just:
 
 ```bash
 # content in ~/tunnel-share, drops land in ~/drop
 python3 scripts/content-server.py --port 8899 &
-# agent — no file needed; creds come from the environment
+# agent — no file needed; creds + session id come from the environment
 node cf-tunnel/agent.js &
-# the private URL is always https://tunnel.deyaochen.com/
-# Deyao logs in via Cloudflare Access once per device; discord him the link.
+# the agent logs the per-session URL: https://tunnel.deyaochen.com/t/<session-id>/
+# discord Deyao THAT link (not a fixed one); he logs in via Access once per device.
 ```
 
 (If the `CF_ACCESS_*` vars aren't in the environment yet — e.g. before they've
 been added to the config — source `~/drop/service-token` from the last deploy,
 or re-run `deploy.sh`.)
 
-Deyao logs in the first time on each device via Cloudflare Access: visiting
-`https://tunnel.deyaochen.com/` redirects to a one-time-PIN prompt, the PIN goes
-to chendeyao000@gmail.com (the only allowed identity), and the session lasts
-24h. Unauthenticated requests get a 302 to the login — verified. The container
-agent skips all this with its Access service token.
+Deyao logs in the first time on each device via Cloudflare Access: visiting the
+per-session `https://tunnel.deyaochen.com/t/<id>/` redirects to a one-time-PIN
+prompt, the PIN goes to chendeyao000@gmail.com (the only allowed identity), and
+the session lasts 24h. Unauthenticated requests get a 302 to the login —
+verified. The container agent skips all this with its Access service token.
 
 The `content-server.py` and `agent.js` processes live in the ephemeral
 container, so they must be restarted each session (the deploy — Worker, route,
@@ -129,6 +146,11 @@ the agent isn't connected.
   drop it, rather than automating the dashboard.
 - Background processes started with `&` inside a single Claude Code Bash call do
   not survive to the next call; run them as detached/background tasks.
+- To update ONLY the Worker code (e.g. after editing `worker.js`), run
+  `wrangler deploy` from `cf-tunnel/` with `CLOUDFLARE_API_TOKEN=$CLOUDFLARE_API`
+  and `CLOUDFLARE_ACCOUNT_ID=ee3b4deef856baf11e1a67b242438325` — do **not** re-run
+  `deploy.sh` for a code change: its service-token step deletes and re-mints the
+  token every run, which would rotate the live `CF_ACCESS_*` env creds.
 
 ## Fallbacks (no tunnel)
 
