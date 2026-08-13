@@ -56,6 +56,17 @@ patterns, recovery, and teardown. Mac host only (USB + `~/.venvs/ios` tooling; n
 available in container pods). Build/signing infra lives in the private repo
 `DE0CH/wda-build`; hard-won pitfalls are in @lessons.md.
 
+## Mobilerun (phone control via cloud API)
+
+The `mobilerun` skill (`.claude/skills/mobilerun/`, vendored from
+https://github.com/droidrun/skills) controls Android/iOS phones through the Mobilerun
+API (api.mobilerun.ai). Works anywhere with network access — no Mac/USB needed, unlike
+`drive-iphone`. The API key here is `MOBILERUN_API` (not `MOBILERUN_API_KEY` as the
+skill's docs assume) — run `export MOBILERUN_API_KEY="$MOBILERUN_API"` before using the
+skill's curl commands. No payment method is on the Mobilerun account yet, so paid
+features (agent tasks, cloud devices) may fail with 402/403 billing errors — ping me on
+Discord per the Tools policy above instead of working around.
+
 ## Notification
 
 You should just assume that I am not paying attention to the text output that you are generating.
