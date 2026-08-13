@@ -15,8 +15,11 @@ Create sessions on top of the context. Pass `--persist` so any new logins/cookie
 picked up during the session are saved back to the context:
 
 ```bash
-browse cloud sessions create --context-id c570c274-69c7-4b40-b550-5177982c13b4 --persist --keep-alive
+browse cloud sessions create --context-id c570c274-69c7-4b40-b550-5177982c13b4 --persist --keep-alive --timeout 3600
 ```
+
+Always pass `--timeout 3600` (1h) — the default ~5-minute timeout kills the session
+(and its page state) while waiting on anything slow, like an OTP reply.
 
 Then drive it with the `browse` CLI (`--session`/connect via the returned
 `connectUrl`), Playwright over CDP, or whatever fits the task.

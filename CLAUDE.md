@@ -32,6 +32,10 @@ the `browse` CLI for interactive browser sessions, the Fetch API for plain page/
 retrieval, and the Search API for web search. There is a persistent logged-in browser
 context — see @browserbase.md.
 
+Always create Browserbase sessions with `--timeout 3600` (1 hour). The default timeout
+is ~5 minutes and kills the session mid-task whenever you're waiting on something slow
+(e.g. Deyao replying with an OTP), losing all page state.
+
 When Deyao is watching a Browserbase session via the live view (debugger URL): those URLs
 are pinned to a specific page/tab, so whenever the session is recreated, a new tab is
 opened, or the page the link points at otherwise changes, immediately send him the fresh
