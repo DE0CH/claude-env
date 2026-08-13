@@ -143,9 +143,26 @@ for my input, when the task is done, or investigation is complete).
 Discord is one-way only (you send, I don't reply there): do NOT poll Discord waiting for a
 reply from me. I will reply directly in the chat session.
 
-When I ask for a YouTube video summary, send the summary itself to me on Discord — not
-just a "done" ping. Deliver Discord content (summaries, transcripts, etc.) as plain text
-messages split across Discord's 2000-character limit — never as file attachments.
+Deliver Discord content (summaries, transcripts, etc.) as plain text messages split
+across Discord's 2000-character limit — never as file attachments.
+
+## YouTube video summary / transcript
+
+When I ask for a **summary** and/or **transcript** of a YouTube video, this is what I mean:
+
+- **Getting the content:** captions/subtitles first (through Browserbase / ScrapingBee —
+  see lessons.md); only if the video genuinely has none, download the audio and
+  transcribe it (loader.to + audio models via OpenRouter worked before, see lessons.md).
+- **Summary** means a structured summary of the video's actual argument and key numbers,
+  in fluent prose — and the summary itself gets sent to me on Discord, not just a
+  "done" ping.
+- **Transcript** means the full text in the video's original language, cleaned up for
+  fluent reading: fix obvious mis-transcription errors (wrong homophones, garbled names),
+  add punctuation and paragraph breaks where the raw transcription lacks them, remove
+  transcription artifacts and filler that breaks sentences — but only minor changes,
+  never altering content or meaning. Editorial additions (like section headings) are
+  fine if marked as such. The transcript also gets sent to me on Discord.
+- Both are delivered as plain-text Discord messages per the Notification rules above.
 
 ## Git
 
