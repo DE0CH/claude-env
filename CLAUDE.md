@@ -66,9 +66,18 @@ over the directory). It controls Android/iOS phones through the Mobilerun API
 (api.mobilerun.ai). Works anywhere with network access — no Mac/USB needed, unlike
 `drive-iphone`. The API key here is `MOBILERUN_API` (not `MOBILERUN_API_KEY` as the
 skill's docs assume) — run `export MOBILERUN_API_KEY="$MOBILERUN_API"` before using the
-skill's curl commands. No payment method is on the Mobilerun account yet, so paid
-features (agent tasks, cloud devices) may fail with 402/403 billing errors — ping me on
-Discord per the Tools policy above instead of working around.
+skill's curl commands.
+
+Billing: the account is pay-as-you-go with a credit balance (no subscription). The
+vendored skill's docs don't mention it, but `POST /devices` takes a `billing` query
+param — pass `billing=minute` to bill per-minute from credits; the default (`auto`)
+falls back to per-minute too, but plain subscription-style calls return 402
+PAYMENT_REQUIRED. Valid deviceTypes (2026-08): `dedicated_premium_device`,
+`dedicated_ios_device`, `dedicated_emulated_device`, `ios_simulator` — but only
+premium is actually live; emulated/simulator return 404, and premium returns 429
+RESOURCE_EXHAUSTED when the shared phone pool has no free device (retry later; not a
+billing problem). Full current API surface: https://api.mobilerun.ai/v1/openapi.json.
+For real billing issues (402), ping me on Discord per the Tools policy above.
 
 ## Notification
 
