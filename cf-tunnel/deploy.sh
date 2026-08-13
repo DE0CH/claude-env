@@ -72,13 +72,20 @@ CSECRET="$(printf '%s' "$ST_JSON" | jq -r '.result.client_secret // empty')"
 
 # 6. Access policies: allow the email OR the service token --------------------
 say "writing Access policies"
-POLICY_BODY="$(cat <<JSON
-{"name":"allow-owner-and-agent","decision":"allow","precedence":1,
- "include":[{"email":{"email":"$ALLOWED_EMAIL"}},{"service_token":{"token_id":"$CID"}}]}
+# identity policy: allow the owner's email (one-time PIN login)
+EMAIL_POLICY="$(cat <<JSON
+{"name":"allow-owner-email","decision":"allow","precedence":1,
+ "include":[{"email":{"email":"chendeyao000@gmail.com"}}]}
 JSON
 )"
-# non-identity policy so the service token alone (no login) is accepted
-api -X POST "$API/accounts/$ACCOUNT_ID/access/apps/$APP_ID/policies" --data "$POLICY_BODY" >/dev/null || true
+api -X POST "$API/accounts/$ACCOUNT_ID/access/apps/$APP_ID/policies" --data "$EMAIL_POLICY" >/dev/null || true
+# non-identity policy: allow the container agent's service token (no login)
+SVC_POLICY="$(cat <<JSON
+{"name":"allow-agent-service-token","decision":"non_identity","precedence":2,
+ "include":[{"service_token":{"token_id":"$CID"}}]}
+JSON
+)"
+api -X POST "$API/accounts/$ACCOUNT_ID/access/apps/$APP_ID/policies" --data "$SVC_POLICY" >/dev/null || true
 
 # 7. Write the container agent's env (local disk only) ------------------------
 umask 077
