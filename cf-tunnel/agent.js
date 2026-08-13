@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Container-side tunnel agent (see ngrok.md).
+ * Container-side tunnel agent (see tunnel.md).
  *
  * Opens an outbound WebSocket to the Cloudflare Worker (worker.js) and
  * proxies forwarded HTTP requests to the local content server.

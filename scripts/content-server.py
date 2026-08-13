@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Local content server for the ngrok workflow (see ngrok.md).
+"""Local content server for the cf-tunnel workflow (see tunnel.md).
 
 Serves a directory of HTML/content AND accepts private data submissions
 that land on local disk only — never in the chat transcript.
 
 Usage:
-    python3 scripts/content-server.py [--port 8899] [--dir ~/ngrok-share] \
+    python3 scripts/content-server.py [--port 8899] [--dir ~/tunnel-share] \
         [--drop ~/drop] [--token SECRET]
 
 Routes (all prefixed with /<token>/ when --token is set):
@@ -190,7 +190,7 @@ class Handler(BaseHTTPRequestHandler):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--port", type=int, default=8899)
-    ap.add_argument("--dir", default=os.path.expanduser("~/ngrok-share"))
+    ap.add_argument("--dir", default=os.path.expanduser("~/tunnel-share"))
     ap.add_argument("--drop", default=os.path.expanduser("~/drop"))
     ap.add_argument("--token", default="", help="require this path prefix on all URLs")
     args = ap.parse_args()

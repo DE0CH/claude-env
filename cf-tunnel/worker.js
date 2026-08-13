@@ -1,5 +1,5 @@
 /**
- * Cloudflare Worker tunnel edge (see ngrok.md).
+ * Cloudflare Worker tunnel edge (see tunnel.md).
  *
  * A container-side agent (agent.js) opens an outbound WebSocket to
  * /__agent; every HTTP request hitting this Worker is forwarded over that

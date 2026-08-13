@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Deploy the Cloudflare tunnel edge + set up Access (see ngrok.md).
+# Deploy the Cloudflare tunnel edge + set up Access (see tunnel.md).
 #
 # Prereqs:
 #   - ~/drop/cftoken  : a Cloudflare API token with permissions

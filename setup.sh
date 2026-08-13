@@ -6,12 +6,9 @@
 #   - mobilecli  (MobileNext skills; needs Node/npm)
 #   - curl + jq   (ScrapingBee skill, Discord/lobster notifications)
 #   - ffmpeg      (audio work; pip imageio-ffmpeg fallback when apt is broken)
-#   - ngrok       (local content / private-drop workflow — see ngrok.md;
-#                  authtoken from NGORK_API. Note: cannot connect from
-#                  Claude-on-the-web containers, install is still harmless)
+#   - wrangler+ws (cf-tunnel local content / private-drop workflow — see tunnel.md)
 #   - secrets     (~/.secrets or env: LOBSTER_TOKEN, SCRAPINGBEE_TOKEN,
-#                  BROWSERBASE_API_KEY, OPENROUTER_API, MOBILENEXT_API,
-#                  NGORK_API)
+#                  BROWSERBASE_API_KEY, OPENROUTER_API, MOBILENEXT_API)
 #
 # Idempotent: safe to re-run. Exits non-zero only if a required install fails;
 # missing secrets are warnings (they may be injected as env vars separately).
@@ -129,7 +126,7 @@ else
   fi
 fi
 
-# --- cf-tunnel tooling: wrangler + ws (see ngrok.md / cf-tunnel/) ------------
+# --- cf-tunnel tooling: wrangler + ws (see tunnel.md / cf-tunnel/) -----------
 # The Cloudflare Worker tunnel edge is deployed with wrangler; the container
 # agent (cf-tunnel/agent.js) needs the `ws` package.
 
@@ -152,34 +149,6 @@ else
   warn "cf-tunnel tooling skipped (no npm)"
 fi
 
-# --- ngrok (see ngrok.md) ---------------------------------------------------
-
-if command -v ngrok >/dev/null 2>&1; then
-  log "ngrok already installed ($(ngrok version 2>/dev/null | head -1))"
-else
-  case "$(uname -s)" in
-    Darwin)
-      if command -v brew >/dev/null 2>&1 && brew install ngrok >/dev/null 2>&1; then
-        log "installed ngrok via brew"
-      else
-        warn "could not install ngrok via brew"
-      fi
-      ;;
-    Linux)
-      NGROK_ARCH=amd64
-      [ "$(uname -m)" = "aarch64" ] && NGROK_ARCH=arm64
-      if curl -fsSL "https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-linux-${NGROK_ARCH}.tgz" \
-          -o /tmp/ngrok.tgz \
-        && tar -xzf /tmp/ngrok.tgz -C "$HOME/.local/bin" ngrok; then
-        rm -f /tmp/ngrok.tgz
-        log "installed ngrok to ~/.local/bin"
-      else
-        warn "could not install ngrok"
-      fi
-      ;;
-  esac
-fi
-
 # --- secrets ----------------------------------------------------------------
 
 if [ -f "$HOME/.secrets" ]; then
@@ -189,16 +158,7 @@ else
   log "~/.secrets not found (secrets may be provided as env vars instead)"
 fi
 
-# authtoken needs the secrets loaded, so this runs after them
-if command -v ngrok >/dev/null 2>&1 && [ -n "${NGORK_API:-}" ]; then
-  if ngrok config add-authtoken "$NGORK_API" >/dev/null 2>&1; then
-    log "ngrok authtoken configured from NGORK_API"
-  else
-    warn "ngrok config add-authtoken failed"
-  fi
-fi
-
-for var in LOBSTER_TOKEN SCRAPINGBEE_TOKEN BROWSERBASE_API_KEY OPENROUTER_API MOBILENEXT_API NGORK_API; do
+for var in LOBSTER_TOKEN SCRAPINGBEE_TOKEN BROWSERBASE_API_KEY OPENROUTER_API MOBILENEXT_API; do
   if [ -n "${!var:-}" ]; then
     log "$var is set"
   else

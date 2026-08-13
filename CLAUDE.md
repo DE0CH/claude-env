@@ -103,15 +103,28 @@ merge first with APKEditor (`java -jar APKEditor.jar m -i app.xapk -o merged.apk
 and re-sign with uber-apk-signer (both on GitHub releases; java is available), then
 upload the `*-aligned-debugSigned.apk`.
 
-## ngrok + local HTML content / private data drops
+## Cloudflare tunnel + local HTML content / private data drops
 
 When I ask for an HTML explanation/report/demo, or need to hand you data that must
-not end up in the chat transcript: build the content as local files, serve it with
-`scripts/content-server.py`, tunnel it with ngrok, and discord me the URL. The
-server's `/drop` form writes my submissions to `~/drop/` on local disk so you can
-use them without ever printing them. Full workflow, transcript-hygiene rules, and
-the (verified) fallbacks for Claude-on-the-web containers — where ngrok cannot
-connect — are in @ngrok.md. The ngrok authtoken is in `NGORK_API` (sic).
+not end up in the chat transcript: build the content as local files under
+`~/tunnel-share`, serve it with `scripts/content-server.py`, and expose it through
+the **cf-tunnel** Cloudflare Worker so I reach it at the fixed private URL
+`https://tunnel.deyaochen.com/` (Cloudflare Access lets in only my email; the
+`/drop` form writes my submissions to `~/drop/` on local disk so you use them
+without ever printing them).
+
+The Cloudflare side (Worker, route, Access) is already deployed and permanent —
+each session you just restart the two local processes:
+
+```bash
+python3 scripts/content-server.py --port 8899 &
+set -a; . ~/drop/tunnel.env; set +a && node cf-tunnel/agent.js &
+```
+
+then discord me the link. If `~/drop/tunnel.env` is missing (fresh container with
+nothing dropped yet), re-run the one-time deploy with an API token per
+@tunnel.md. Full workflow, transcript-hygiene rules, redeploy steps, and
+no-tunnel fallbacks are in @tunnel.md.
 
 ## Notification
 
