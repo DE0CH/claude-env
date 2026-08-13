@@ -36,6 +36,11 @@ Always create Browserbase sessions with `--timeout 3600` (1 hour). The default t
 is ~5 minutes and kills the session mid-task whenever you're waiting on something slow
 (e.g. Deyao replying with an OTP), losing all page state.
 
+Use a browser session without a proxy first. If a website flow then fails for no clear
+reason (instant rejections, failed payments/verifications, captchas, auto-bounces),
+consider that it may be IP reputation: retry the same flow in a Browserbase session
+created with a residential proxy (`--proxies`) before giving up.
+
 When Deyao is watching a Browserbase session via the live view (debugger URL): those URLs
 are pinned to a specific page/tab, so whenever the session is recreated, a new tab is
 opened, or the page the link points at otherwise changes, immediately send him the fresh
