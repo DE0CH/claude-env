@@ -54,41 +54,55 @@ in front of the public hostname `tunnel.deyaochen.com`, so only Deyao's email
 gets in via the browser; the agent authenticates with an Access **service
 token** (no login).
 
-### One-time deploy (needs a Cloudflare API token)
+### Secrets live in the environment, not files
 
-Token permissions (create in dash → My Profile → API Tokens; the "Edit
-Cloudflare Workers" template + three extra perms covers it):
-- Account: Workers Scripts **Edit**, Access: Apps and Policies **Edit**,
-  Access: Service Tokens **Edit**, Account Settings **Read**
-- Zone `deyaochen.com`: DNS **Edit**, Workers Routes **Edit**, Zone **Read**
+The container is ephemeral: a new session finds nothing that isn't in the git
+repo, so credentials come from **environment variables** (set once in the CCR
+environment config, like `LOBSTER_TOKEN`):
 
-Put the token in `~/drop/cftoken` (via the ppng.io drop, never the transcript),
-then:
+- `CLOUDFLARE_API` — the Cloudflare API token (used only to run `deploy.sh`).
+- `CF_ACCESS_CLIENT_ID` / `CF_ACCESS_CLIENT_SECRET` — the Access service token
+  the agent uses every session. `deploy.sh` mints these and tells you to add
+  them to the environment config.
+
+### One-time deploy (already done; re-run only to re-provision)
+
+`CLOUDFLARE_API` must be a token with: Account Workers Scripts **Edit**,
+Access: Apps and Policies **Edit**, Access: Service Tokens **Edit**, Account
+Settings **Read**; Zone `deyaochen.com` DNS **Edit**, Workers Routes **Edit**,
+Zone **Read**. Then:
 
 ```bash
 cd cf-tunnel && ./deploy.sh
 ```
 
-`deploy.sh` deploys the Worker, points `tunnel.deyaochen.com` at it (proxied DNS
-record + Worker route), creates the Access app + a policy allowing Deyao's email
-and one allowing the agent's service token, mints the service token, and writes
-the agent's env to `~/drop/tunnel.env` (client id/secret included — local disk
-only, 0600). It's idempotent on re-run.
-
-Account id `ee3b4deef856baf11e1a67b242438325`, zone id
-`f51ca95ee5e6c664372000f887c96a92` are baked into `deploy.sh`.
+`deploy.sh` reads `CLOUDFLARE_API` (falls back to `~/drop/cftoken`), deploys the
+Worker, points `tunnel.deyaochen.com` at it (proxied DNS record + Worker route),
+creates the Access app with a policy for Deyao's email and one for the agent's
+service token, mints the service token, and writes its creds to
+`~/drop/service-token` (0600, secret kept out of stdout). Add the two printed
+`CF_ACCESS_*` vars to the environment config. Idempotent on re-run. Account id
+`ee3b4deef856baf11e1a67b242438325`, zone id
+`f51ca95ee5e6c664372000f887c96a92` are baked in.
 
 ### Each session (serve content through the tunnel)
 
+The agent reads `CF_ACCESS_CLIENT_ID` / `CF_ACCESS_CLIENT_SECRET` from the
+environment (and defaults `wss://tunnel.deyaochen.com/__agent` +
+`http://127.0.0.1:8899`), so bring-up is just:
+
 ```bash
-# 1. content in ~/tunnel-share, drops land in ~/drop
+# content in ~/tunnel-share, drops land in ~/drop
 python3 scripts/content-server.py --port 8899 &
-# 2. bring up the agent with the saved env
-set -a; . ~/drop/tunnel.env; set +a
+# agent — no file needed; creds come from the environment
 node cf-tunnel/agent.js &
-# 3. the private URL is always the same: https://tunnel.deyaochen.com/
-#    Deyao logs in via Cloudflare Access once per device; discord him the link.
+# the private URL is always https://tunnel.deyaochen.com/
+# Deyao logs in via Cloudflare Access once per device; discord him the link.
 ```
+
+(If the `CF_ACCESS_*` vars aren't in the environment yet — e.g. before they've
+been added to the config — source `~/drop/service-token` from the last deploy,
+or re-run `deploy.sh`.)
 
 Deyao logs in the first time on each device via Cloudflare Access: visiting
 `https://tunnel.deyaochen.com/` redirects to a one-time-PIN prompt, the PIN goes

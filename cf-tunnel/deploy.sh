@@ -1,28 +1,35 @@
 #!/usr/bin/env bash
 # Deploy the Cloudflare tunnel edge + set up Access (see tunnel.md).
 #
-# Prereqs:
-#   - ~/drop/cftoken  : a Cloudflare API token with permissions
-#       Account: Workers Scripts:Edit, Access: Apps and Policies:Edit,
-#                Access: Service Tokens:Edit, Account Settings:Read
-#       Zone (deyaochen.com): DNS:Edit, Workers Routes:Edit, Zone:Read
-#   - wrangler, curl, jq on PATH
+# One-time setup. The container is ephemeral, so this reads the Cloudflare API
+# token from the environment variable CLOUDFLARE_API (set in the CCR
+# environment config, like the other secrets), NOT a file. Falls back to
+# ~/drop/cftoken if the env var is not present in this session yet.
 #
-# Idempotent-ish: re-running updates the Worker and re-uses existing Access
-# app / service token by name where possible.
+# Token permissions:
+#   Account: Workers Scripts:Edit, Access: Apps and Policies:Edit,
+#            Access: Service Tokens:Edit, Account Settings:Read
+#   Zone (deyaochen.com): DNS:Edit, Workers Routes:Edit, Zone:Read
+# Requires wrangler, curl, jq on PATH.
 #
-# Outputs (local disk only, never printed):
-#   ~/drop/tunnel.env  : the container agent's env (worker url, secret, service token)
+# On success it prints the two Access service-token values (CF_ACCESS_CLIENT_ID
+# and CF_ACCESS_CLIENT_SECRET) that must be added to the environment's variables
+# so future sessions' agents can authenticate. These are the ONLY per-agent
+# secrets; everything else is either in the repo or on Cloudflare.
 set -euo pipefail
 
 HOSTNAME="tunnel.deyaochen.com"
 WORKER_NAME="claude-tunnel"
 ACCOUNT_ID="ee3b4deef856baf11e1a67b242438325"
 ZONE_ID="f51ca95ee5e6c664372000f887c96a92"
-ALLOWED_EMAIL="${ALLOWED_EMAIL:-chendeyao.hk@gmail.com}"
 HERE="$(cd "$(dirname "$0")" && pwd)"
 
-TOKEN="$(cat ~/drop/cftoken)"
+TOKEN="${CLOUDFLARE_API:-}"
+[ -z "$TOKEN" ] && [ -f ~/drop/cftoken ] && TOKEN="$(cat ~/drop/cftoken)"
+if [ -z "$TOKEN" ]; then
+  echo "No Cloudflare API token: set CLOUDFLARE_API in the environment (or drop ~/drop/cftoken)." >&2
+  exit 1
+fi
 export CLOUDFLARE_API_TOKEN="$TOKEN"
 export CLOUDFLARE_ACCOUNT_ID="$ACCOUNT_ID"
 API="https://api.cloudflare.com/client/v4"
@@ -31,19 +38,10 @@ auth=(-H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json")
 say() { printf '==> %s\n' "$*"; }
 api() { curl -s "${auth[@]}" "$@"; }
 
-# 1. Worker secret (shared agent secret) --------------------------------------
-if [ ! -f ~/drop/agent_secret ]; then
-  head -c 32 /dev/urandom | base64 | tr -dc 'A-Za-z0-9' | head -c 40 > ~/drop/agent_secret
-  chmod 600 ~/drop/agent_secret
-fi
-AGENT_SECRET="$(cat ~/drop/agent_secret)"
-
-# 2. Deploy the Worker --------------------------------------------------------
+# 1. Deploy the Worker --------------------------------------------------------
+# No AGENT_SECRET: Cloudflare Access (service token) is the auth for /__agent.
 say "deploying Worker $WORKER_NAME"
-( cd "$HERE" && printf '%s' "$AGENT_SECRET" | wrangler secret put AGENT_SECRET --name "$WORKER_NAME" >/dev/null 2>&1 || true )
 ( cd "$HERE" && wrangler deploy >/tmp/wrangler-deploy.log 2>&1 ) || { echo "wrangler deploy failed:"; cat /tmp/wrangler-deploy.log; exit 1; }
-# secret again after first deploy in case the script did not exist yet
-( cd "$HERE" && printf '%s' "$AGENT_SECRET" | wrangler secret put AGENT_SECRET --name "$WORKER_NAME" >/dev/null 2>&1 || true )
 
 # 3. Route the hostname to the Worker ----------------------------------------
 # The Workers Custom Domains API (PUT /workers/domains) returns a 10000 auth
@@ -79,7 +77,7 @@ fi
 
 # 5. Service token (for the container agent to bypass the login) --------------
 # Delete any existing token of this name first (its secret is unrecoverable,
-# so we always mint a fresh one and write it to tunnel.env).
+# so we always mint a fresh one and emit it for the environment config).
 say "creating Access service token"
 OLD_ST="$(api "$API/accounts/$ACCOUNT_ID/access/service_tokens" | jq -r '.result[]?|select(.name=="claude-container-agent")|.id')"
 for t in $OLD_ST; do api -X DELETE "$API/accounts/$ACCOUNT_ID/access/service_tokens/$t" >/dev/null || true; done
@@ -111,17 +109,20 @@ JSON
 )"
 api -X POST "$API/accounts/$ACCOUNT_ID/access/apps/$APP_ID/policies" --data "$SVC_POLICY" >/dev/null || true
 
-# 7. Write the container agent's env (local disk only) ------------------------
+# 7. Emit the agent credentials for the environment config --------------------
+# The agent reads these from env vars (CF_ACCESS_CLIENT_ID / _SECRET). Because
+# the container is ephemeral, add them to the CCR environment's variables so
+# every future session has them — do NOT rely on a file. A copy is written to
+# ~/drop/service-token for THIS session's immediate use only.
 umask 077
-cat > ~/drop/tunnel.env <<ENV
-TUNNEL_WORKER_URL=wss://$HOSTNAME/__agent
-TUNNEL_AGENT_SECRET=$AGENT_SECRET
-CF_ACCESS_CLIENT_ID=$CID
-CF_ACCESS_CLIENT_SECRET=$CSECRET
-TUNNEL_TARGET=http://127.0.0.1:8899
-ENV
-chmod 600 ~/drop/tunnel.env
+printf 'CF_ACCESS_CLIENT_ID=%s\nCF_ACCESS_CLIENT_SECRET=%s\n' "$CID" "$CSECRET" > ~/drop/service-token
+chmod 600 ~/drop/service-token
 
 say "done. Public URL: https://$HOSTNAME/  (Access-gated: chendeyao000@gmail.com)"
-say "agent env written to ~/drop/tunnel.env"
-say "next: python3 scripts/content-server.py --port 8899 & ; set -a; . ~/drop/tunnel.env; set +a; node cf-tunnel/agent.js &"
+echo
+echo "Service-token creds written to ~/drop/service-token (CF_ACCESS_CLIENT_ID,"
+echo "CF_ACCESS_CLIENT_SECRET). The SECRET is not printed here to keep it out of"
+echo "the transcript. Add both to the environment config so future sessions have"
+echo "them, then relay them to Deyao via Discord (never echo the secret)."
+echo
+say "run the agent this session: set -a; . ~/drop/service-token; set +a; node cf-tunnel/agent.js &"

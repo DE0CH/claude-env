@@ -5,12 +5,19 @@
  * Opens an outbound WebSocket to the Cloudflare Worker (worker.js) and
  * proxies forwarded HTTP requests to the local content server.
  *
+ * The container is ephemeral: everything not in the git repo must come from
+ * the environment. So the credentials are read from environment variables
+ * (set once in the CCR environment config, like LOBSTER_TOKEN etc.), NOT a
+ * file on disk.
+ *
  * Env:
- *   TUNNEL_WORKER_URL   wss://<name>.<subdomain>.workers.dev/__agent (required)
- *   TUNNEL_AGENT_SECRET shared secret, must match the Worker's AGENT_SECRET (required)
  *   CF_ACCESS_CLIENT_ID / CF_ACCESS_CLIENT_SECRET
- *                       Access service token (required once Access is enabled)
+ *                       Access service token (REQUIRED). Minted by deploy.sh;
+ *                       add both to the environment's variables.
+ *   TUNNEL_WORKER_URL   default wss://tunnel.deyaochen.com/__agent
  *   TUNNEL_TARGET       local origin to proxy to (default http://127.0.0.1:8899)
+ *   TUNNEL_AGENT_SECRET optional; only needed if the Worker was deployed with
+ *                       an AGENT_SECRET (defense-in-depth; off by default).
  *
  * Requires the `ws` package (npm install -g ws; setup.sh does this).
  */
@@ -21,11 +28,16 @@ try {
 } catch {}
 const WebSocket = require("ws");
 
-const WORKER_URL = process.env.TUNNEL_WORKER_URL;
-const AGENT_SECRET = process.env.TUNNEL_AGENT_SECRET;
+const WORKER_URL = process.env.TUNNEL_WORKER_URL || "wss://tunnel.deyaochen.com/__agent";
 const TARGET = process.env.TUNNEL_TARGET || "http://127.0.0.1:8899";
-if (!WORKER_URL || !AGENT_SECRET) {
-  console.error("TUNNEL_WORKER_URL and TUNNEL_AGENT_SECRET are required");
+const AGENT_SECRET = process.env.TUNNEL_AGENT_SECRET; // optional
+const ACCESS_ID = process.env.CF_ACCESS_CLIENT_ID;
+const ACCESS_SECRET = process.env.CF_ACCESS_CLIENT_SECRET;
+if (!ACCESS_ID || !ACCESS_SECRET) {
+  console.error(
+    "CF_ACCESS_CLIENT_ID and CF_ACCESS_CLIENT_SECRET are required " +
+    "(set them in the environment; mint with cf-tunnel/deploy.sh).",
+  );
   process.exit(1);
 }
 
@@ -33,11 +45,11 @@ const MAX_BODY = 25 * 1024 * 1024;
 let backoff = 1000;
 
 function connect() {
-  const headers = { "x-agent-secret": AGENT_SECRET };
-  if (process.env.CF_ACCESS_CLIENT_ID) {
-    headers["CF-Access-Client-Id"] = process.env.CF_ACCESS_CLIENT_ID;
-    headers["CF-Access-Client-Secret"] = process.env.CF_ACCESS_CLIENT_SECRET;
-  }
+  const headers = {
+    "CF-Access-Client-Id": ACCESS_ID,
+    "CF-Access-Client-Secret": ACCESS_SECRET,
+  };
+  if (AGENT_SECRET) headers["x-agent-secret"] = AGENT_SECRET;
   const ws = new WebSocket(WORKER_URL, { headers });
   let pingTimer;
 

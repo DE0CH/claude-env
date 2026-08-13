@@ -113,18 +113,23 @@ the **cf-tunnel** Cloudflare Worker so I reach it at the fixed private URL
 `/drop` form writes my submissions to `~/drop/` on local disk so you use them
 without ever printing them).
 
-The Cloudflare side (Worker, route, Access) is already deployed and permanent —
-each session you just restart the two local processes:
+The container is ephemeral, so anything not in this repo comes from the
+environment: my secrets are environment variables, not files. The Cloudflare
+side (Worker, route, Access) is already deployed and permanent, and the agent's
+Access service-token creds live in env vars `CF_ACCESS_CLIENT_ID` /
+`CF_ACCESS_CLIENT_SECRET`. So each session just restarts the two local
+processes (the agent reads its creds from the environment):
 
 ```bash
 python3 scripts/content-server.py --port 8899 &
-set -a; . ~/drop/tunnel.env; set +a && node cf-tunnel/agent.js &
+node cf-tunnel/agent.js &
 ```
 
-then discord me the link. If `~/drop/tunnel.env` is missing (fresh container with
-nothing dropped yet), re-run the one-time deploy with an API token per
-@tunnel.md. Full workflow, transcript-hygiene rules, redeploy steps, and
-no-tunnel fallbacks are in @tunnel.md.
+then discord me the link `https://tunnel.deyaochen.com/`. If those two env vars
+aren't set (or the tunnel needs re-provisioning), re-run `cf-tunnel/deploy.sh` —
+it uses the Cloudflare API token in env var `CLOUDFLARE_API` and prints the two
+service-token vars to add to the environment config. Full workflow,
+transcript-hygiene rules, and no-tunnel fallbacks are in @tunnel.md.
 
 ## Notification
 

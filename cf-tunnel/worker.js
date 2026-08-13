@@ -45,7 +45,11 @@ export class Tunnel {
       if (request.headers.get("Upgrade") !== "websocket") {
         return new Response("expected websocket", { status: 426 });
       }
-      if (request.headers.get("x-agent-secret") !== this.env.AGENT_SECRET) {
+      // Cloudflare Access already gates this hostname (the agent presents an
+      // Access service token). AGENT_SECRET is optional defense-in-depth:
+      // enforced only if it is configured on the Worker.
+      if (this.env.AGENT_SECRET &&
+          request.headers.get("x-agent-secret") !== this.env.AGENT_SECRET) {
         return new Response("forbidden", { status: 403 });
       }
       const pair = new WebSocketPair();
