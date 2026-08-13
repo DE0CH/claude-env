@@ -56,29 +56,6 @@ patterns, recovery, and teardown. Mac host only (USB + `~/.venvs/ios` tooling; n
 available in container pods). Build/signing infra lives in the private repo
 `DE0CH/wda-build`; hard-won pitfalls are in @lessons.md.
 
-## Mobilerun (phone control via cloud API)
-
-The `mobilerun` skill (`.claude/skills/mobilerun/`) is the official published skill
-from https://github.com/droidrun/skills, vendored verbatim (identical to the packaged
-`mobilerun.skill` in their latest release — do not hand-edit it; to update, re-download
-https://github.com/droidrun/skills/releases/latest/download/mobilerun.skill and unzip
-over the directory). It controls Android/iOS phones through the Mobilerun API
-(api.mobilerun.ai). Works anywhere with network access — no Mac/USB needed, unlike
-`drive-iphone`. The API key here is `MOBILERUN_API` (not `MOBILERUN_API_KEY` as the
-skill's docs assume) — run `export MOBILERUN_API_KEY="$MOBILERUN_API"` before using the
-skill's curl commands.
-
-Billing: the account is pay-as-you-go with a credit balance (no subscription). The
-vendored skill's docs don't mention it, but `POST /devices` takes a `billing` query
-param — pass `billing=minute` to bill per-minute from credits; the default (`auto`)
-falls back to per-minute too, but plain subscription-style calls return 402
-PAYMENT_REQUIRED. Valid deviceTypes (2026-08): `dedicated_premium_device`,
-`dedicated_ios_device`, `dedicated_emulated_device`, `ios_simulator` — but only
-premium is actually live; emulated/simulator return 404, and premium returns 429
-RESOURCE_EXHAUSTED when the shared phone pool has no free device (retry later; not a
-billing problem). Full current API surface: https://api.mobilerun.ai/v1/openapi.json.
-For real billing issues (402), ping me on Discord per the Tools policy above.
-
 ## Notification
 
 You should just assume that I am not paying attention to the text output that you are generating.
