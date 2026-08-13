@@ -56,6 +56,26 @@ patterns, recovery, and teardown. Mac host only (USB + `~/.venvs/ios` tooling; n
 available in container pods). Build/signing infra lives in the private repo
 `DE0CH/wda-build`; hard-won pitfalls are in @lessons.md.
 
+## MobileNext (cloud phones + mobile automation)
+
+The official MobileNext skills are vendored in `.claude/skills/mobilewright` and
+`.claude/skills/mobilecli` (from `mobile-next/mobilewright-skill` @ 24e0c21 and
+`mobile-next/mobilecli` @ 79bf822 — to update, re-copy `skills/<name>/SKILL.md` from
+those repos). They drive iOS/Android devices: local ones via mobilecli, and Mobile
+Next Cloud real devices (works from container pods, no Mac/USB needed).
+
+The API key lives in `MOBILENEXT_API` (not `MOBILENEXT_API_KEY` as the docs assume) —
+run `export MOBILENEXT_API_KEY="$MOBILENEXT_API"` first. Auth is
+`Authorization: Bearer $MOBILENEXT_API_KEY` against `https://api.mobilenext.ai`
+(sanity check: `GET /api/v1/keys`). For cloud devices from Claude Code, the MCP
+server is `claude mcp add mobilenext --transport http https://app.mobilenext.ai/mcp`;
+mobilewright targets the cloud by adding
+`driver: { type: 'mobilenext', apiKey: process.env['MOBILENEXT_API_KEY'] }` to
+`mobilewright.config.ts` (falls back to local devices via mobilecli when unset).
+Dashboard: app.mobilenext.ai. No payment method is on the account yet, so paid cloud
+usage may fail with billing errors (402) — ping me on Discord per the Tools policy
+above instead of working around.
+
 ## Notification
 
 You should just assume that I am not paying attention to the text output that you are generating.

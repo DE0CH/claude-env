@@ -3,10 +3,11 @@
 #
 # Installs/verifies the tooling that CLAUDE.md and the bundled skills rely on:
 #   - browse CLI (Browserbase skill; needs Node/npm)
+#   - mobilecli  (MobileNext skills; needs Node/npm)
 #   - curl + jq   (ScrapingBee skill, Discord/lobster notifications)
 #   - ffmpeg      (audio work; pip imageio-ffmpeg fallback when apt is broken)
 #   - secrets     (~/.secrets or env: LOBSTER_TOKEN, SCRAPINGBEE_TOKEN,
-#                  BROWSERBASE_API_KEY, OPENROUTER_API)
+#                  BROWSERBASE_API_KEY, OPENROUTER_API, MOBILENEXT_API)
 #
 # Idempotent: safe to re-run. Exits non-zero only if a required install fails;
 # missing secrets are warnings (they may be injected as env vars separately).
@@ -91,6 +92,16 @@ else
   fail "browse CLI not installed (no npm)"
 fi
 
+# --- mobilecli (MobileNext skills) ------------------------------------------
+
+if command -v mobilecli >/dev/null 2>&1; then
+  log "mobilecli already installed ($(mobilecli --version 2>/dev/null || echo ok))"
+elif command -v npm >/dev/null 2>&1 && npm install -g mobilecli >/dev/null 2>&1; then
+  log "installed mobilecli via npm"
+else
+  warn "could not install mobilecli (mobilewright still works via npx)"
+fi
+
 # --- ffmpeg -----------------------------------------------------------------
 
 if command -v ffmpeg >/dev/null 2>&1; then
@@ -123,7 +134,7 @@ else
   log "~/.secrets not found (secrets may be provided as env vars instead)"
 fi
 
-for var in LOBSTER_TOKEN SCRAPINGBEE_TOKEN BROWSERBASE_API_KEY OPENROUTER_API; do
+for var in LOBSTER_TOKEN SCRAPINGBEE_TOKEN BROWSERBASE_API_KEY OPENROUTER_API MOBILENEXT_API; do
   if [ -n "${!var:-}" ]; then
     log "$var is set"
   else
