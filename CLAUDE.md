@@ -76,6 +76,16 @@ Dashboard: app.mobilenext.ai. No payment method is on the account yet, so paid c
 usage may fail with billing errors (402) — ping me on Discord per the Tools policy
 above instead of working around.
 
+## ngrok + local HTML content / private data drops
+
+When I ask for an HTML explanation/report/demo, or need to hand you data that must
+not end up in the chat transcript: build the content as local files, serve it with
+`scripts/content-server.py`, tunnel it with ngrok, and discord me the URL. The
+server's `/drop` form writes my submissions to `~/drop/` on local disk so you can
+use them without ever printing them. Full workflow, transcript-hygiene rules, and
+the (verified) fallbacks for Claude-on-the-web containers — where ngrok cannot
+connect — are in @ngrok.md. The ngrok authtoken is in `NGORK_API` (sic).
+
 ## Notification
 
 You should just assume that I am not paying attention to the text output that you are generating.
