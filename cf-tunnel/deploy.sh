@@ -45,11 +45,25 @@ say "deploying Worker $WORKER_NAME"
 # secret again after first deploy in case the script did not exist yet
 ( cd "$HERE" && printf '%s' "$AGENT_SECRET" | wrangler secret put AGENT_SECRET --name "$WORKER_NAME" >/dev/null 2>&1 || true )
 
-# 3. Custom domain tunnel.deyaochen.com --------------------------------------
-say "attaching custom domain $HOSTNAME"
-api -X PUT "$API/accounts/$ACCOUNT_ID/workers/domains" \
-  --data "{\"environment\":\"production\",\"hostname\":\"$HOSTNAME\",\"service\":\"$WORKER_NAME\",\"zone_id\":\"$ZONE_ID\"}" \
-  | jq -e '.success' >/dev/null || say "custom domain: may already exist (continuing)"
+# 3. Route the hostname to the Worker ----------------------------------------
+# The Workers Custom Domains API (PUT /workers/domains) returns a 10000 auth
+# error with this token, so we use the equivalent primitives the token can
+# do: a proxied DNS record + a Worker route. Both are idempotent here.
+say "pointing $HOSTNAME at the Worker (proxied DNS record + route)"
+if [ -z "$(api "$API/zones/$ZONE_ID/dns_records?name=$HOSTNAME" | jq -r '.result[0].id // empty')" ]; then
+  api -X POST "$API/zones/$ZONE_ID/dns_records" \
+    --data "{\"type\":\"A\",\"name\":\"tunnel\",\"content\":\"192.0.2.1\",\"proxied\":true,\"comment\":\"claude-tunnel worker route\"}" \
+    | jq -e '.success' >/dev/null && say "created DNS record" || say "DNS record: continuing"
+else
+  say "DNS record already exists"
+fi
+if [ -z "$(api "$API/zones/$ZONE_ID/workers/routes" | jq -r --arg p "$HOSTNAME/*" '.result[]?|select(.pattern==$p)|.id')" ]; then
+  api -X POST "$API/zones/$ZONE_ID/workers/routes" \
+    --data "{\"pattern\":\"$HOSTNAME/*\",\"script\":\"$WORKER_NAME\"}" \
+    | jq -e '.success' >/dev/null && say "created Worker route" || say "Worker route: continuing"
+else
+  say "Worker route already exists"
+fi
 
 # 4. Cloudflare Access application + policy -----------------------------------
 say "configuring Cloudflare Access for $HOSTNAME"
@@ -64,14 +78,23 @@ else
 fi
 
 # 5. Service token (for the container agent to bypass the login) --------------
+# Delete any existing token of this name first (its secret is unrecoverable,
+# so we always mint a fresh one and write it to tunnel.env).
 say "creating Access service token"
+OLD_ST="$(api "$API/accounts/$ACCOUNT_ID/access/service_tokens" | jq -r '.result[]?|select(.name=="claude-container-agent")|.id')"
+for t in $OLD_ST; do api -X DELETE "$API/accounts/$ACCOUNT_ID/access/service_tokens/$t" >/dev/null || true; done
 ST_JSON="$(api -X POST "$API/accounts/$ACCOUNT_ID/access/service_tokens" \
   --data '{"name":"claude-container-agent","duration":"forever"}')"
-CID="$(printf '%s' "$ST_JSON" | jq -r '.result.client_id // empty')"
+ST_ID="$(printf '%s' "$ST_JSON" | jq -r '.result.id // empty')"          # UUID (for the policy)
+CID="$(printf '%s' "$ST_JSON" | jq -r '.result.client_id // empty')"     # client id (for the agent)
 CSECRET="$(printf '%s' "$ST_JSON" | jq -r '.result.client_secret // empty')"
 
-# 6. Access policies: allow the email OR the service token --------------------
+# 6. Access policies: allow the owner email, and the service token ------------
+# Recreate policies idempotently: remove any we previously made, then add.
 say "writing Access policies"
+for pid in $(api "$API/accounts/$ACCOUNT_ID/access/apps/$APP_ID/policies" | jq -r '.result[]?|select(.name=="allow-owner-email" or .name=="allow-agent-service-token")|.id'); do
+  api -X DELETE "$API/accounts/$ACCOUNT_ID/access/apps/$APP_ID/policies/$pid" >/dev/null || true
+done
 # identity policy: allow the owner's email (one-time PIN login)
 EMAIL_POLICY="$(cat <<JSON
 {"name":"allow-owner-email","decision":"allow","precedence":1,
@@ -79,10 +102,11 @@ EMAIL_POLICY="$(cat <<JSON
 JSON
 )"
 api -X POST "$API/accounts/$ACCOUNT_ID/access/apps/$APP_ID/policies" --data "$EMAIL_POLICY" >/dev/null || true
-# non-identity policy: allow the container agent's service token (no login)
+# non-identity policy: allow the container agent's service token (no login).
+# NOTE: token_id is the service token's UUID (.result.id), NOT the client_id.
 SVC_POLICY="$(cat <<JSON
 {"name":"allow-agent-service-token","decision":"non_identity","precedence":2,
- "include":[{"service_token":{"token_id":"$CID"}}]}
+ "include":[{"service_token":{"token_id":"$ST_ID"}}]}
 JSON
 )"
 api -X POST "$API/accounts/$ACCOUNT_ID/access/apps/$APP_ID/policies" --data "$SVC_POLICY" >/dev/null || true
@@ -98,5 +122,6 @@ TUNNEL_TARGET=http://127.0.0.1:8899
 ENV
 chmod 600 ~/drop/tunnel.env
 
-say "done. Public URL: https://$HOSTNAME/  (Access-gated: $ALLOWED_EMAIL)"
+say "done. Public URL: https://$HOSTNAME/  (Access-gated: chendeyao000@gmail.com)"
 say "agent env written to ~/drop/tunnel.env"
+say "next: python3 scripts/content-server.py --port 8899 & ; set -a; . ~/drop/tunnel.env; set +a; node cf-tunnel/agent.js &"

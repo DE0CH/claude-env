@@ -1,6 +1,10 @@
 name = "claude-tunnel"
 main = "worker.js"
 compatibility_date = "2026-01-01"
+# We serve via the tunnel.deyaochen.com custom domain (attached in deploy.sh),
+# not a *.workers.dev subdomain — skip subdomain enablement so deploy doesn't
+# need User Details / subdomain permissions.
+workers_dev = false
 
 # AGENT_SECRET is a deploy-time secret: npx wrangler secret put AGENT_SECRET
 

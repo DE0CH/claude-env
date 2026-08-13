@@ -140,10 +140,30 @@ node cf-tunnel/agent.js &
 #    Deyao logs in via Cloudflare Access once per device; discord him the link.
 ```
 
-Cloudflare API mutations from the logged-in dashboard are CSRF-blocked (403),
-and the token-permission dropdowns are react-select widgets that are painful to
-drive via the accessibility tree — so create the API token in a real browser
-and drop it, rather than automating the dashboard.
+Deyao logs in the first time on each device via Cloudflare Access: visiting
+`https://tunnel.deyaochen.com/` redirects to a one-time-PIN prompt, the PIN goes
+to chendeyao000@gmail.com (the only allowed identity), and the session lasts
+24h. Unauthenticated requests get a 302 to the login — verified. The container
+agent skips all this with its Access service token.
+
+The `content-server.py` and `agent.js` processes live in the ephemeral
+container, so they must be restarted each session (the deploy — Worker, route,
+Access — is one-time and persists on Cloudflare). The Worker returns 503 when
+the agent isn't connected.
+
+Gotchas learned building this (don't re-derive):
+- The Workers Custom Domains API (`PUT /accounts/…/workers/domains`) returns a
+  10000 auth error even with Workers Scripts:Edit — `deploy.sh` uses a proxied
+  DNS record + a Worker route instead (needs DNS:Edit + Workers Routes:Edit).
+- An Access service-token policy needs the token's **UUID** (`.result.id`),
+  NOT its `client_id`, in `include[].service_token.token_id` — else you get
+  `invalid 'include' configuration` (12130).
+- Cloudflare API mutations from the logged-in dashboard are CSRF-blocked (403),
+  and the token-permission dropdowns are react-select widgets painful to drive
+  via the accessibility tree — so create the API token in a real browser and
+  drop it, rather than automating the dashboard.
+- Background processes started with `&` inside a single Claude Code Bash call do
+  not survive to the next call; run them as detached/background tasks.
 
 ## GitHub workspace pods
 
