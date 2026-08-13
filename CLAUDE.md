@@ -145,6 +145,17 @@ reply from me. I will reply directly in the chat session.
 Always commit and push directly to `main` in general — don't create feature branches unless
 explicitly asked to.
 
+When the push is rejected because the remote has new changes (non-fast-forward), do NOT
+force-push. Integrate first with a rebase, then push:
+
+```bash
+git pull --rebase origin main
+git push origin HEAD:main
+```
+
+Rebasing (not merging) keeps `main` linear — resolve any conflicts during the rebase, then
+push. This is the standard recovery whenever remote `main` has moved ahead of you.
+
 ## Other files
 
 @lobster.md
