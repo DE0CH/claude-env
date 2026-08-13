@@ -143,6 +143,9 @@ for my input, when the task is done, or investigation is complete).
 Discord is one-way only (you send, I don't reply there): do NOT poll Discord waiting for a
 reply from me. I will reply directly in the chat session.
 
+When I ask for a YouTube video summary, send the summary itself to me on Discord — not
+just a "done" ping. Split it across messages to fit Discord's 2000-character limit.
+
 ## Git
 
 Always commit and push directly to `main` in general — don't create feature branches unless
