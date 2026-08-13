@@ -76,9 +76,27 @@ server is `claude mcp add mobilenext --transport http https://app.mobilenext.ai/
 mobilewright targets the cloud by adding
 `driver: { type: 'mobilenext', apiKey: process.env['MOBILENEXT_API_KEY'] }` to
 `mobilewright.config.ts` (falls back to local devices via mobilecli when unset).
-Dashboard: app.mobilenext.ai. No payment method is on the account yet, so paid cloud
-usage may fail with billing errors (402) — ping me on Discord per the Tools policy
-above instead of working around.
+Dashboard: app.mobilenext.ai. If cloud usage fails with billing/credit errors
+(e.g. "account has $0.00 credits"), ping me on Discord per the Tools policy above
+instead of working around.
+
+The MCP server also works without `claude mcp add`: POST JSON-RPC directly to
+`https://app.mobilenext.ai/mcp` with `Authorization: Bearer $MOBILENEXT_API` and
+`Accept: application/json, text/event-stream` (stateless; responses are SSE
+`data:` lines). Tools: `mobilenext_allocate_device`, `mobilenext_list_apps`,
+`mobilenext_click_on_screen_at_coordinates`, `mobilenext_type_keys`,
+`mobilenext_save_screenshot`, etc.
+
+Installing apps on MobileNext cloud Android devices: the Play Store app is signed
+in with a managed Android Enterprise account whose catalog is browsable (open a
+`market://details?id=<pkg>` URL), but arbitrary installs are blocked with "Your
+administrator has not given you access to this item". Sideloading works instead:
+`mobilenext_create_upload` → PUT the APK to the presigned URL →
+`mobilenext_install_app` with the uploadId. The install runs plain `adb install`,
+so only single `.apk` files are accepted — for split-APK apps (XAPK from APKPure),
+merge first with APKEditor (`java -jar APKEditor.jar m -i app.xapk -o merged.apk`)
+and re-sign with uber-apk-signer (both on GitHub releases; java is available), then
+upload the `*-aligned-debugSigned.apk`.
 
 ## ngrok + local HTML content / private data drops
 
