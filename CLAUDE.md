@@ -76,6 +76,9 @@ You should just assume that I am not paying attention to the text output that yo
 So use discord to ping me whenever you need to get my attention (e.g. asking a question, waiting
 for my input, or when the task is done). 
 
+Discord is one-way only (you send, I don't reply there): do NOT poll Discord waiting for a
+reply from me. I will reply directly in the chat session.
+
 ## Git
 
 Always commit and push directly to `main` in general — don't create feature branches unless
