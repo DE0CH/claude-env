@@ -43,6 +43,7 @@ if (!ACCESS_ID || !ACCESS_SECRET) {
 
 const MAX_BODY = 25 * 1024 * 1024;
 let backoff = 1000;
+let replaced = 0;
 
 function connect() {
   const headers = {
@@ -51,10 +52,13 @@ function connect() {
   };
   if (AGENT_SECRET) headers["x-agent-secret"] = AGENT_SECRET;
   const ws = new WebSocket(WORKER_URL, { headers });
-  let pingTimer;
+  let pingTimer, stableTimer;
 
   ws.on("open", () => {
-    backoff = 1000;
+    // only treat the connection as healthy after it survives a while —
+    // during an agent-vs-agent ping-pong (see tunnel.md) each side reconnects
+    // instantly, and resetting backoff here would keep the fight at 1s forever
+    stableTimer = setTimeout(() => { backoff = 1000; replaced = 0; }, 60_000);
     console.log(`[agent] connected to ${WORKER_URL}, proxying to ${TARGET}`);
     // keep the socket warm through idle periods
     pingTimer = setInterval(() => {
@@ -105,6 +109,14 @@ function connect() {
     if (retried) return;
     retried = true;
     clearInterval(pingTimer);
+    clearTimeout(stableTimer);
+    if (why.includes("replaced") && ++replaced === 3) {
+      console.error(
+        "[agent] replaced 3x — another agent is fighting for the tunnel " +
+        "(likely a previous session's container still alive; archive that " +
+        "session — see the stale-agent gotcha in tunnel.md)",
+      );
+    }
     console.error(`[agent] ${why}; reconnecting in ${backoff}ms`);
     setTimeout(connect, backoff);
     backoff = Math.min(backoff * 2, 30_000);

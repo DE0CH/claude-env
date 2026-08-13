@@ -115,6 +115,23 @@ container, so they must be restarted each session (the deploy — Worker, route,
 Access — is one-time and persists on Cloudflare). The Worker returns 503 when
 the agent isn't connected.
 
+### Stale agent from a previous session (verified 2026-08-13)
+
+Only one agent can hold the tunnel: when a new agent connects, the Worker
+closes the old socket with `1012 replaced`. But container reclaim is lazy — a
+finished session's container (and its `agent.js`) can stay alive for hours, and
+since both agents auto-reconnect they fight forever: the agent log ping-pongs
+`connected` / `closed (1012 replaced)` every few seconds and the public URL
+alternates between the old and new containers' content. The agent prints a
+hint after 3 such closes.
+
+Fix: find the old session with `list_sessions` (claude-code-remote MCP) and
+`archive_session` it — that releases its container (reversible via
+`unarchive_session`). Reclaim takes a few minutes and the Worker may report
+`{"agent":true}` on a half-open socket from the dead container meanwhile
+(requests then return "tunnel agent timed out"); just (re)start the local
+agent — it replaces the dead socket and everything settles.
+
 ### Gotchas learned building this (don't re-derive)
 
 - The Workers Custom Domains API (`PUT /accounts/…/workers/domains`) returns a
