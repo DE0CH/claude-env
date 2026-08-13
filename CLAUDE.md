@@ -58,9 +58,12 @@ available in container pods). Build/signing infra lives in the private repo
 
 ## Mobilerun (phone control via cloud API)
 
-The `mobilerun` skill (`.claude/skills/mobilerun/`, vendored from
-https://github.com/droidrun/skills) controls Android/iOS phones through the Mobilerun
-API (api.mobilerun.ai). Works anywhere with network access — no Mac/USB needed, unlike
+The `mobilerun` skill (`.claude/skills/mobilerun/`) is the official published skill
+from https://github.com/droidrun/skills, vendored verbatim (identical to the packaged
+`mobilerun.skill` in their latest release — do not hand-edit it; to update, re-download
+https://github.com/droidrun/skills/releases/latest/download/mobilerun.skill and unzip
+over the directory). It controls Android/iOS phones through the Mobilerun API
+(api.mobilerun.ai). Works anywhere with network access — no Mac/USB needed, unlike
 `drive-iphone`. The API key here is `MOBILERUN_API` (not `MOBILERUN_API_KEY` as the
 skill's docs assume) — run `export MOBILERUN_API_KEY="$MOBILERUN_API"` before using the
 skill's curl commands. No payment method is on the Mobilerun account yet, so paid
