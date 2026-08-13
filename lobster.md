@@ -3,7 +3,9 @@
 There is a Discord bot named **lobster** (Discord username `lobseter`, application/user ID
 `1531420155853406228`) that can DM me directly.
 
-- **Token:** stored as `LOBSTER_TOKEN` somewhere in this environment. It's your job to 
+- **Token:** stored as `LOBSTER_TOKEN` somewhere in this environment. It's your job to
+  find it — check the environment variables first, then `~/.secrets` (source it with
+  `set -a; . ~/.secrets; set +a` as in the snippets below). Never print the token itself.
 
 ## "discord me"
 
