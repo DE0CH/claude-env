@@ -135,7 +135,7 @@ transcript-hygiene rules, and no-tunnel fallbacks are in @tunnel.md.
 
 You should just assume that I am not paying attention to the text output that you are generating.
 So use discord to ping me whenever you need to get my attention (e.g. asking a question, waiting
-for my input, or when the task is done). 
+for my input, when the task is done, or investigation is complete). 
 
 Discord is one-way only (you send, I don't reply there): do NOT poll Discord waiting for a
 reply from me. I will reply directly in the chat session.
