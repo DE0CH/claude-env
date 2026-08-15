@@ -19,8 +19,16 @@ more sensitive accounts.
   above for everything. Only reach for `privileged` when a task genuinely requires
   one of the sensitive accounts, and prefer asking me first if it's not obvious
   that it does.
-- Same usage rules as the regular context (one session at a time, `--persist`,
-  `--timeout 3600`, release sessions when done).
+- **ALWAYS use a UK proxy (London if possible)** for any session on this context —
+  never connect to it without one. Verified working (exits via a London
+  residential ISP):
+
+  ```bash
+  browse cloud sessions create --body '{"projectId":"8f2c3e0b-53ae-4425-828e-79e5fd52a180","browserSettings":{"context":{"id":"6da1d16b-9f4e-4a67-b89e-92ba9824f3b7","persist":true}},"proxies":[{"type":"browserbase","geolocation":{"country":"GB","city":"LONDON"}}],"keepAlive":true,"timeout":3600}'
+  ```
+
+- Same usage rules as the regular context (one session at a time, persist,
+  `timeout 3600`, release sessions when done).
 
 ## How to use it
 

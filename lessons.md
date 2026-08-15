@@ -126,9 +126,11 @@ Goal was: transcript if it exists, otherwise audio → Whisper. What actually wo
 
 ### What didn't work (don't retry these first)
 
-- **Browserbase `--proxies` and `--verified`** are paid/Enterprise-gated on the current
-  plan; `--solve-captchas` does **not** solve Cloudflare Turnstile (tested on
-  cobalt.tools).
+- **Browserbase `--verified`** is paid/Enterprise-gated on the current plan;
+  `--solve-captchas` does **not** solve Cloudflare Turnstile (tested on
+  cobalt.tools). **Proxies now work** (2026-08-15): geolocated proxy sessions
+  (e.g. GB/London, residential exit IP) create fine via the `proxies` array in
+  the session body — see browserbase.md for the working invocation.
 - **Non-web InnerTube clients** (IOS, ANDROID_VR, TVHTML5, MWEB, embedded players):
   `LOGIN_REQUIRED`/`ERROR` from every vantage point tried — Browserbase logged-in session,
   ScrapingBee residential IP (js_scenario evaluate), with or without visitorData. YouTube
