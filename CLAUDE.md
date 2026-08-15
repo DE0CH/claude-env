@@ -169,9 +169,11 @@ When I ask for a **summary** and/or **transcript** of a YouTube video, this is w
 When I ask for **screenshots** of a video (interesting bits, leaked products, key visuals),
 this is what I mean:
 
-- **Download the video at the highest resolution actually available** (try 4K, fall back to
-  1080p — never settle for 720p without checking). loader.to worked before; mechanics and
-  pitfalls are in lessons.md.
+- **Get frames at the highest resolution the video actually has** (check the watch page's
+  format list — never settle for 720p without checking). Downloading the file via loader.to
+  tops out below 4K; for true 4K, screenshot the YouTube player itself at 2160p through the
+  logged-in Browserbase session (seek → pause → element screenshot). Mechanics and pitfalls
+  for both paths are in lessons.md.
 - **Coarse pass:** extract frames at **1-second intervals** across the content (skip
   intros/sponsor segments — use the captions' timestamps to find segment boundaries), and
   review them as tiled contact sheets to locate the interesting moments.
