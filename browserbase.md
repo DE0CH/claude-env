@@ -15,10 +15,10 @@ There is a second persistent context named **privileged** where I keep logins fo
 more sensitive accounts.
 
 - **Context ID:** `6da1d16b-9f4e-4a67-b89e-92ba9824f3b7` (CLI alias: `privileged`)
-- **Do NOT use this context if you can avoid it.** Default to the regular context
-  above for everything. Only reach for `privileged` when a task genuinely requires
-  one of the sensitive accounts, and prefer asking me first if it's not obvious
-  that it does.
+- **Only use this context when I explicitly ask for it.** Default to the regular
+  context above for everything. If you think a task requires `privileged` but I
+  haven't explicitly said to use it, ALWAYS ask me and get my permission first —
+  never decide on your own, no matter how obvious it seems.
 - **ALWAYS use a UK proxy (London if possible)** for any session on this context —
   never connect to it without one. Verified working (exits via a London
   residential ISP):
