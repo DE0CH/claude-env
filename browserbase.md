@@ -9,6 +9,19 @@ signed in as me — do NOT create a new context.
 - **Known logged-in accounts:** YouTube/Google. In a context-backed session youtube.com
   shows `LOGGED_IN: true` and bot-walled videos are playable.
 
+## "privileged" context — sensitive accounts, avoid unless necessary
+
+There is a second persistent context named **privileged** where I keep logins for
+more sensitive accounts.
+
+- **Context ID:** `6da1d16b-9f4e-4a67-b89e-92ba9824f3b7` (CLI alias: `privileged`)
+- **Do NOT use this context if you can avoid it.** Default to the regular context
+  above for everything. Only reach for `privileged` when a task genuinely requires
+  one of the sensitive accounts, and prefer asking me first if it's not obvious
+  that it does.
+- Same usage rules as the regular context (one session at a time, `--persist`,
+  `--timeout 3600`, release sessions when done).
+
 ## How to use it
 
 Create sessions on top of the context. Pass `--persist` so any new logins/cookies
