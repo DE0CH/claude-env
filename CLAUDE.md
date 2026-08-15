@@ -164,6 +164,25 @@ When I ask for a **summary** and/or **transcript** of a YouTube video, this is w
   fine if marked as such. The transcript also gets sent to me on Discord.
 - Both are delivered as plain-text Discord messages per the Notification rules above.
 
+## YouTube video screenshots
+
+When I ask for **screenshots** of a video (interesting bits, leaked products, key visuals),
+this is what I mean:
+
+- **Download the video at the highest resolution actually available** (try 4K, fall back to
+  1080p — never settle for 720p without checking). loader.to worked before; mechanics and
+  pitfalls are in lessons.md.
+- **Coarse pass:** extract frames at **1-second intervals** across the content (skip
+  intros/sponsor segments — use the captions' timestamps to find segment boundaries), and
+  review them as tiled contact sheets to locate the interesting moments.
+- **Fine pass:** for each interesting moment, do a binary-search-like refinement: extract
+  frames at ~0.2 s steps in a narrow window around it and pick the best one (sharpest,
+  best-composed, caption fully visible). Don't trust automated sharpness heuristics blindly —
+  they drift across scene cuts, so verify the chosen frames visually before sending.
+- **Deliver to Discord as image attachments** (up to 10 per message, with a short caption
+  saying what each batch shows). Screenshots are the one exception to the "plain text only,
+  no attachments" Discord rule.
+
 ## Git
 
 Always commit and push directly to `main` in general — don't create feature branches unless
