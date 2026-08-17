@@ -102,6 +102,12 @@
     <button type="submit" id="otpBtn">Send code</button>
   </form>
 
+  <div id="sentView" class="hidden">
+    <div class="big-ok">✅</div>
+    <p class="center" id="sentText">Received.</p>
+    <p class="center"><a href="#" id="againLink" class="hidden" style="color:var(--accent)">Send a different code</a></p>
+  </div>
+
   <div id="doneView" class="hidden">
     <div class="big-ok">✅</div>
     <p class="center" id="doneText">All set — you can close this tab.</p>
@@ -111,7 +117,7 @@
 <script>
 (() => {
   const $ = id => document.getElementById(id);
-  const views = { creds: $('credsForm'), otp: $('otpForm'), done: $('doneView') };
+  const views = { creds: $('credsForm'), otp: $('otpForm'), sent: $('sentView'), done: $('doneView') };
   let current = 'creds', credsSent = false, lastState = '';
 
   function show(name) {
@@ -137,9 +143,11 @@
     try {
       await post('hetzner-creds', { email: $('email').value.trim(), password: $('password').value });
       credsSent = true;
-      setStatus('Credentials received. Claude is logging in — keep this page open in case a 2FA code is needed.', true);
-      $('credsForm').classList.add('hidden');
-      btn.textContent = 'Sent ✓';
+      $('sentText').textContent = 'Credentials received — Claude is logging in.';
+      $('againLink').classList.add('hidden');
+      show('sent');
+      setStatus('Keep this page open in case a 2FA code is needed.', true);
+      btn.disabled = false; btn.textContent = 'Send to Claude';
     } catch (err) {
       btn.disabled = false; btn.textContent = 'Send to Claude';
       $('credsForm').classList.add('shake');
@@ -153,21 +161,27 @@
     const btn = $('otpBtn'); btn.disabled = true; btn.textContent = 'Sending…';
     try {
       await post('hetzner-2fa', { otp: $('otp').value.trim() });
-      setStatus('Code sent — Claude is entering it now.', true);
       $('otp').value = ''; btn.disabled = false; btn.textContent = 'Send code';
+      $('sentText').textContent = 'Code received — Claude is entering it now.';
+      $('againLink').classList.remove('hidden');
+      show('sent');
+      setStatus('Waiting for Claude…', true);
     } catch (err) {
       btn.disabled = false; btn.textContent = 'Send code';
       setStatus('Send failed (' + err.message + ') — try again.', false);
     }
   });
 
+  $('againLink').addEventListener('click', e => { e.preventDefault(); show('otp'); });
+
   async function poll() {
     try {
       const r = await fetch('status.json?t=' + Date.now());
       if (!r.ok) throw 0;
-      const s = await r.json();
-      if (s.state !== lastState) {
-        lastState = s.state;
+      const raw = await r.text();
+      const s = JSON.parse(raw);
+      if (raw !== lastState) {
+        lastState = raw;
         if (s.state === 'need_credentials') {
           show('creds'); setStatus(s.message || 'Waiting for your Hetzner email + password.', false);
         } else if (s.state === 'need_2fa') {
@@ -176,8 +190,7 @@
           setStatus(s.message || 'Claude needs your 2FA code now.', false);
           if (navigator.vibrate) navigator.vibrate(200);
         } else if (s.state === 'processing') {
-          if (credsSent || current === 'creds') show('creds');
-          $('credsForm').classList.add('hidden');
+          if (current !== 'sent') { $('sentText').textContent = 'Working…'; $('againLink').classList.add('hidden'); show('sent'); }
           setStatus(s.message || 'Working — keep this page open.', true);
         } else if (s.state === 'done') {
           show('done');
