@@ -338,6 +338,67 @@ def list_packages(ids, grep=None, **kw):
     return shell(ids, cmd, **kw)
 
 
+# ---------- network / proxy (policy group) ----------
+#
+# eds-aic has a NATIVE transparent proxy built into the policy group
+# (NetRedirectPolicy). No root hackery on the phone needed: point the group
+# at a SOCKS5 endpoint and every instance bound to that group has its traffic
+# transparently redirected. Optional per-target Rules restrict which apps /
+# domains go through the proxy (everything else stays direct) — ideal for
+# giving an outside-China phone a China-resident exit for Chinese apps only,
+# while Google Play etc. stay on the phone's real (Google-reachable) IP.
+#
+# Fields (all under NetRedirectPolicy):
+#   NetRedirect   on|off   master switch
+#   CustomProxy   on|off   manual transparent-proxy config (vs. managed)
+#   ProxyType     socks5   (only socks5 is supported)
+#   HostAddr      IPv4     proxy IP — MUST be a literal IPv4, not a hostname
+#   Port          1-65535
+#   ProxyUserName / ProxyPassword   optional auth
+#   Rules[]       {Target, RuleType}  RuleType: 'domain' (e.g. *.weixin.qq.com)
+#                                     or 'prc' (an app package name). Up to 100.
+#                                     Empty Rules == route ALL traffic.
+
+def get_policy_group(policy_group_id, region=DEFAULT_REGION):
+    for g in api('ListPolicyGroups', region=region,
+                 MaxResults=100).get('PolicyGroupModel', []):
+        if g.get('PolicyGroupId') == policy_group_id:
+            return g
+    raise EcpError(f'policy group {policy_group_id} not found')
+
+
+def set_proxy(policy_group_id, host, port, user=None, password=None,
+              rules=None, region=DEFAULT_REGION):
+    """Enable the transparent SOCKS5 proxy on a policy group.
+
+    host must be an IPv4 literal (the API rejects hostnames). rules is a list
+    of (target, rule_type) where rule_type is 'domain' or 'prc' (package);
+    omit/empty to route ALL traffic through the proxy.
+    """
+    grp = get_policy_group(policy_group_id, region)
+    nrp = {'NetRedirect': 'on', 'CustomProxy': 'on', 'ProxyType': 'socks5',
+           'HostAddr': host, 'Port': str(port)}
+    if user is not None:
+        nrp['ProxyUserName'] = user
+    if password is not None:
+        nrp['ProxyPassword'] = password
+    if rules:
+        nrp['Rules'] = [{'Target': t, 'RuleType': rt} for t, rt in rules]
+    return api('ModifyPolicyGroup', region=region,
+               PolicyGroupId=policy_group_id,
+               PolicyGroupName=grp.get('PolicyGroupName'),
+               NetRedirectPolicy=nrp)
+
+
+def clear_proxy(policy_group_id, region=DEFAULT_REGION):
+    """Disable the transparent proxy on a policy group."""
+    grp = get_policy_group(policy_group_id, region)
+    return api('ModifyPolicyGroup', region=region,
+               PolicyGroupId=policy_group_id,
+               PolicyGroupName=grp.get('PolicyGroupName'),
+               NetRedirectPolicy={'NetRedirect': 'off', 'CustomProxy': 'off'})
+
+
 # ---------- CLI ----------
 
 def _print(obj):
@@ -396,6 +457,22 @@ def main():
     p.add_argument('id'); p.add_argument('url')
     p = sub.add_parser('apps')
     p.add_argument('id'); p.add_argument('--grep')
+    p = sub.add_parser('proxy-show')
+    p.add_argument('policy_group_id')
+    p = sub.add_parser('proxy-set',
+                       help='enable transparent socks5 proxy on a policy group')
+    p.add_argument('policy_group_id')
+    p.add_argument('host', help='proxy IPv4 (hostnames are rejected by the API)')
+    p.add_argument('port', type=int)
+    p.add_argument('--user')
+    p.add_argument('--password')
+    p.add_argument('--rule', action='append', default=[], metavar='TYPE:TARGET',
+                   help="route only matching traffic; TYPE is 'domain' or "
+                        "'prc' (package). e.g. --rule domain:*.weixin.qq.com "
+                        "--rule prc:com.tencent.mm. Repeatable; omit to route "
+                        "ALL traffic.")
+    p = sub.add_parser('proxy-off')
+    p.add_argument('policy_group_id')
 
     a = ap.parse_args()
     r = a.region
@@ -439,6 +516,19 @@ def main():
         _print(install_apk_from_url(a.id, a.url, region=r))
     elif a.cmd == 'apps':
         _print(list_packages(a.id, grep=a.grep, region=r))
+    elif a.cmd == 'proxy-show':
+        _print(get_policy_group(a.policy_group_id, r).get('NetRedirectPolicy'))
+    elif a.cmd == 'proxy-set':
+        rules = []
+        for spec in a.rule:
+            rt, _, tgt = spec.partition(':')
+            if rt not in ('domain', 'prc') or not tgt:
+                sys.exit(f"bad --rule {spec!r}: use domain:TARGET or prc:PKG")
+            rules.append((tgt, rt))
+        _print(set_proxy(a.policy_group_id, a.host, a.port, user=a.user,
+                         password=a.password, rules=rules, region=r))
+    elif a.cmd == 'proxy-off':
+        _print(clear_proxy(a.policy_group_id, r))
 
 
 if __name__ == '__main__':
