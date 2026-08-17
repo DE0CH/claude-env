@@ -134,6 +134,14 @@ it uses the Cloudflare API token in env var `CLOUDFLARE_API` and prints the two
 service-token vars to add to the environment config. Full workflow,
 transcript-hygiene rules, and no-tunnel fallbacks are in @tunnel.md.
 
+## Waiting on external events (live chats, OTPs, slow pages)
+
+Never wait inside a long foreground Bash loop — you get no turn until it exits and
+cannot react mid-wait. Instead run `scripts/watch-dom.sh` (background DOM watcher
+for `browse` sessions: exits the moment its probe changes, waking you with a turn)
+via `run_in_background`, and ALWAYS arm a `send_later` deadman alarm (~10 min)
+alongside it in case the watcher itself hangs. Details and war stories: lessons.md.
+
 ## Notification
 
 You should just assume that I am not paying attention to the text output that you are generating.

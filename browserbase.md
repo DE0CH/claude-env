@@ -2,10 +2,10 @@
 
 ## Session timeouts (lessons from 2026-08 Booking.com upgrade task)
 
-- `timeout: 3600` is a **floor** (beats the ~5-min default), not a ceiling: this plan
-  accepts up to `timeout: 21600` (6 h, verified empirically). For any task involving
-  live-chat waits, OTP round-trips, or human-in-the-loop delays, create the session
-  with `timeout: 21600` up front.
+- Timeout policy (per Deyao, 2026-08): keep `timeout: 3600` for quick scrape/fetch
+  tasks, but use `timeout: 21600` (6 h — plan maximum, verified empirically) whenever
+  the task is **interactive**: live-chat waits, OTP round-trips, or any
+  human-in-the-loop delay. Decide at creation; it cannot be changed later.
 - A running session's timeout **cannot be extended in place** — the sessions update
   API only accepts `status: REQUEST_RELEASE`. Plan the timeout at creation.
 - **For flows gated by email-OTP verification (e.g. Booking.com booking access):
