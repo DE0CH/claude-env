@@ -99,10 +99,10 @@ The MCP server also works without `claude mcp add`: POST JSON-RPC directly to
 `mobilenext_click_on_screen_at_coordinates`, `mobilenext_type_keys`,
 `mobilenext_save_screenshot`, etc.
 
-Installing apps on MobileNext cloud Android devices: the Play Store app is signed
-in with a managed Android Enterprise account whose catalog is browsable (open a
-`market://details?id=<pkg>` URL), but arbitrary installs are blocked with "Your
-administrator has not given you access to this item". Sideloading works instead:
+Installing apps on MobileNext cloud Android devices: download Android apps through
+the open Play Store catalogue — the Play Store app is signed in, so open a
+`market://details?id=<pkg>` URL and install from there. Only if a specific app
+genuinely isn't installable through the Play Store, fall back to sideloading:
 `mobilenext_create_upload` → PUT the APK to the presigned URL →
 `mobilenext_install_app` with the uploadId. The install runs plain `adb install`,
 so only single `.apk` files are accepted — for split-APK apps (XAPK from APKPure),
