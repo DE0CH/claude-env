@@ -1,5 +1,23 @@
 # Browserbase persistent browser profile
 
+## Session timeouts (lessons from 2026-08 Booking.com upgrade task)
+
+- `timeout: 3600` is a **floor** (beats the ~5-min default), not a ceiling: this plan
+  accepts up to `timeout: 21600` (6 h, verified empirically). For any task involving
+  live-chat waits, OTP round-trips, or human-in-the-loop delays, create the session
+  with `timeout: 21600` up front.
+- A running session's timeout **cannot be extended in place** — the sessions update
+  API only accepts `status: REQUEST_RELEASE`. Plan the timeout at creation.
+- **For flows gated by email-OTP verification (e.g. Booking.com booking access):
+  always back the session with a persistent context + `persist: true`.** The
+  verification cookie then survives browser death, and a replacement session resumes
+  verified — without burning another OTP from a human. Task context for Booking.com:
+  `9e119381-3407-4cf8-9d1a-fe4236d0d005` (created 2026-08-17; reuse for Booking.com
+  tasks, do not use the personal logged-in contexts for this).
+- Emergency fallback if a session is about to expire without a context: export
+  cookies/localStorage over CDP (`Network.getAllCookies`) and re-import into the
+  replacement session.
+
 There is a persistent Browserbase **context** that stores my logged-in accounts
 (cookies, localStorage, sessions). Reuse it whenever a task needs a browser that's
 signed in as me — do NOT create a new context.
