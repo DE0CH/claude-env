@@ -9,9 +9,9 @@ we actually use to drive Chinese apps on a cloud phone:
   - vision: screenshot() → CreateScreenshot, poll DescribeTasks, download PNG
   - input:  shell() → RunSyncCommand (≤3 s) or RunCommand+DescribeInvocations;
             tap / swipe / text / key / launch built on top
-  - apps:   install_apk_from_url() → SendFile(DOWNLOAD_URL, AutoInstall) —
-            the phone (on a China network) downloads the APK itself, so
-            Tencent CDNs etc. that block our egress work fine
+  - apps:   install_apk_from_url() → root-shell curl on the phone +
+            pm install — the phone (on a China network) downloads the APK
+            itself, so Tencent CDNs etc. that block our egress work fine
 
 Gotchas learned building this:
   - `input text` only does ASCII — for Chinese text use the clipboard or an
@@ -19,6 +19,8 @@ Gotchas learned building this:
   - Screenshot tasks land as OSS URLs in DescribeTasks Data[].Result (JSON
     with a DownloadUrl / Url field); the bucket is auto-created
     (cloudphone-saved-bucket-<region>-<uid>).
+  - SendFile(DOWNLOAD_URL, AutoInstall) is broken for APK installs — see
+    install_apk_from_url docstring. Use the root-shell path.
   - Array params are RPC-flattened: Key.1, Key.2, ...
   - Keep automation human-paced on WeChat/Alipay — cloud-phone risk control.
 
@@ -301,24 +303,23 @@ def launch(ids, package, activity=None, **kw):
 
 # ---------- apps ----------
 
-def install_apk_from_url(instance_ids, url, filename=None,
-                         region=DEFAULT_REGION, timeout=900):
-    """Install an APK from a public download URL. The cloud phone downloads
-    it itself (China network — Tencent CDNs work). Waits for the SendFile
-    task; installation happens via AutoInstall. Returns finished tasks."""
-    if isinstance(instance_ids, str):
-        instance_ids = [instance_ids]
-    if filename is None:
-        filename = url.rsplit('/', 1)[-1].split('?')[0] or 'app.apk'
-    resp = api('SendFile', region=region,
-               AndroidInstanceIdList=instance_ids,
-               UploadType='DOWNLOAD_URL', UploadUrl=url,
-               SourceFilePath=f'/sdcard/Download/{filename}',
-               AutoInstall=True)
-    task_ids = [d['TaskId'] for d in resp.get('Data', [])] or \
-               [resp.get('TaskId')]
-    return wait_tasks([t for t in task_ids if t], region=region,
-                      timeout=timeout)
+def install_apk_from_url(instance_ids, url, region=DEFAULT_REGION,
+                         timeout=900):
+    """Install an APK from a public download URL by downloading it ON the
+    phone (root shell curl → /data/local/tmp) and pm-installing it there.
+
+    Verified working (WeChat 8.0.56, 248 MB, seconds to download on the
+    phone's China network). Don't switch back to
+    SendFile(DOWNLOAD_URL, AutoInstall=true): tested 2026-08-18, it left a
+    0-byte file in /sdcard/Download AND AutoInstall's pm install can't read
+    /sdcard anyway (SELinux: system_server denied read on fuse).
+    Returns {instance_id: shell output}; output ends with 'Success' on a
+    good install."""
+    q = url.replace("'", "%27")
+    cmd = (f"cd /data/local/tmp && curl -sSL -o app.apk '{q}' && "
+           f"pm install -r /data/local/tmp/app.apk && rm /data/local/tmp/app.apk")
+    return shell(instance_ids, cmd, region=region, sync=False,
+                 timeout=timeout)
 
 
 def list_packages(ids, grep=None, **kw):
