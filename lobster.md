@@ -15,7 +15,6 @@ notification mechanism.
 - My DM channel with lobster: `1531422588247474266`
 
 ```bash
-set -a; . ~/.secrets; set +a
 curl -s -X POST \
   -H "Authorization: Bot $LOBSTER_TOKEN" \
   -H "Content-Type: application/json" \
@@ -34,10 +33,9 @@ curl -s -X POST -H "Authorization: Bot $LOBSTER_TOKEN" -H "Content-Type: applica
 Keep messages short — they land as a phone notification. Prefix long output with a one-line
 summary; Discord's per-message limit is 2000 characters, so split or truncate longer content.
 
-Sanity check (loads the token, sends a test DM — does not print the token):
+Sanity check (sends a test DM — does not print the token):
 
 ```bash
-set -a; . ~/.secrets; set +a
 curl -s -X POST \
   -H "Authorization: Bot $LOBSTER_TOKEN" \
   -H "Content-Type: application/json" \
