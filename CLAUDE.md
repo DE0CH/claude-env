@@ -63,6 +63,22 @@ if no transcript exists, download the audio (through Browserbase) and transcribe
 
 If audio transcription is required, use OpenAI Whisper through Openrouter.
 
+## Accounts & task email
+
+For any task that needs an email address or an account (signups, alerts, notifications,
+budgets, etc.), use **chendeyao000@gmail.com** by default. The Claude account email
+(chendeyao010@proton.me) is only for identifying me — treat it as irrelevant for tasks
+and never use it as a task/service email unless I explicitly say so for that task.
+
+## Make a skills file after researching a new tool
+
+Whenever you research a new tool/service/API to get a task done, always distill what you
+learned into a skills file (`SKILL.md`) at the end — either write one under
+`.claude/skills/<name>/SKILL.md`, or find and adapt an existing community `skills.md` if
+one exists. A skills file should always be generated after doing research, so the next
+session starts from the distilled knowledge instead of re-deriving it. (When the tool
+also needs installing, update the setup script and notify me, per the Tools policy above.)
+
 ## China context
 
 I lived in China and have a Chinese phone number. Whenever a task involves a Chinese
