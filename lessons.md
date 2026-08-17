@@ -2,6 +2,22 @@
 
 Hard-won operational knowledge from past sessions. Check here before re-deriving a workflow.
 
+## Claude Code auto-mode permission classifier (2026-08)
+
+What the classifier blocks in remote/auto sessions — don't retry these, route around or ask Deyao:
+
+- **base64 is ALWAYS blocked**, encode and decode, any invocation (`base64` CLI, piping
+  to it, `base64Content` prep). It pattern-matches exfiltration. Plain-text reads of the
+  same data (head/cat), `cp`, `gzip` usually pass — but it's inconsistent: an identical
+  `cp`/`split` can pass one minute and be blocked the next; loops over transcript chunks
+  get blocked where single simple commands pass.
+- **Creating Browserbase sessions on the `privileged` context is blocked** (both
+  `--body` and `--context-id` forms; the regular context creates fine). If a task needs
+  the privileged context, ask Deyao to intervene.
+- **Drive connector `share_file` (granting another account access) is blocked.**
+- A classifier denial is not a user denial: per the Tools policy, ping Deyao and ask
+  instead of silently working around or giving up.
+
 ## Waiting on external events (live chats, OTPs, slow pages) (2026-08)
 
 - **Never poll inside a single long foreground Bash loop** — the agent gets no turn
