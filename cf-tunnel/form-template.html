@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<title>Hetzner login · Claude</title>
+<style>
+  :root {
+    --bg: #f4f5f7; --card: #ffffff; --text: #1a1d21; --muted: #6b7280;
+    --accent: #d50c2d; --accent2: #a30923; --ring: rgba(213,12,45,.25);
+    --ok: #16a34a; --border: #e5e7eb; --input-bg: #fbfbfc;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #101216; --card: #1a1e24; --text: #eceef1; --muted: #9aa1ab;
+      --accent: #ff2e50; --accent2: #d50c2d; --ring: rgba(255,46,80,.3);
+      --ok: #34d399; --border: #2a2f37; --input-bg: #14171c;
+    }
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: var(--bg); color: var(--text);
+    min-height: 100dvh; display: flex; align-items: center; justify-content: center;
+    padding: 1rem; padding-top: max(1rem, env(safe-area-inset-top));
+  }
+  .card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 20px; padding: 1.75rem 1.5rem 1.5rem;
+    width: 100%; max-width: 26rem;
+    box-shadow: 0 8px 30px rgba(0,0,0,.08);
+  }
+  .brand { display: flex; align-items: center; gap: .65rem; margin-bottom: .35rem; }
+  .brand .logo {
+    width: 38px; height: 38px; border-radius: 10px; flex: none;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    color: #fff; font-weight: 800; font-size: 1.15rem;
+    display: flex; align-items: center; justify-content: center;
+  }
+  h1 { font-size: 1.25rem; font-weight: 700; }
+  .sub { color: var(--muted); font-size: .9rem; margin-bottom: 1.4rem; line-height: 1.45; }
+  .field { margin-bottom: 1rem; }
+  label { display: block; font-size: .82rem; font-weight: 600; margin-bottom: .35rem; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+  input {
+    width: 100%; font-size: 1.05rem; padding: .85rem 1rem;
+    border: 1.5px solid var(--border); border-radius: 12px;
+    background: var(--input-bg); color: var(--text);
+    transition: border-color .15s, box-shadow .15s;
+  }
+  input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 4px var(--ring); }
+  button {
+    width: 100%; font-size: 1.05rem; font-weight: 700; color: #fff;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border: none; border-radius: 12px; padding: .95rem; cursor: pointer;
+    margin-top: .25rem; transition: transform .1s, opacity .15s;
+  }
+  button:active { transform: scale(.98); }
+  button:disabled { opacity: .55; }
+  .status {
+    display: flex; align-items: flex-start; gap: .6rem;
+    font-size: .9rem; line-height: 1.45; color: var(--muted);
+    border: 1px dashed var(--border); border-radius: 12px;
+    padding: .8rem .9rem; margin-bottom: 1.2rem;
+  }
+  .dot {
+    width: 10px; height: 10px; border-radius: 50%; flex: none; margin-top: .35rem;
+    background: var(--accent); animation: pulse 1.6s ease-in-out infinite;
+  }
+  .dot.ok { background: var(--ok); animation: none; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .3; } }
+  .big-ok { font-size: 3rem; text-align: center; margin: 1rem 0 .5rem; }
+  .center { text-align: center; color: var(--muted); font-size: .95rem; line-height: 1.5; }
+  .hidden { display: none; }
+  .shake { animation: shake .4s; }
+  @keyframes shake { 0%,100%{transform:translateX(0)} 25%{transform:translateX(-6px)} 75%{transform:translateX(6px)} }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="brand"><div class="logo">H</div><h1 id="title">Hetzner login</h1></div>
+  <p class="sub" id="subtitle">Goes straight to local disk on the runner — never into the chat transcript.</p>
+  <div class="status" id="statusBox"><div class="dot" id="statusDot"></div><div id="statusText">Connecting…</div></div>
+
+  <form id="credsForm">
+    <div class="field">
+      <label for="email">Email / username</label>
+      <input id="email" name="email" type="email" autocomplete="username" inputmode="email" autocapitalize="none" spellcheck="false" required>
+    </div>
+    <div class="field">
+      <label for="password">Password</label>
+      <input id="password" name="password" type="password" autocomplete="current-password" required>
+    </div>
+    <button type="submit" id="credsBtn">Send to Claude</button>
+  </form>
+
+  <form id="otpForm" class="hidden">
+    <div class="field">
+      <label for="otp" id="otpLabel">2FA code</label>
+      <input id="otp" name="otp" type="text" autocomplete="one-time-code" inputmode="numeric" pattern="[0-9]*" placeholder="123456" required>
+    </div>
+    <button type="submit" id="otpBtn">Send code</button>
+  </form>
+
+  <div id="doneView" class="hidden">
+    <div class="big-ok">✅</div>
+    <p class="center" id="doneText">All set — you can close this tab.</p>
+  </div>
+</div>
+
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const views = { creds: $('credsForm'), otp: $('otpForm'), done: $('doneView') };
+  let current = 'creds', credsSent = false, lastState = '';
+
+  function show(name) {
+    if (current === name) return;
+    Object.entries(views).forEach(([k, el]) => el.classList.toggle('hidden', k !== name));
+    current = name;
+    if (name === 'otp') setTimeout(() => $('otp').focus(), 50);
+  }
+  function setStatus(text, ok) {
+    $('statusText').textContent = text;
+    $('statusDot').className = 'dot' + (ok ? ' ok' : '');
+  }
+
+  async function post(label, obj) {
+    const body = new URLSearchParams({ label, text: JSON.stringify(obj) });
+    const r = await fetch('drop', { method: 'POST', body });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+  }
+
+  $('credsForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const btn = $('credsBtn'); btn.disabled = true; btn.textContent = 'Sending…';
+    try {
+      await post('hetzner-creds', { email: $('email').value.trim(), password: $('password').value });
+      credsSent = true;
+      setStatus('Credentials received. Claude is logging in — keep this page open in case a 2FA code is needed.', true);
+      $('credsForm').classList.add('hidden');
+      btn.textContent = 'Sent ✓';
+    } catch (err) {
+      btn.disabled = false; btn.textContent = 'Send to Claude';
+      $('credsForm').classList.add('shake');
+      setTimeout(() => $('credsForm').classList.remove('shake'), 450);
+      setStatus('Send failed (' + err.message + ') — try again.', false);
+    }
+  });
+
+  $('otpForm').addEventListener('submit', async e => {
+    e.preventDefault();
+    const btn = $('otpBtn'); btn.disabled = true; btn.textContent = 'Sending…';
+    try {
+      await post('hetzner-2fa', { otp: $('otp').value.trim() });
+      setStatus('Code sent — Claude is entering it now.', true);
+      $('otp').value = ''; btn.disabled = false; btn.textContent = 'Send code';
+    } catch (err) {
+      btn.disabled = false; btn.textContent = 'Send code';
+      setStatus('Send failed (' + err.message + ') — try again.', false);
+    }
+  });
+
+  async function poll() {
+    try {
+      const r = await fetch('status.json?t=' + Date.now());
+      if (!r.ok) throw 0;
+      const s = await r.json();
+      if (s.state !== lastState) {
+        lastState = s.state;
+        if (s.state === 'need_credentials') {
+          show('creds'); setStatus(s.message || 'Waiting for your Hetzner email + password.', false);
+        } else if (s.state === 'need_2fa') {
+          show('otp');
+          if (s.otp_label) $('otpLabel').textContent = s.otp_label;
+          setStatus(s.message || 'Claude needs your 2FA code now.', false);
+          if (navigator.vibrate) navigator.vibrate(200);
+        } else if (s.state === 'processing') {
+          if (credsSent || current === 'creds') show('creds');
+          $('credsForm').classList.add('hidden');
+          setStatus(s.message || 'Working — keep this page open.', true);
+        } else if (s.state === 'done') {
+          show('done');
+          if (s.message) $('doneText').textContent = s.message;
+          setStatus('Finished.', true);
+          return; // stop polling
+        } else if (s.state === 'error') {
+          if (s.retry === 'creds') { show('creds'); $('credsForm').classList.remove('hidden'); $('credsBtn').disabled = false; $('credsBtn').textContent = 'Send to Claude'; }
+          setStatus(s.message || 'Something went wrong — see chat.', false);
+        }
+      }
+    } catch (e) {
+      setStatus('Reconnecting…', false);
+    }
+    setTimeout(poll, 2000);
+  }
+  poll();
+})();
+</script>
+</body>
+</html>

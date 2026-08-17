@@ -38,6 +38,19 @@ The whole point is that dropped data never appears in the transcript:
   with grep for what you need rather than dumping it.
 - Drops persist in `~/drop` — delete them when the task is done.
 
+### Task-specific forms (preferred over the generic /drop form)
+
+Deyao's standing preference: when asking him for specific data (logins, 2FA,
+keys), do NOT link the generic `/drop` form. Serve a custom, mobile-friendly
+page with exactly the fields needed as `~/tunnel-share/index.html` — start from
+`cf-tunnel/form-template.html`. It submits to the `drop` endpoint (urlencoded
+`label` + `text`=JSON, so drops land in `~/drop` and wake the watcher) and
+polls `status.json` for dynamic state changes: write
+`{"state":"need_2fa","message":"..."}` (or `need_credentials` / `processing` /
+`done` / `error` with optional `retry":"creds"` and `otp_label`) to
+`~/tunnel-share/status.json` and the open page switches views instantly —
+no reload, no new link, phone-friendly.
+
 ## cf-tunnel: a private, Access-gated tunnel that works from web containers
 
 `cf-tunnel/` is a Cloudflare Worker that tunnels into the container. cloudflared

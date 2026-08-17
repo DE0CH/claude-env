@@ -122,6 +122,18 @@ startup — discord me THAT link. Cloudflare Access lets in only my email; the
 `/drop` form writes my submissions to `~/drop/` on local disk so you use them
 without ever printing them.
 
+**When asking me for specific info (logins, 2FA codes, keys): never send me the
+generic `/drop` form.** Build a task-specific page instead — polished,
+mobile-friendly, with exactly the named fields needed (email, password, 2FA…)
+— as `~/tunnel-share/index.html` so the bare session URL opens it. Start from
+`cf-tunnel/form-template.html` (a worked example from the Hetzner setup): it
+POSTs each submission to the `drop` endpoint as JSON (so the wake-on-drop
+watcher fires instantly), and polls `status.json` in `~/tunnel-share` every 2 s
+so the agent can flip it between states (`need_credentials` → `need_2fa` →
+`processing` → `done` / `error` + message) — meaning a 2FA field appears on my
+phone the moment it's needed, with no new link. Always pair the wait with a
+background watcher on `~/drop` (wakes on submit) + a `send_later` deadman.
+
 The container is ephemeral, so anything not in this repo comes from the
 environment: my secrets are environment variables, not files. The Cloudflare
 side (Worker, route, Access) is already deployed and permanent, and the agent's
