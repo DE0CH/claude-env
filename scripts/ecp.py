@@ -83,26 +83,37 @@ def api(action, region=DEFAULT_REGION, **params):
 
 def create_group(spec=DEFAULT_SPEC, image_id=None, region=DEFAULT_REGION,
                  charge_type='PostPaid', period=1, period_unit='Hour',
-                 auto_pay=True, number_of_instances=1, name=None):
+                 auto_pay=True, number_of_instances=1, name=None,
+                 biz_region=None):
     """Create a cloud-phone instance group. PostPaid+Hour = pay-as-you-go.
-    BILLABLE — confirm with Deyao before calling."""
+    BILLABLE — confirm with Deyao before calling.
+
+    biz_region: where the phone lives (e.g. cn-hongkong). Only cn-shanghai
+    and ap-southeast-1 have API endpoints; every other region (incl. HK) is
+    a BizRegionId served through one of those two. PostPaid is
+    whitelist-only outside mainland regions — HK needs ChargeType=PrePaid
+    (Month). auto_pay=False creates an unpaid order (no charge) that Deyao
+    pays in the console."""
+    biz_region = biz_region or region
     if image_id is None:
-        image_id = latest_system_image(region)
+        image_id = latest_system_image(region, biz_region=biz_region)
     return api('CreateAndroidInstanceGroup', region=region,
-               BizRegionId=region, InstanceGroupSpec=spec, ImageId=image_id,
+               BizRegionId=biz_region, InstanceGroupSpec=spec,
+               ImageId=image_id,
                ChargeType=charge_type, Period=period, PeriodUnit=period_unit,
                AutoPay=auto_pay, NumberOfInstances=number_of_instances,
                InstanceGroupName=name)
 
 
-def latest_system_image(region=DEFAULT_REGION):
+def latest_system_image(region=DEFAULT_REGION, biz_region=None):
+    biz_region = biz_region or region
     data = api('DescribeImageList', region=region, ImageType='System',
                MaxResults=50)
     imgs = [i for i in data.get('Data', [])
-            if i.get('Status') == 'AVAILABLE' and region in
+            if i.get('Status') == 'AVAILABLE' and biz_region in
             (i.get('ImageRegionList') or [])]
     if not imgs:
-        raise EcpError(f'no AVAILABLE system image in {region}')
+        raise EcpError(f'no AVAILABLE system image in {biz_region}')
     imgs.sort(key=lambda i: i.get('GmtCreate', ''), reverse=True)
     return imgs[0]['ImageId']
 
@@ -347,6 +358,12 @@ def main():
     p.add_argument('--period', type=int, default=1)
     p.add_argument('--unit', default='Hour')
     p.add_argument('--name')
+    p.add_argument('--biz-region',
+                   help='region the phone lives in (e.g. cn-hongkong); '
+                        'defaults to --region')
+    p.add_argument('--no-autopay', action='store_true',
+                   help='create an UNPAID order (no charge) for manual '
+                        'payment in the console')
     p.add_argument('--confirm', action='store_true',
                    help='required — this creates billable resources')
     for name in ('start', 'stop', 'reboot'):
@@ -392,7 +409,9 @@ def main():
                      'Re-run with --confirm after Deyao approves.')
         _print(create_group(spec=a.spec, image_id=a.image, region=r,
                             charge_type=a.charge, period=a.period,
-                            period_unit=a.unit, name=a.name))
+                            period_unit=a.unit, name=a.name,
+                            biz_region=a.biz_region,
+                            auto_pay=not a.no_autopay))
     elif a.cmd == 'start':
         _print(start_instances(a.ids, r))
     elif a.cmd == 'stop':
