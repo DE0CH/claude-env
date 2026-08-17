@@ -2,6 +2,12 @@
 
 They are either in your environment variables or in `~/.secrets`.
 
+Never use tools to actively search for or enumerate secrets (e.g. grepping/listing
+env vars, dumping `~/.secrets`, hunting for keys). The permission classifier blocks
+this as exfiltration-shaped — don't even attempt it. Using a secret is fine: reference
+the specific variable you need (e.g. `$LOBSTER_TOKEN`) directly in the command that
+needs it, without printing it.
+
 ## Runner Environment
 
 Expect to find yourself being run in two places: 1. My own mac. 2. A github workspaces pod.
