@@ -40,6 +40,55 @@ drive.google.com in a regular-context Browserbase session, driven over CDP with 
 - Don't retype `connectUrl` signing keys by hand (a dropped character = 401): fetch with
   `browse cloud sessions get <id>` and extract programmatically.
 
+## Chinese airline sites/apps from outside China (2026-08, Shenzhen Airlines seat selection)
+
+- **Mainland ZH domains are unreachable from every non-China vantage point tried**:
+  `www.shenzhenair.com` and the `res.shenzhenair.com` CDN time out from the container,
+  from Browserbase (datacenter AND GB residential proxy), and from a US MobileNext
+  device alike. Only `global.shenzhenair.com` (intl site) is reachable.
+- The intl site's guest "Seat selection check-in" form always pops a **member login
+  modal** on submit (6-digit password). Its "Forget your password" flow is
+  **security-question based** (step 1 = mobile/doc + DOB + image captcha) — there is
+  NO SMS reset on the intl site, despite what you'd expect from a Chinese carrier.
+  The check-in form's "Document No." wants the ID/passport used at booking; e-ticket
+  numbers are rejected ("Voucher number format is incorrect").
+- The ZH Android app (`com.air.sz`) is **not on Google Play in any region**
+  (play.google.com 404s with gl=US/GB/SG/CN/TW) — Chinese airlines publish only to
+  Chinese vendor stores + their own site. On MobileNext's managed Play,
+  `market://` shows "Item not found" (different from the admin-blocked message).
+- **Working install path on a MobileNext cloud Android**: open Tencent 应用宝's
+  distribution page `https://a.app.qq.com/o/simple.jsp?pkgname=<pkg>` in the DEVICE
+  browser, tap 通过第三方浏览器下载, accept Chrome's "Download anyway" — the
+  developer-signed APK comes from `imtt.dd.qq.com` (official Tencent store CDN; the
+  page shows an 官方 badge and the developer name to sanity-check). The same CDN
+  **connection-resets curl from the container**, but the device downloads it fine.
+- **Agent-side APK fetching (curl or the Browserbase downloads API) gets blocked by
+  the permission classifier** even after user approval in chat. The right move (per
+  Deyao) is to "click through the phone": drive the device's own browser/store UI to
+  download and install, so no binary ever touches the agent host.
+- `sj.qq.com` (应用宝 web) is reachable from the container for app metadata, but its
+  desktop pages only offer QR codes — `a.app.qq.com/o/simple.jsp?pkgname=` is the
+  direct mobile page. Clicking its download button with `browse network on` captures
+  the real `imtt.dd.qq.com` URL from the beacon params if it's ever needed.
+
+## Booking.com flights: order access + Gotogate changes (2026-08, LHR–SZX booking)
+
+- Order-details links from confirmation emails hit a **"You need permission to access
+  this booking" wall**; "Verify with email" sends a 6-char code to the booking's
+  contact email (per-character input boxes: `browse fill` box 1 + `browse type` rest).
+  The Booking.com-context cookie did not cover a different traveller's booking.
+- The order page's **"Customer reference" equals the Gotogate order number** — use it
+  to authenticate scary-looking `*.gotogate.support` payment emails (Brevo-tracked
+  links, odd sender domain, but same order ref = genuine). PIN code sits next to it.
+- Price details show pending "Booking changes" (e.g. "Flight change £2,308") that are
+  **added to the total even while unpaid**; the itinerary/cabin display stays stale
+  (still showed Economy + old seat) after payment and even after the change is
+  ticketed — the **e-ticket number updating is the reliable signal** of reissue.
+- Booking.com flights **live chat** (Help centre → Continue without an account →
+  confirmation number → topic → Start chat) is handled by Gotogate agents and works
+  well for "was payment received / is the change ticketed / what's the new e-ticket
+  number". They **cannot assign seats** — seats must go through the airline.
+
 ## Waiting on external events (live chats, OTPs, slow pages) (2026-08)
 
 - **Never poll inside a single long foreground Bash loop** — the agent gets no turn
