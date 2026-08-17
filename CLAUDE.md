@@ -57,6 +57,13 @@ if no transcript exists, download the audio (through Browserbase) and transcribe
 
 If audio transcription is required, use OpenAI Whisper through Openrouter.
 
+## China context
+
+I lived in China and have a Chinese phone number. Whenever a task involves a Chinese
+service (telecom, banking, shopping, government, etc.), assume their website is
+usually broken — try the mobile app first (e.g. via MobileNext cloud devices or my
+iPhone) and only fall back to the website if the app path fails.
+
 ## iPhone control
 
 My physical iPhone can be driven through the accessibility API (WebDriverAgent +
