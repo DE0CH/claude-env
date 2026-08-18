@@ -8,6 +8,34 @@ exfiltration-shaped — don't even attempt it. Using a secret is fine: reference
 the specific variable you need (e.g. `$LOBSTER_TOKEN`) directly in the command that
 needs it, without printing it.
 
+Environment variables can't be changed mid-session — the running container's env is
+fixed when the session starts. So when I tell you "there's a new environment variable
+`X`", I mean it will be present in the **next** session I start, not the current one.
+Write and treat the docs as if it's already available for you (the next agent will have it).
+
+## AWS
+
+My AWS credentials are in two environment variables:
+
+- `AWS_ACCESS_ID`  — the access key ID
+- `AWS_ACCESS_KEY` — the secret access key
+
+These are non-standard names, so map them to what the CLI/SDKs expect before using them:
+
+```bash
+export AWS_ACCESS_KEY_ID="$AWS_ACCESS_ID"
+export AWS_SECRET_ACCESS_KEY="$AWS_ACCESS_KEY"
+export AWS_DEFAULT_REGION=us-east-1        # use us-west-2 for Device Farm
+```
+
+- Identity: IAM user `ai-poweruser` (policy **PowerUserAccess**) in account `795109470764`.
+  PowerUserAccess does everything EXCEPT `iam:*`, `organizations:*`, `account:*` — so it
+  can't create/modify IAM users, roles, or keys (by design). Install the CLI with
+  `pip install awscli` if it's missing.
+- A cost budget `monthly-cost-20-usd` ($20/mo) alerts chendeyao000@gmail.com at 80% /
+  100% / 100%-forecast. Be mindful of it before spinning up billable resources.
+- Never use the root account; don't leave long-lived admin keys lying around.
+
 ## Runner Environment
 
 Expect to find yourself being run in two places: 1. My own mac. 2. A github workspaces pod.
@@ -93,6 +121,38 @@ pymobiledevice3 + Appium) — use the `drive-iphone` skill for bring-up, driving
 patterns, recovery, and teardown. Mac host only (USB + `~/.venvs/ios` tooling; not
 available in container pods). Build/signing infra lives in the private repo
 `DE0CH/wda-build`; hard-won pitfalls are in @lessons.md.
+
+## Phone automation — prefer AWS Device Farm over MobileNext
+
+For remote real-device tasks (Android/iOS), prefer **AWS Device Farm** over MobileNext.
+It natively points the WHOLE device at an external proxy AND gives programmatic control:
+
+- `aws devicefarm create-remote-access-session` with a `deviceProxy {host, port}` in its
+  `configuration` sets a device-wide HTTP/S proxy — no adb/Settings-UI hacking. E.g.
+  `{"host":"geo.iproyal.com","port":12321}`.
+- Drive the live device via the session's Appium/WebDriver endpoint
+  (`get-remote-access-session` → `endpoints.remoteDriverEndpoint`): open a Chrome web
+  session, navigate, screenshot, tap — all from code.
+- **Region: us-west-2 only.** Cost: ~$0.17/device-minute metered (first 1,000 device-min
+  free on a new account); don't buy a $250/mo slot for one-offs.
+- `deviceProxy` carries **no auth** (host+port only), so authenticate at the proxy by
+  **IP-whitelisting the Device Farm egress range `54.244.50.32/27`** at IPRoyal.
+
+Caveat: Device Farm needs the AWS account **fully activated** — a brand-new account
+returns `SubscriptionRequiredException` for a while (IAM/Budgets work immediately; device
+services lag). Until it clears, fall back to **MobileNext** (below): allocate an Android
+device, set the Wi-Fi proxy via the Settings UI (Connections → Wi-Fi → connected-network
+cog → View more → Proxy → Manual → host+port → Save; the field warns "used by browser"),
+and IP-whitelist the device's egress IP at IPRoyal.
+
+### IPRoyal — use conservatively
+Residential proxy (skill: `iproyal`; ~2 GB balance). Route **only tiny probes** through it
+(e.g. `ipv4.icanhazip.com`), never bulk traffic — the full Android egress test above cost
+~10 KB. Android / Device Farm proxies have no auth field, so IP-whitelist the device's
+egress IP (whitelist API: `POST /residential-users/{hash}/whitelist-entries {ip,port}`,
+hash `01M08XFVYVS8QT13ZYX8T2WHZ1`) and **delete the entry immediately after**. Check an
+exit IP's reputation on ping0.cc via a SEPARATE Browserbase session (Browserbase's own IP),
+**never through IPRoyal**. Full worked example: skill `.claude/skills/device-egress-proxy`.
 
 ## MobileNext (cloud phones + mobile automation)
 
