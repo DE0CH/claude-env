@@ -2,11 +2,12 @@
 name: exa-search
 description: >
   Fast AI-native web search via Exa, accessed through OpenRouter's `web` plugin
-  (engine=exa). Returns ranked results WITH clean, LLM-ready extracted page
-  content (title + url + full text), not just links. Use this as the DEFAULT for
-  any web search — it is faster and richer than driving Google in a browser.
-  Trigger whenever a task needs to find pages/URLs, answer a factual/current
-  question from the web, gather sources for research/RAG, or look up docs/pricing.
+  (engine=exa) — needs no Exa key, only OPENROUTER_API. Returns ranked results WITH
+  clean, LLM-ready extracted page content (title + url + text), not just links.
+  FALLBACK for web search: prefer the `exa` skill (direct Exa API, richer) when the
+  EXA_API key is available; use THIS when it isn't. Trigger whenever a task needs to
+  find pages/URLs, answer a factual/current question, gather sources for RAG, or look
+  up docs/pricing and the direct Exa key is unavailable.
 allowed-tools: Bash
 ---
 

@@ -36,10 +36,13 @@ notify me to update the set up script in the container set up section manually.
 If claude-in-chrome is avaliable and it's running on mac, use it and normal tools 
 (ignore the directive about Browserbase below), Browserbase is still avaliable when needed.
 
-**Web search: use the `exa-search` skill by default** (Exa via OpenRouter — fast,
-AI-native, returns ranked results with extracted page content, not just Google links).
-Do NOT use Browserbase's Search API as the default anymore — it's slow and just types
-into Google. Browserbase Search is a last-resort fallback only.
+**Web search: use the `exa` skill by default** (direct Exa API — fast, AI-native,
+returns ranked results with extracted page content plus grounded answers / find-similar,
+not just Google links). Needs the `EXA_API` key (ask Deyao to persist it; this session
+it's cached at `scratchpad/exa_key`). If that key is unavailable, fall back to the
+`exa-search` skill (Exa via OpenRouter, no key needed, search-only). Do NOT use
+Browserbase's Search API as the default anymore — it's slow and just types into Google.
+Browserbase Search is a last-resort fallback only.
 
 If claude-in-chrome is not avaliable, then use Browserbase for ANY content from websites 
 — not just interactive browsing: media/file downloads, YouTube videos/audio/subtitles, 
