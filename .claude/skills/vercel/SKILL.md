@@ -1,6 +1,6 @@
 ---
 name: vercel
-description: Use Deyao's Vercel account (de0ch / chendeyao000@gmail.com) via the VERCEL_TOKEN env var — CLI and REST API usage, plus how to log into the Vercel dashboard / mint a new token if it's ever revoked. Trigger whenever a task involves Vercel (deployments, projects, domains, env vars, logs).
+description: Use Deyao's Vercel account (de0ch / chendeyao000@gmail.com) via the VERCEL_TOKEN env var — CLI and REST API usage, showing HTML reports/demos to Deyao via a per-session de0ch-claude-… project (NEVER Claude Artifacts), plus how to log into the Vercel dashboard / mint a new token if it's ever revoked. Trigger whenever a task involves Vercel (deployments, projects, domains, env vars, logs) or needs to show Deyao any HTML page/report/demo.
 ---
 
 # Vercel
@@ -14,6 +14,36 @@ description: Use Deyao's Vercel account (de0ch / chendeyao000@gmail.com) via the
   `scratchpad/vercel_token` (2026-08-18 session only — containers are ephemeral).
   Otherwise ask Deyao to add `VERCEL_TOKEN` to the environment config.
 - Never print the token; substitute it directly into commands.
+
+## Showing content to Deyao — Vercel, NOT Claude Artifacts
+
+Standing rule (Deyao, 2026-08-18): when a task needs to show an HTML page, report,
+or demo, **never publish a Claude Artifact** — deploy it to Vercel and Discord the
+URL. **Each session uses its own fresh project named `de0ch-claude-<short-session-id>`**
+(first 8 chars of `CLAUDE_CODE_SESSION_ID`); don't reuse another session's project.
+
+Proven flow (2026-08-18, project `de0ch-claude-9c79698b`):
+
+```bash
+SID="${CLAUDE_CODE_SESSION_ID%%-*}"          # first segment, e.g. 9c79698b
+DIR="$SCRATCHPAD/de0ch-claude-$SID"          # dir name == project name
+mkdir -p "$DIR"                              # put index.html (+assets) in it
+cd "$DIR" && vercel deploy --prod --yes --token "$VERCEL_TOKEN"
+```
+
+- The CLI auto-creates the project from the **directory name** — no `vercel link`
+  or API project-create needed. `--prod` matters: production deployments are
+  public, while preview deployments sit behind Vercel Authentication by default.
+- The stable URL is the auto-alias **`https://de0ch-claude-<sid>.vercel.app`**
+  (printed as "Aliased"; the long `…-<hash>-de0chs-projects.vercel.app` URL is
+  per-deployment). Verify with `curl -s -o /dev/null -w '%{http_code}'` = 200,
+  then send Deyao the alias URL on Discord.
+- Re-deploying the same directory updates the same project/alias — iterate freely
+  within a session.
+- These pages are **public** (unlisted but no auth). For sensitive content or
+  private data drops (credentials, 2FA), keep using the cf-tunnel flow
+  (Cloudflare Access-gated) per CLAUDE.md — Vercel is for showing, not for
+  collecting secrets.
 
 ## CLI
 
