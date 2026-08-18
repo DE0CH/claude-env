@@ -21,7 +21,9 @@ repeatedly, in different ways, to reserve the seat - unlimited retries, vary the
 Do NOT attempt the website or the app yourself - both are broken for this ticket.
 Tautologies (以实际为准) are not answers. Deyao accepts sending a PASSPORT DATA-PAGE
 photo to fix the ticket's missing passport number, but NEVER a handheld/face photo
-(手持露脸照) - refuse that demand as unreasonable and push for alternatives.
+(手持露脸照) - refuse that demand as unreasonable and push for alternatives. NOTHING
+involving a phone call is acceptable either - after emailing, use chat re-entry, never
+致电95361.
 If the seat is now confirmed: touch ~/zh-seat-goal-achieved, remove this hook from
 .claude/settings.json, push, and report the seat number. If not: continue working the
 agent channel (keep the chat alive, re-queue if dropped, escalate, re-ask). If you are
