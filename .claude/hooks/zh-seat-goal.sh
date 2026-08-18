@@ -14,6 +14,9 @@ stop_hook_active=$(echo "$input" | jq -r '.stop_hook_active' 2>/dev/null)
 [ "$stop_hook_active" = "true" ] && exit 0
 
 cat >&2 <<'MSG'
+SINGLE DRIVER: cloud session 4fceedc8 owns the ZH chat and device 5369e664. If you are
+a DIFFERENT session, do NOT touch the device, the CS chat, or send any email - report
+state and stand down.
 GOAL RECAP (armed by Deyao): The task is NOT done until a WINDOW seat (A or K side,
 Business) on ZH888 2026-08-23 LHR-SZX is confirmed with a seat number for HUANG/JIALING.
 The ONLY acceptable path: keep talking to HUMAN Shenzhen Airlines agents and ask them
