@@ -84,6 +84,13 @@ one exists. A skills file should always be generated after doing research, so th
 session starts from the distilled knowledge instead of re-deriving it. (When the tool
 also needs installing, update the setup script and notify me, per the Tools policy above.)
 
+## Prompts for the next agent
+
+When I ask you to write a prompt for the next agent (a follow-up session), keep it short
+and state only the END GOALS — what the task should achieve. Do NOT include methodology,
+steps, or how-to instructions: the next agent figures out the approach itself (and has
+the skills files / lessons.md for distilled knowledge).
+
 ## China context
 
 I lived in China and have a Chinese phone number. Whenever a task involves a Chinese
