@@ -192,6 +192,33 @@ merge first with APKEditor (`java -jar APKEditor.jar m -i app.xapk -o merged.apk
 and re-sign with uber-apk-signer (both on GitHub releases; java is available), then
 upload the `*-aligned-debugSigned.apk`.
 
+## Proxies (two-tier) & mobilerun
+
+**mobilerun** (droidrun/mobilerun, cloud.mobilerun.ai — NOT MobileNext; the names are confusingly
+close) is a cloud-phone agent framework. Cloud API base `https://api.mobilerun.ai/v1`, auth
+`Authorization: Bearer $MOBILERUN_API` (a `dr_sk_` key; note the var is `MOBILERUN_API`, and the
+SDK also auto-reads `MOBILERUN_CLOUD_API_KEY`). Cloud Phones are always-on/persistent virtual
+Androids — **no idle force-deallocation** (unlike MobileNext's ~30–45 min), billed per-minute
+(~$0.03/min) or a $50/mo slot. **Every Cloud Phone REQUIRES a SOCKS5 proxy attached at provision
+time** (BYO; mobilerun only speaks SOCKS5). Proxy is switchable live any time via
+`POST /v1/devices/{id}/proxy` (SOCKS5 host/port/user/password) — it replaces the existing
+connection, no reprovision; `DELETE`-style disconnect also exists. Key device ops:
+`POST /v1/devices` (provision, `billing=minute`), `.../open`-deep-link, `.../screenshot`,
+execute-JS-in-Chrome (CDP), terminate.
+
+**Two-tier proxy policy (Deyao):**
+- **Tier 1 — cheap datacenter for everything: DataImpulse** (`gw.dataimpulse.com:823`, SOCKS5,
+  user:pass, country-targeting in the base price). **Pay-as-you-go $0.50/GB, traffic never
+  expires**, no monthly commitment ($5 → 10GB intro). API + sub-users, so mint creds per task like
+  IPRoyal. *(Account not yet created as of 2026-08-18 — needs signup + $5 top-up; ping Deyao to
+  fund. Evomi datacenter $0.45/GB PAYG `dcp.evomi.com:2000` is the runner-up.)*
+- **Tier 2 — residential/mobile only when we really need it: IPRoyal** (already set up; see the
+  `iproyal` skill). Mint a fresh sub-user each time (see skill); residential SOCKS5
+  `geo.iproyal.com:32325`.
+
+Default to Tier 1 (datacenter) for general traffic; escalate to Tier 2 only when a datacenter IP
+gets blocked or a task genuinely needs residential/mobile reputation.
+
 ## Cloudflare tunnel + local HTML content / private data drops
 
 When I ask for an HTML explanation/report/demo, or need to hand you data that must

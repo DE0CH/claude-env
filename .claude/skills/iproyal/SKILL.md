@@ -22,10 +22,22 @@ Two separate things, do not confuse them:
 
 Per this repo's secrets policy, credentials live in **environment variables** — reference them directly, never print them:
 
-- `IPROYAL_PROXY_USER` / `IPROYAL_PROXY_PASS` — the residential proxy login (from a dashboard order). Required to make requests.
-- `IPROYAL_API` — the management-API Bearer token (dashboard Settings → API). Only needed for the management API.
+- `IPROYAL_PROXY_USER` / `IPROYAL_PROXY_PASS` — the residential proxy login (from a dashboard order). **In this environment these are NOT set** — do not depend on them.
+- `IPROYAL_API` — the management-API Bearer token (dashboard Settings → API). This IS set; it's how we mint creds.
 
-If you don't have proxy credentials but do have `IPROYAL_API` and the account has traffic, you can mint testable credentials by creating a **sub-user** via the API (returns a username/password) — see [Management API](#management-api).
+**Standing rule (Deyao): mint a fresh sub-user every time IPRoyal proxy creds are needed** — don't rely on
+`IPROYAL_PROXY_USER`/`IPROYAL_PROXY_PASS`. Create a sub-user via `$IPROYAL_API` (returns a username + the
+password you set), use it as the proxy login (`user:password_country-xx…`), then delete it when the task is
+done. Account has traffic (check `/v1/me`). One-liner to mint:
+
+```bash
+# vary the username per task so it's unique; give it a slice of traffic (GB)
+curl -s -X POST https://resi-api.iproyal.com/v1/residential-subusers \
+  -H "Authorization: Bearer $IPROYAL_API" -H "Content-Type: application/json" \
+  -d '{"username":"task-'"$(printf %s "$RANDOM")"'","password":"Str0ng-Pass_'"$RANDOM"'","traffic":0.5}'
+# -> returns {hash, username, password, ...}. SOCKS5: geo.iproyal.com:32325  user=<username> pass=<password>_country-xx
+# clean up when done: DELETE /v1/residential-subusers/{hash}
+```
 
 ## Quick start
 
