@@ -16,8 +16,6 @@ harness:
   **no whitelist**.
 - **iOS** Wi-Fi proxy: *has* Username/Password → creds directly, no whitelist.
 - **Android** Wi-Fi/global proxy: host+port only, **no auth** → IP-whitelist the egress IP.
-- (legacy) **AWS Device Farm** `deviceProxy`: host+port only → whitelist. Deprioritized; use
-  mobilerun instead.
 
 For the no-auth cases, authenticate at IPRoyal by **IP-whitelisting the device's egress IP**
 instead of sending creds. Env: `IPROYAL_API` (management token). Residential user hash:

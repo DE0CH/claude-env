@@ -13,29 +13,6 @@ fixed when the session starts. So when I tell you "there's a new environment var
 `X`", I mean it will be present in the **next** session I start, not the current one.
 Write and treat the docs as if it's already available for you (the next agent will have it).
 
-## AWS
-
-My AWS credentials are in two environment variables:
-
-- `AWS_ACCESS_ID`  — the access key ID
-- `AWS_ACCESS_KEY` — the secret access key
-
-These are non-standard names, so map them to what the CLI/SDKs expect before using them:
-
-```bash
-export AWS_ACCESS_KEY_ID="$AWS_ACCESS_ID"
-export AWS_SECRET_ACCESS_KEY="$AWS_ACCESS_KEY"
-export AWS_DEFAULT_REGION=us-east-1        # use us-west-2 for Device Farm
-```
-
-- Identity: IAM user `ai-poweruser` (policy **PowerUserAccess**) in account `795109470764`.
-  PowerUserAccess does everything EXCEPT `iam:*`, `organizations:*`, `account:*` — so it
-  can't create/modify IAM users, roles, or keys (by design). Install the CLI with
-  `pip install awscli` if it's missing.
-- A cost budget `monthly-cost-20-usd` ($20/mo) alerts chendeyao000@gmail.com at 80% /
-  100% / 100%-forecast. Be mindful of it before spinning up billable resources.
-- Never use the root account; don't leave long-lived admin keys lying around.
-
 ## Runner Environment
 
 Expect to find yourself being run in two places: 1. My own mac. 2. A github workspaces pod.
@@ -136,8 +113,7 @@ For remote real-device / cloud-phone tasks (Android/iOS), prefer **mobilerun**
 - Full programmatic control: provision, open-URL / deep-link, screenshot, execute-JS-in-Chrome
   (CDP), install apps, GPS / locale / timezone, terminate.
 
-MobileNext stays a fallback when a specific device/region is only available there. (We
-previously preferred AWS Device Farm — dropped in favour of mobilerun.)
+MobileNext stays a fallback when a specific device/region is only available there.
 
 ### IPRoyal — use conservatively
 Residential proxy = Tier 2 (skill: `iproyal`; ~2 GB balance). Route **only tiny probes**
