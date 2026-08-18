@@ -128,6 +128,21 @@ through it (e.g. `ipv4.icanhazip.com`), never bulk traffic. Check an exit IP's r
 ping0.cc via a SEPARATE Browserbase session (Browserbase's own IP), **never through the proxy
 under test**.
 
+## Installing apps on phones — on-device only
+
+Install apps ON the phone itself, through an app store app; NEVER download an APK to
+the container and then upload/sideload it to the device.
+
+- **Play Store apps:** use **Aurora Store** on the device (anonymous login works — no
+  Google account needed). If the device already has a signed-in Play Store (e.g.
+  MobileNext cloud devices), using it directly is fine too — it's still on-device.
+- **Chinese apps:** install a Chinese app store on the device first (e.g. Tencent 应用宝
+  via its mobile page `https://a.app.qq.com/o/simple.jsp?pkgname=<pkg>` in the device
+  browser), then install the app from that store.
+
+The whole flow — store install, search, download, install — happens by driving the
+phone's own UI/browser. No APK ever touches the container.
+
 ## MobileNext (cloud phones + mobile automation)
 
 The official MobileNext skills are vendored in `.claude/skills/mobilewright` and
@@ -155,16 +170,12 @@ The MCP server also works without `claude mcp add`: POST JSON-RPC directly to
 `mobilenext_click_on_screen_at_coordinates`, `mobilenext_type_keys`,
 `mobilenext_save_screenshot`, etc.
 
-Installing apps on MobileNext cloud Android devices: download Android apps through
-the open Play Store catalogue — the Play Store app is signed in, so open a
-`market://details?id=<pkg>` URL and install from there. Only if a specific app
-genuinely isn't installable through the Play Store, fall back to sideloading:
-`mobilenext_create_upload` → PUT the APK to the presigned URL →
-`mobilenext_install_app` with the uploadId. The install runs plain `adb install`,
-so only single `.apk` files are accepted — for split-APK apps (XAPK from APKPure),
-merge first with APKEditor (`java -jar APKEditor.jar m -i app.xapk -o merged.apk`)
-and re-sign with uber-apk-signer (both on GitHub releases; java is available), then
-upload the `*-aligned-debugSigned.apk`.
+Installing apps on MobileNext cloud Android devices: follow the on-device-only policy
+above. The Play Store app is signed in, so open a `market://details?id=<pkg>` URL and
+install from there (or use Aurora Store); for Chinese apps, install them through a
+Chinese app store on the device. Do NOT use the upload-APK sideloading path
+(`mobilenext_create_upload` → `mobilenext_install_app`) — that routes the APK through
+the container.
 
 ## Proxies (two-tier) & mobilerun
 
