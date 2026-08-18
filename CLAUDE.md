@@ -117,6 +117,12 @@ For remote real-device / cloud-phone tasks (Android/iOS), prefer **mobilerun**
   we hand it Evomi / IPRoyal creds directly.
 - **No idle force-deallocation** — Cloud Phones are persistent (MobileNext kills real devices
   at ~30–45 min).
+
+**Swap the device proxy to the FINAL egress IP _before_ starting an app** (its very first
+launch included). Apps fingerprint the network at first open — installing/launching on a
+datacenter IP and then switching to the "real" residential/mobile IP mid-session defeats
+the point. Install steps can run on the cheap Tier-1 proxy, but do the proxy swap (and
+verify the exit IP) before the target app's first launch.
 - Full programmatic control: provision, open-URL / deep-link, screenshot, execute-JS-in-Chrome
   (CDP), install apps, GPS / locale / timezone, terminate.
 
