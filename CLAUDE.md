@@ -122,37 +122,28 @@ patterns, recovery, and teardown. Mac host only (USB + `~/.venvs/ios` tooling; n
 available in container pods). Build/signing infra lives in the private repo
 `DE0CH/wda-build`; hard-won pitfalls are in @lessons.md.
 
-## Phone automation — prefer AWS Device Farm over MobileNext
+## Phone automation — prefer mobilerun
 
-For remote real-device tasks (Android/iOS), prefer **AWS Device Farm** over MobileNext.
-It natively points the WHOLE device at an external proxy AND gives programmatic control:
+For remote real-device / cloud-phone tasks (Android/iOS), prefer **mobilerun**
+(droidrun/mobilerun, cloud.mobilerun.ai) over MobileNext. Full API details are in the
+"Proxies (two-tier) & mobilerun" section below. Why it wins:
 
-- `aws devicefarm create-remote-access-session` with a `deviceProxy {host, port}` in its
-  `configuration` sets a device-wide HTTP/S proxy — no adb/Settings-UI hacking. E.g.
-  `{"host":"geo.iproyal.com","port":12321}`.
-- Drive the live device via the session's Appium/WebDriver endpoint
-  (`get-remote-access-session` → `endpoints.remoteDriverEndpoint`): open a Chrome web
-  session, navigate, screenshot, tap — all from code.
-- **Region: us-west-2 only.** Cost: ~$0.17/device-minute metered (first 1,000 device-min
-  free on a new account); don't buy a $250/mo slot for one-offs.
-- `deviceProxy` carries **no auth** (host+port only), so authenticate at the proxy by
-  **IP-whitelisting the Device Farm egress range `54.244.50.32/27`** at IPRoyal.
+- **Whole-device SOCKS5 proxy with auth, switchable live** (`POST /v1/devices/{id}/proxy`) —
+  no adb / Settings-UI hacking and **no IP-whitelisting dance**: SOCKS5 carries user:pass, so
+  we hand it Evomi / IPRoyal creds directly.
+- **No idle force-deallocation** — Cloud Phones are persistent (MobileNext kills real devices
+  at ~30–45 min).
+- Full programmatic control: provision, open-URL / deep-link, screenshot, execute-JS-in-Chrome
+  (CDP), install apps, GPS / locale / timezone, terminate.
 
-Caveat: Device Farm needs the AWS account **fully activated** — a brand-new account
-returns `SubscriptionRequiredException` for a while (IAM/Budgets work immediately; device
-services lag). Until it clears, fall back to **MobileNext** (below): allocate an Android
-device, set the Wi-Fi proxy via the Settings UI (Connections → Wi-Fi → connected-network
-cog → View more → Proxy → Manual → host+port → Save; the field warns "used by browser"),
-and IP-whitelist the device's egress IP at IPRoyal.
+MobileNext stays a fallback when a specific device/region is only available there. (We
+previously preferred AWS Device Farm — dropped in favour of mobilerun.)
 
 ### IPRoyal — use conservatively
-Residential proxy (skill: `iproyal`; ~2 GB balance). Route **only tiny probes** through it
-(e.g. `ipv4.icanhazip.com`), never bulk traffic — the full Android egress test above cost
-~10 KB. Android / Device Farm proxies have no auth field, so IP-whitelist the device's
-egress IP (whitelist API: `POST /residential-users/{hash}/whitelist-entries {ip,port}`,
-hash `01M08XFVYVS8QT13ZYX8T2WHZ1`) and **delete the entry immediately after**. Check an
-exit IP's reputation on ping0.cc via a SEPARATE Browserbase session (Browserbase's own IP),
-**never through IPRoyal**. Full worked example: skill `.claude/skills/device-egress-proxy`.
+Residential proxy = Tier 2 (skill: `iproyal`; ~2 GB balance). Route **only tiny probes**
+through it (e.g. `ipv4.icanhazip.com`), never bulk traffic. Check an exit IP's reputation on
+ping0.cc via a SEPARATE Browserbase session (Browserbase's own IP), **never through the proxy
+under test**.
 
 ## MobileNext (cloud phones + mobile automation)
 
@@ -207,17 +198,18 @@ connection, no reprovision; `DELETE`-style disconnect also exists. Key device op
 execute-JS-in-Chrome (CDP), terminate.
 
 **Two-tier proxy policy (Deyao):**
-- **Tier 1 — cheap datacenter for everything: DataImpulse** (`gw.dataimpulse.com:823`, SOCKS5,
-  user:pass, country-targeting in the base price). **Pay-as-you-go $0.50/GB, traffic never
-  expires**, no monthly commitment ($5 → 10GB intro). API + sub-users, so mint creds per task like
-  IPRoyal. *(Account not yet created as of 2026-08-18 — needs signup + $5 top-up; ping Deyao to
-  fund. Evomi datacenter $0.45/GB PAYG `dcp.evomi.com:2000` is the runner-up.)*
-- **Tier 2 — residential/mobile only when we really need it: IPRoyal** (already set up; see the
-  `iproyal` skill). Mint a fresh sub-user each time (see skill); residential SOCKS5
-  `geo.iproyal.com:32325`.
+- **Tier 1 — cheap datacenter for everything: Evomi** (skill: `evomi`; **active**, key validated
+  2026-08-18). PAYG $0.45/GB, SOCKS5, product `sdc` (Shared Datacenter). Get a ready proxy string
+  from the Public API: `GET https://api.evomi.com/public/generate?product=sdc&protocol=socks5&countries=US`
+  with `apikey=$EVOMI_API` (or header `x-apikey`). SOCKS5 endpoint **`dcp.evomi.com:2002`**; creds
+  come back as `user:pass_country-XX_session-…`. **`EVOMI_API` is not yet a session env var** — ask
+  Deyao to add it for next session; this session it's cached at `scratchpad/evomi_key`.
+- **Tier 2 — residential/mobile only when we really need it: IPRoyal** (skill: `iproyal`). Mint a
+  fresh sub-user each time (see skill); residential SOCKS5 `geo.iproyal.com:32325`.
 
-Default to Tier 1 (datacenter) for general traffic; escalate to Tier 2 only when a datacenter IP
-gets blocked or a task genuinely needs residential/mobile reputation.
+Default to Tier 1 (Evomi datacenter) for general traffic; escalate to Tier 2 only when a datacenter
+IP gets blocked or a task genuinely needs residential/mobile reputation. Both are SOCKS5 with
+user:pass — hand them straight to mobilerun's `POST /v1/devices/{id}/proxy`.
 
 ## Cloudflare tunnel + local HTML content / private data drops
 

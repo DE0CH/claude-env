@@ -1,6 +1,6 @@
 ---
 name: device-egress-proxy
-description: Route a remote mobile device's traffic through an IPRoyal residential proxy and verify/rate the egress IP. Use when a task needs a phone (Android/iOS) to browse from a residential IP, or asks to check a proxy exit IP's reputation. Covers AWS Device Farm (preferred), MobileNext (fallback), IPRoyal IP-whitelisting, and ping0.cc reputation lookup via Browserbase.
+description: Route a remote mobile device's traffic through a proxy (Evomi datacenter Tier-1 or IPRoyal residential Tier-2) and verify/rate the egress IP. Use when a task needs a phone (Android/iOS) to browse from a proxied IP, or asks to check a proxy exit IP's reputation. Covers mobilerun (preferred — whole-device SOCKS5 with auth, no whitelisting), MobileNext (fallback, IP-whitelisting), and ping0.cc reputation lookup via Browserbase.
 ---
 
 # Device egress proxy (mobile → residential IP → reputation)
@@ -10,27 +10,31 @@ confirm/rate that exit IP. Proven end-to-end 2026-08-18 (Android via MobileNext:
 device direct `99.78.197.7` → IPRoyal exit `190.142.235.17`, a clean VE residential IP).
 
 ## The auth problem (read first)
-IPRoyal residential auth normally rides on the **password**. But device proxy settings
-often have **no username/password field**:
-- **Android** Wi-Fi/global proxy: host+port only, no auth.
-- **AWS Device Farm** `deviceProxy`: host+port only, no auth.
-- **iOS** Wi-Fi proxy: *does* have Username/Password — so iOS can use IPRoyal creds directly
-  (mint a sub-user, see below), no whitelist needed.
+Proxy auth normally rides on the **password**. Whether you need a whitelist depends on the
+harness:
+- **mobilerun** (preferred): whole-device **SOCKS5 with user:pass** → hand it creds directly,
+  **no whitelist**.
+- **iOS** Wi-Fi proxy: *has* Username/Password → creds directly, no whitelist.
+- **Android** Wi-Fi/global proxy: host+port only, **no auth** → IP-whitelist the egress IP.
+- (legacy) **AWS Device Farm** `deviceProxy`: host+port only → whitelist. Deprioritized; use
+  mobilerun instead.
 
 For the no-auth cases, authenticate at IPRoyal by **IP-whitelisting the device's egress IP**
 instead of sending creds. Env: `IPROYAL_API` (management token). Residential user hash:
 `01M08XFVYVS8QT13ZYX8T2WHZ1`.
 
-## Preferred harness: AWS Device Farm
-See CLAUDE.md "Phone automation". Native device-wide proxy + Appium control:
-1. `aws devicefarm create-remote-access-session` (us-west-2) with
-   `configuration.deviceProxy = {"host":"geo.iproyal.com","port":12321}`.
-2. Whitelist the Device Farm egress CIDR **`54.244.50.32/27`** at IPRoyal (see whitelist API).
-3. Drive via `get-remote-access-session` → `endpoints.remoteDriverEndpoint` (Appium/WebDriver):
-   open a Chrome web session, GET `http://ipv4.icanhazip.com`, read the body.
-4. Stop the session; delete the whitelist entry.
-- ~$0.17/device-min (1000 free min on new accounts). **Blocked by `SubscriptionRequiredException`
-  until the AWS account is fully activated** — fall back to MobileNext until then.
+## Preferred harness: mobilerun
+Whole-device SOCKS5 **with auth**, so no whitelisting — hand it Tier-1 Evomi (skill `evomi`,
+`dcp.evomi.com:2002`) or Tier-2 IPRoyal (`geo.iproyal.com:32325`) SOCKS5 creds. See CLAUDE.md
+"Proxies (two-tier) & mobilerun". Cloud Phones are persistent (no idle deallocation).
+1. Provision / pick a ready device (`POST /v1/devices` or `GET /v1/devices?state=ready`),
+   `Authorization: Bearer $MOBILERUN_API`.
+2. Attach the proxy: `POST /v1/devices/{id}/proxy` with a `socks5` body `{host,port,user,password}`
+   — switchable live any time (replaces the existing connection). See the `evomi` skill for a
+   generate → split → POST one-liner.
+3. Read the exit IP: open `https://ipv4.icanhazip.com` (open-deep-link) → `screenshot`, or
+   execute-JS-in-Chrome (CDP) to fetch it. Swap the proxy and re-read to compare exits.
+4. Terminate the device when done (`POST /v1/devices/{id}` terminate) if you provisioned it.
 
 ## Fallback harness: MobileNext (Android)
 JSON-RPC to `https://app.mobilenext.ai/mcp` (see CLAUDE.md MobileNext section; helper pattern
