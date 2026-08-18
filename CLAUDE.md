@@ -36,12 +36,17 @@ notify me to update the set up script in the container set up section manually.
 If claude-in-chrome is avaliable and it's running on mac, use it and normal tools 
 (ignore the directive about Browserbase below), Browserbase is still avaliable when needed.
 
+**Web search: use the `exa-search` skill by default** (Exa via OpenRouter — fast,
+AI-native, returns ranked results with extracted page content, not just Google links).
+Do NOT use Browserbase's Search API as the default anymore — it's slow and just types
+into Google. Browserbase Search is a last-resort fallback only.
+
 If claude-in-chrome is not avaliable, then use Browserbase for ANY content from websites 
 — not just interactive browsing: media/file downloads, YouTube videos/audio/subtitles, 
-search results, APIs. It covers three modes:
+APIs. It covers three modes:
 the `browse` CLI for interactive browser sessions, the Fetch API for plain page/content
-retrieval, and the Search API for web search. There is a persistent logged-in browser
-context — see @browserbase.md.
+retrieval, and the Search API for web search (fallback only — prefer `exa-search`). There
+is a persistent logged-in browser context — see @browserbase.md.
 
 Always create Browserbase sessions with `--timeout 3600` (1 hour). The default timeout
 is ~5 minutes and kills the session mid-task whenever you're waiting on something slow
