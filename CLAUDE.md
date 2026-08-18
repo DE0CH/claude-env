@@ -24,9 +24,10 @@ For 2. you are modify the environment however you want because the pod is epheme
 
 Whenever a tool is not avaliable, the first priority is to fix the tooling, not to work around.
 Examples include, a tool is not installed, in which case you should install it in the proper way, 
-by either using brew, apt, pip depending on the environment. If there's a billing issue, for
-example I don't have credit anymore or I've ran out of free plan usage, you should ping me
-to ask me to recharge intead of working around it. If a workaround is reqruied, you should
+by either using brew, apt, pip depending on the environment. If ANY service you use has a
+billing issue — no credit left, free-plan usage exhausted, a payment failing, a
+"$0.00 credits" style error — you should discord me (per the Notification section) to ask
+me to recharge instead of working around it. If a workaround is reqruied, you should
 always ask me for permission first because using the workaround.
 
 When a new tool is required, for example by me asking you to add a new tool, edit claude.md,
