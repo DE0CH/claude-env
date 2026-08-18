@@ -395,3 +395,10 @@ often-wrong answers. Always escalate to a human agent (转人工 / "human agent"
 re-ask until a named human joins the chat), verify a human is actually on the line
 (queue position, agent name/number in the header or messages), and only then present
 the request. Bot answers may be used as background hints, never as the outcome.
+
+Bots are often reluctant to hand over — try MULTIPLE escalation methods before giving
+up: type 转人工/人工/人工客服/找人工 repeatedly (some bots count attempts), pick any
+menu option that mentions 人工 or complaints (投诉), answer the bot's "which topic"
+prompt then immediately re-ask for 人工, try the hotline-callback entry, and if the
+widget has separate queues (票务/会员/投诉) pick the one most likely staffed. Persist
+for several rounds; log what finally worked in lessons.md.
