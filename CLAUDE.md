@@ -207,6 +207,11 @@ execute-JS-in-Chrome (CDP), terminate.
 - **Tier 2 — residential/mobile only when we really need it: IPRoyal** (skill: `iproyal`). Mint a
   fresh sub-user each time (see skill); residential SOCKS5 `geo.iproyal.com:32325`.
 
+**Hard product split (Deyao): Evomi is ONLY for datacenter IPs; IPRoyal is THE source for
+mobile / residential IPs.** Never use Evomi's residential (`rp`/`rpc`) or mobile (`mp`)
+products (they're unfunded anyway — `mp` returns "Not enough balance"), and don't buy
+datacenter from IPRoyal.
+
 Default to Tier 1 (Evomi datacenter) for general traffic; escalate to Tier 2 only when a datacenter
 IP gets blocked or a task genuinely needs residential/mobile reputation. Both are SOCKS5 with
 user:pass — hand them straight to mobilerun's `POST /v1/devices/{id}/proxy`.
