@@ -264,9 +264,14 @@ Goal was: transcript if it exists, otherwise audio → Whisper. What actually wo
 
 ### What didn't work (don't retry these first)
 
-- **Browserbase `--verified`** is paid/Enterprise-gated on the current plan;
-  `--solve-captchas` does **not** solve Cloudflare Turnstile (tested on
-  cobalt.tools). **Proxies now work** (2026-08-15): geolocated proxy sessions
+- **Browserbase `--verified`** is paid/Enterprise-gated on the current plan.
+  **Browserbase HAS built-in captcha solving — use it FIRST** (Deyao, 2026-08-19):
+  create the session with `browserSettings: {solveCaptchas: true}` and poll the page
+  text until the wall clears. Verified working on archive.today's "One more step"
+  interstitial (a session without it hit the wall; with it, sailed straight through).
+  Reach for residential proxies only after the built-in solver fails. Known limit:
+  it did **not** solve Cloudflare Turnstile on cobalt.tools (tested 2026-08).
+  **Proxies now work** (2026-08-15): geolocated proxy sessions
   (e.g. GB/London, residential exit IP) create fine via the `proxies` array in
   the session body — see browserbase.md for the working invocation.
 - **Non-web InnerTube clients** (IOS, ANDROID_VR, TVHTML5, MWEB, embedded players):
@@ -556,3 +561,23 @@ REST API (`tap`/`keyboard`/`screenshot`/`ui-state`). Specifics:
   2026-08-21T21:30Z (fresh session, phone path).
 - A 服务大厅 first-visit tutorial overlay blocks everything and survives BACK — the
   only listed seat entry is 选座值机 anyway (no separate intl entry).
+
+## archive.today (archive.is/ph) dumps via Browserbase (2026-08-19)
+
+`scripts/archive-dump.js` does the whole flow (details in the `archive-today` skill).
+Mechanics worth remembering:
+
+- **`https://archive.ph/newest/<url>` is the single entry point**: 302s to the newest
+  snapshot if one exists; otherwise renders a "No results" page (URL stays on
+  `/newest/`) with an "archive this url" link — that link goes to a tokenized
+  per-visitor subdomain (`https://<token>.archive.ph/?url=...`) with the submit form
+  prefilled (`form action=https://archive.ph/submit/`, input `url`, submit `save`).
+- Submitting lands on `https://archive.ph/wip/<code>` which auto-refreshes until the
+  capture finishes, then redirects to the final snapshot `https://archive.ph/<code>`
+  (~30-60 s for a simple page). Poll `location.href` until it leaves `/wip/`.
+- **Datacenter IPs get the "One more step" CAPTCHA wall**; a session created with
+  `browserSettings:{solveCaptchas:true}` cleared it (see the Browserbase captcha
+  lesson above). No login, no cookies needed.
+- Navigations (the /newest/ redirect, wip meta-refreshes) destroy Playwright
+  execution contexts mid-`evaluate` — wrap page-state reads in a retry loop instead
+  of assuming a settled page.
