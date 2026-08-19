@@ -1,20 +1,23 @@
-<!DOCTYPE html>
+<!doctype html>
 <!--
-  Sourced-report template (Deyao's preferred format, established 2026-08-19).
+  Sourced-report template — Deyao's approved format (2026-08-19).
+
+  Layout/palette modeled on the report Deyao explicitly praised
+  (de0ch-claude-3d5b71d3.vercel.app: warm paper background, burnt-orange accent,
+  kicker/hero header, numbered sections, callouts, tags, source badges, dark mode),
+  plus the citation back-button he required (restores the EXACT scroll position
+  from the moment a citation was clicked — not scroll-into-view).
 
   How to use:
-  1. Copy this file to the Vercel project dir as index.html (see vercel skill:
-     de0ch-claude-<sid>/, deploy to prod with the vercel CLI; note HTML comments
-     cannot contain double hyphens, hence no literal CLI flags here).
-  2. Replace every {{PLACEHOLDER}} and the EXAMPLE-marked blocks with real content.
-  3. Every factual claim gets a citation: <sup><a href="#s1">[1]</a></sup> pointing
-     at a numbered <li id="s1"> in the Sources section. Number sources in the order
-     they first appear.
-  4. Keep the back-button markup/CSS/JS at the bottom EXACTLY as is — Deyao requires
-     that clicking a citation shows a floating "back" button restoring the EXACT
-     scroll position from the moment of the click (not scroll-into-view).
-  5. Components (stats grid, flow diagram, blockquote, table) are optional — delete
-     the ones the report doesn't need. Don't invent new styling; extend this palette.
+  1. Copy as index.html into the Vercel project dir (see vercel skill) and deploy prod.
+  2. Replace every {{PLACEHOLDER}}; delete optional components the report doesn't need
+     (flow strip, table, tags, extra callouts). Don't invent new styling.
+  3. Citations: <sup><a href="#s1">1</a></sup> in the text, one <li id="sN"> per source
+     in the Sources panel, numbered in first-appearance order. Give each source a badge:
+     Vendor / Gov / Peer-reviewed (badge sec) / News / Industry / First-party.
+  4. Keep the back-button markup, CSS, and script verbatim.
+  5. Mobile rule (CLAUDE.md): wide content scrolls in its own container (.scroll),
+     never the page body.
 -->
 <html lang="en">
 <head>
@@ -22,195 +25,203 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{{REPORT TITLE}}</title>
 <style>
-  :root {
-    --bg: #f7f7f5;
-    --paper: #ffffff;
-    --ink: #1c1e21;
-    --muted: #5b6068;
-    --accent: #7a3fd1;
-    --accent-soft: #f0e8fc;
-    --border: #e3e2de;
-    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  :root{
+    --bg:#f7f7f5; --panel:#ffffff; --ink:#1a1a19; --muted:#5f5f59;
+    --line:#e4e2dc; --accent:#b3541e; --accent-soft:#f3e5da;
+    --good:#2f6f4e; --good-soft:#e3f0e8; --warn:#8a5a00; --warn-soft:#f6ecd6;
+    --bad:#a3341f; --bad-soft:#f6e0da; --code:#f0efea;
+    --maxw:820px;
   }
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body {
-    background: var(--bg);
-    color: var(--ink);
-    font: 17px/1.65 -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-    padding: 0 0 4rem;
+  @media (prefers-color-scheme:dark){
+    :root:not([data-theme="light"]){
+      --bg:#151513; --panel:#1f1e1b; --ink:#eceae3; --muted:#a5a299;
+      --line:#333029; --accent:#e08a4e; --accent-soft:#3a2a1c;
+      --good:#7fc79c; --good-soft:#1e2e25; --warn:#e0b355; --warn-soft:#332a17;
+      --bad:#e58a72; --bad-soft:#33211d; --code:#26241f;
+    }
   }
-  header {
-    background: linear-gradient(135deg, #241a3d, #46247a);
-    color: #fff;
-    padding: 3.2rem 1.5rem 2.6rem;
+  :root[data-theme="dark"]{
+      --bg:#151513; --panel:#1f1e1b; --ink:#eceae3; --muted:#a5a299;
+      --line:#333029; --accent:#e08a4e; --accent-soft:#3a2a1c;
+      --good:#7fc79c; --good-soft:#1e2e25; --warn:#e0b355; --warn-soft:#332a17;
+      --bad:#e58a72; --bad-soft:#33211d; --code:#26241f;
   }
-  .wrap { max-width: 820px; margin: 0 auto; padding: 0 1.5rem; }
-  header .inner { max-width: 820px; margin: 0 auto; }
-  header h1 { font-size: 1.9rem; line-height: 1.25; letter-spacing: -0.01em; }
-  header p.sub { margin-top: .8rem; color: #cfc4e8; font-size: 1.02rem; max-width: 640px; }
-  header .meta { margin-top: 1.2rem; font-size: .85rem; color: #a695cc; }
-  main section { margin-top: 2.6rem; }
-  h2 { font-size: 1.35rem; letter-spacing: -0.01em; margin-bottom: .9rem; padding-top: .4rem; }
-  h3 { font-size: 1.05rem; margin: 1.4rem 0 .5rem; }
-  p { margin-bottom: .9rem; }
-  p:last-child { margin-bottom: 0; }
-  a { color: var(--accent); text-decoration: none; border-bottom: 1px solid #d8c5f2; }
-  a:hover { border-bottom-color: var(--accent); }
-  .card {
-    background: var(--paper); border: 1px solid var(--border); border-radius: 12px;
-    padding: 1.4rem 1.5rem; margin-bottom: 1rem;
-  }
-  .tldr {
-    background: var(--accent-soft); border: 1px solid #ddc9f6; border-radius: 12px;
-    padding: 1.3rem 1.5rem; margin-top: 2.2rem;
-  }
-  .tldr h2 { margin-bottom: .6rem; font-size: 1.1rem; color: #4a2582; }
-  ul, ol { margin: 0 0 .9rem 1.3rem; }
-  li { margin-bottom: .45rem; }
-  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: .8rem; margin: 1.1rem 0; }
-  .stat { background: var(--paper); border: 1px solid var(--border); border-radius: 10px; padding: .9rem 1rem; }
-  .stat .n { font-size: 1.35rem; font-weight: 700; letter-spacing: -0.02em; }
-  .stat .l { font-size: .8rem; color: var(--muted); margin-top: .15rem; line-height: 1.35; }
-  .flow {
-    background: var(--paper); border: 1px solid var(--border); border-radius: 12px;
-    padding: 1.3rem 1.4rem; margin: 1.1rem 0; overflow-x: auto;
-  }
-  .flow .row { display: flex; align-items: stretch; gap: .5rem; min-width: 620px; }
-  .flow .node {
-    flex: 1; border-radius: 9px; padding: .7rem .8rem; font-size: .82rem; line-height: 1.4;
-    border: 1px solid var(--border); background: #fafaf8;
-  }
-  .flow .node b { display: block; font-size: .88rem; margin-bottom: .15rem; }
-  .flow .node.hl { background: var(--accent-soft); border-color: #d3bcf3; }
-  .flow .arrow { align-self: center; color: var(--muted); font-size: 1.1rem; flex: 0 0 auto; }
-  .flow .cap { font-size: .78rem; color: var(--muted); margin-top: .8rem; }
-  blockquote {
-    border-left: 3px solid var(--accent); background: var(--paper);
-    padding: .9rem 1.2rem; margin: 1rem 0; border-radius: 0 10px 10px 0;
-    font-size: .95rem; color: #333;
-  }
-  blockquote .who { display: block; margin-top: .5rem; font-size: .8rem; color: var(--muted); }
-  table { width: 100%; border-collapse: collapse; font-size: .92rem; margin: 1rem 0; background: var(--paper); border-radius: 10px; overflow: hidden; }
-  th, td { text-align: left; padding: .6rem .8rem; border-bottom: 1px solid var(--border); vertical-align: top; }
-  th { background: #f1efec; font-size: .8rem; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
-  tr:last-child td { border-bottom: none; }
-  .tablebox { overflow-x: auto; }
-  .srcs { counter-reset: src; }
-  .srcs li { font-size: .9rem; margin-bottom: .55rem; color: var(--muted); }
-  .srcs li b { color: var(--ink); font-weight: 600; }
-  .note { font-size: .85rem; color: var(--muted); }
-  sup a { border-bottom: none; font-weight: 600; font-size: .75em; }
-  @media (max-width: 640px) {
-    body { font-size: 16px; }
-    header h1 { font-size: 1.5rem; }
-  }
-  /* Back-to-exact-position button — REQUIRED, do not remove or alter behavior. */
-  #backbtn {
-    position: fixed; bottom: 1.4rem; right: 1.4rem; z-index: 50;
-    display: none; align-items: center; gap: .45rem;
-    background: var(--accent); color: #fff; border: none; border-radius: 999px;
-    padding: .65rem 1.1rem; font: 600 .9rem/1 inherit; font-family: inherit;
-    cursor: pointer; box-shadow: 0 4px 16px rgba(70, 36, 122, .35);
-  }
-  #backbtn:hover { background: #6531b3; }
-  #backbtn.show { display: inline-flex; }
-  .flash { animation: flashbg 1.6s ease-out; }
-  @keyframes flashbg {
-    0%, 40% { background: #efe2ff; box-shadow: 0 0 0 4px #efe2ff; border-radius: 6px; }
-    100% { background: transparent; box-shadow: none; }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+    font:16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased}
+  .wrap{max-width:var(--maxw);margin:0 auto;padding:0 22px}
+  header.hero{padding:64px 0 40px;border-bottom:1px solid var(--line)}
+  .kicker{font-size:.78rem;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);font-weight:600;margin:0 0 14px}
+  h1{font-size:2.15rem;line-height:1.15;margin:0 0 18px;letter-spacing:-.02em}
+  .lede{font-size:1.16rem;color:var(--muted);margin:0;max-width:64ch}
+  .meta{margin-top:26px;font-size:.82rem;color:var(--muted);display:flex;gap:8px 18px;flex-wrap:wrap}
+  .meta b{color:var(--ink);font-weight:600}
+  h2{font-size:1.42rem;letter-spacing:-.01em;margin:52px 0 6px;padding-top:14px}
+  h2 .num{color:var(--accent);font-variant-numeric:tabular-nums;margin-right:.5ch}
+  h3{font-size:1.06rem;margin:30px 0 4px}
+  p{margin:14px 0}
+  a{color:var(--accent);text-decoration:none;border-bottom:1px solid color-mix(in srgb,var(--accent) 35%,transparent)}
+  a:hover{border-bottom-color:var(--accent)}
+  sup a{border:none;font-weight:600;font-size:.72em;padding:0 1px}
+  strong{font-weight:650}
+  .tldr{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:24px 26px;margin:34px 0}
+  .tldr h2{margin:0 0 8px;font-size:1.08rem;padding:0}
+  .tldr ul{margin:8px 0 0;padding-left:20px}
+  .tldr li{margin:9px 0}
+  .flow{display:flex;align-items:stretch;gap:0;flex-wrap:wrap;margin:26px 0;border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--panel)}
+  .flow .step{flex:1 1 140px;padding:18px 16px;border-right:1px solid var(--line);min-width:140px}
+  .flow .step:last-child{border-right:none}
+  .flow .n{font-size:.72rem;color:var(--accent);font-weight:700;letter-spacing:.1em}
+  .flow .t{font-weight:650;margin:6px 0 4px;font-size:.96rem}
+  .flow .d{font-size:.82rem;color:var(--muted);line-height:1.45}
+  .callout{border-left:3px solid var(--accent);background:var(--accent-soft);
+    padding:14px 18px;border-radius:0 10px 10px 0;margin:22px 0;font-size:.96rem}
+  .callout .lbl{font-weight:700;color:var(--accent);font-size:.74rem;letter-spacing:.1em;text-transform:uppercase;display:block;margin-bottom:4px}
+  .tag{display:inline-block;font-size:.72rem;font-weight:650;padding:2px 9px;border-radius:20px;vertical-align:middle}
+  .tag.good{background:var(--good-soft);color:var(--good)}
+  .tag.warn{background:var(--warn-soft);color:var(--warn)}
+  .tag.bad{background:var(--bad-soft);color:var(--bad)}
+  table{width:100%;border-collapse:collapse;margin:22px 0;font-size:.92rem}
+  th,td{text-align:left;padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{font-size:.74rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:650}
+  td code,p code,li code{background:var(--code);padding:1px 6px;border-radius:5px;font-size:.86em;
+    font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+  .scroll{overflow-x:auto}
+  .src{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:8px 26px 22px;margin-top:14px}
+  ol.sources{font-size:.86rem;color:var(--muted);padding-left:26px;margin:14px 0 0}
+  ol.sources li{margin:11px 0;padding-left:4px}
+  ol.sources li::marker{color:var(--accent);font-weight:700}
+  ol.sources a{word-break:break-word}
+  .badge{font-size:.68rem;font-weight:700;letter-spacing:.05em;padding:1px 7px;border-radius:5px;
+    background:var(--good-soft);color:var(--good);margin-left:6px;text-transform:uppercase}
+  .badge.sec{background:var(--accent-soft);color:var(--accent)}
+  .badge.gov{background:var(--warn-soft);color:var(--warn)}
+  footer{border-top:1px solid var(--line);margin-top:56px;padding:28px 0 60px;color:var(--muted);font-size:.82rem}
+  .disc{background:var(--warn-soft);border-radius:10px;padding:14px 18px;font-size:.88rem;color:var(--ink);margin:22px 0}
+  hr.soft{border:none;border-top:1px solid var(--line);margin:0}
+  /* Citation back-button — REQUIRED. Restores exact scroll position; keep verbatim. */
+  #backbtn{
+    position:fixed;bottom:22px;right:22px;z-index:50;
+    display:none;align-items:center;gap:7px;
+    background:var(--accent);color:#fff;border:none;border-radius:999px;
+    padding:10px 18px;font:600 .9rem/1 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    cursor:pointer;box-shadow:0 4px 16px color-mix(in srgb,var(--accent) 40%,transparent)}
+  #backbtn:hover{filter:brightness(.92)}
+  #backbtn.show{display:inline-flex}
+  .flash{animation:flashbg 1.6s ease-out}
+  @keyframes flashbg{
+    0%,40%{background:var(--accent-soft);box-shadow:0 0 0 4px var(--accent-soft);border-radius:6px}
+    100%{background:transparent;box-shadow:none}
   }
 </style>
 </head>
 <body>
-
-<header>
-  <div class="inner">
-    <h1>{{REPORT TITLE — the question being answered}}</h1>
-    <p class="sub">{{One-paragraph short answer / hook.}}</p>
-    <div class="meta">Research report · {{YYYY-MM-DD}} · all claims linked to sources at the bottom</div>
+<header class="hero">
+  <div class="wrap">
+    <p class="kicker">{{TOPIC AREA}} · Research Note</p>
+    <h1>{{Report title — the question being answered}}</h1>
+    <p class="lede">{{2-3 sentence hook: the surprising short answer.}}</p>
+    <div class="meta">
+      <span><b>Prepared for</b> Deyao</span>
+      <span><b>Date</b> {{DD Mon YYYY}}</span>
+      <span><b>Sourcing</b> {{e.g. primary docs + vendor statements}}</span>
+    </div>
   </div>
 </header>
 
-<div class="wrap">
+<main class="wrap">
 
   <div class="tldr">
-    <h2>TL;DR</h2>
+    <h2>The short version</h2>
     <ul>
-      <li><b>{{Key point.}}</b> {{One sentence, cited.}}<sup><a href="#s1">[1]</a></sup></li>
-      <li><b>{{Key point.}}</b> {{...}}<sup><a href="#s2">[2]</a></sup></li>
+      <li><strong>{{Key point.}}</strong> {{One cited sentence.}}<sup><a href="#s1">1</a></sup></li>
+      <li><strong>{{Key point.}}</strong> {{...}}<sup><a href="#s2">2</a></sup></li>
       <!-- 4-6 bullets covering the whole answer -->
     </ul>
   </div>
 
-  <main>
+  <h2><span class="num">1</span>{{Section title}}</h2>
+  <p>{{Body text with citations.<sup><a href="#s1">1</a></sup>}}</p>
 
-  <section>
-    <h2>1. {{Section title}}</h2>
-    <div class="card">
-      <p>{{Body text with citations.<sup><a href="#s1">[1]</a></sup>}}</p>
-    </div>
+  <!-- OPTIONAL: labeled callout for a pull-quote or key aside -->
+  <div class="callout">
+    <span class="lbl">{{Label, e.g. "Vendor, in its own words"}}</span>
+    "{{Quote or key point.}}"<sup><a href="#s1">1</a></sup>
+  </div>
 
-    <!-- OPTIONAL: stats grid for headline numbers -->
-    <div class="stats">
-      <div class="stat"><div class="n">{{64M+}}</div><div class="l">{{what the number is}}<sup><a href="#s1">[1]</a></sup></div></div>
-      <div class="stat"><div class="n">{{195}}</div><div class="l">{{...}}<sup><a href="#s2">[2]</a></sup></div></div>
-    </div>
-  </section>
+  <!-- OPTIONAL: table. Wrap in .scroll so wide tables scroll inside their
+       own container, never the page. Use .tag good/warn/bad for verdict cells. -->
+  <div class="scroll">
+  <table>
+    <thead><tr><th>{{Col}}</th><th>{{Col}}</th><th>{{Verdict col}}</th></tr></thead>
+    <tbody>
+      <tr>
+        <td><strong>{{Row title}}</strong><br><span style="color:var(--muted);font-size:.85em">{{subtext}}</span></td>
+        <td>{{Cell text, cited.<sup><a href="#s3">3</a></sup>}}</td>
+        <td><span class="tag good">{{Good}}</span></td>
+      </tr>
+      <tr>
+        <td><strong>{{Row title}}</strong></td>
+        <td>{{...}}</td>
+        <td><span class="tag warn">{{Caveat}}</span></td>
+      </tr>
+      <tr>
+        <td><strong>{{Row title}}</strong></td>
+        <td>{{...}}</td>
+        <td><span class="tag bad">{{Bad}}</span></td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
 
-  <section>
-    <h2>2. {{Section title}}</h2>
+  <!-- OPTIONAL: caveat/disclaimer box for scoping a claim honestly -->
+  <div class="disc">
+    <strong>{{Caveat label:}}</strong> {{What is directly attributed vs. sector context /
+    inference — keep vendor claims and independent findings clearly separated.}}
+  </div>
 
-    <!-- OPTIONAL: pull quote from a primary source -->
-    <blockquote>"{{Direct quote.}}"
-      <span class="who">— {{Who/where}}<sup><a href="#s1">[1]</a></sup></span>
-    </blockquote>
+  <h2><span class="num">2</span>{{Section title}}</h2>
+  <p>{{...}}</p>
 
-    <!-- OPTIONAL: horizontal flow diagram for a pipeline/architecture -->
-    <div class="flow">
-      <div class="row">
-        <div class="node"><b>{{Stage 1}}</b>{{short description}}</div>
-        <div class="arrow">→</div>
-        <div class="node hl"><b>{{Stage 2 (highlighted)}}</b>{{...}}</div>
-        <div class="arrow">→</div>
-        <div class="node"><b>{{Stage 3}}</b>{{...}}</div>
-      </div>
-      <div class="cap">{{Caption explaining the diagram, cited.<sup><a href="#s3">[3]</a></sup>}}</div>
-    </div>
+  <!-- OPTIONAL: horizontal flow strip for a pipeline/architecture.
+       flex-wrap makes it stack on mobile automatically. -->
+  <div class="flow">
+    <div class="step"><div class="n">{{STAGE-1}}</div><div class="t">{{Title}}</div><div class="d">{{Short description; <code>code</code> ok.}}</div></div>
+    <div class="step"><div class="n">{{STAGE-2}}</div><div class="t">{{Title}}</div><div class="d">{{...}}</div></div>
+    <div class="step"><div class="n">{{STAGE-3}}</div><div class="t">{{Title}}</div><div class="d">{{...}}</div></div>
+    <div class="step"><div class="n">{{STAGE-4}}</div><div class="t">{{Title}}</div><div class="d">{{...}}</div></div>
+  </div>
 
-    <!-- OPTIONAL: data table (wrap in .tablebox so wide tables scroll, not the page) -->
-    <div class="tablebox">
-    <table>
-      <tr><th>{{Col}}</th><th>{{Col}}</th><th>Source</th></tr>
-      <tr><td>{{...}}</td><td>{{...}}</td><td>{{...}}<sup><a href="#s4">[4]</a></sup></td></tr>
-    </table>
-    </div>
-    <p class="note">{{Optional footnote under the table.}}</p>
-  </section>
+  <h2><span class="num">{{N}}</span>Bottom line</h2>
+  <p>{{Closing synthesis — answer the original question in full, no new claims.}}</p>
 
-  <section>
-    <h2>{{N}}. Bottom line</h2>
-    <div class="card">
-      <p>{{Closing synthesis paragraph — answer the original question in full, no new claims.}}</p>
-    </div>
-  </section>
-
-  <section>
-    <h2>Sources</h2>
-    <ol class="srcs">
-      <li id="s1"><b>{{Publisher — page title}}</b> ({{what claim(s) it supports}}) · <a href="{{URL}}">{{short-domain}}</a></li>
-      <li id="s2"><b>{{...}}</b> · <a href="{{URL}}">{{...}}</a></li>
-      <!-- one <li id="sN"> per source, in first-appearance order -->
+  <div class="src">
+    <h3 style="margin-top:22px">Sources</h3>
+    <p style="font-size:.82rem;color:var(--muted);margin:2px 0 0">{{Method note: e.g.
+    "Vendor statements are marked as such; they describe stated method, not independently
+    verified sourcing. Government records and peer-reviewed research are marked accordingly."}}</p>
+    <ol class="sources">
+      <li id="s1">{{Publisher}} — <a href="{{URL}}">"{{Page title}}"</a> <span class="badge">Vendor</span> — {{what claim it supports}}.</li>
+      <li id="s2">{{Publisher}} — <a href="{{URL}}">"{{...}}"</a> <span class="badge gov">Gov</span> — {{...}}.</li>
+      <li id="s3">{{Authors}} — <a href="{{URL}}">"{{Paper title}}"</a>, {{venue year}} <span class="badge sec">Peer-reviewed</span> — {{...}}.</li>
+      <!-- one <li id="sN"> per source; badges: Vendor / Gov (badge gov) /
+           Peer-reviewed (badge sec) / News / Industry / First-party (plain badge) -->
     </ol>
-    <p class="note" style="margin-top:1rem">Method note: {{how sources were used — e.g. vendor claims reported as claims and attributed; independent sources used for economics/criticism; primary sources preferred over aggregators}}.</p>
-  </section>
+  </div>
 
-  </main>
-</div>
+  <footer>
+    <hr class="soft" style="margin-bottom:20px">
+    {{Footer disclaimer: what source classes the report is compiled from, and any
+    attribution caveats worth repeating.}}
+  </footer>
+</main>
 
 <!-- ============================================================
      Citation back-button. REQUIRED by Deyao: restores the EXACT
-     scroll position from the moment the citation was clicked.
-     Keep verbatim (it auto-binds to all sup a[href^="#s"] links).
+     scroll position from the moment the citation was clicked
+     (window.scrollX/Y + scrollTo — NOT scroll-into-view).
+     Auto-binds to all sup a[href^="#s"] links; keep verbatim.
      ============================================================ -->
 <button id="backbtn" type="button" aria-label="Back to where you were reading">↩ Back to text</button>
 
@@ -225,8 +236,8 @@
     el.classList.add('flash');
   }
 
-  // Clicking a citation like [8] in the text: remember the exact scroll
-  // position at that moment, jump to the source, and offer a way back.
+  // Clicking a citation: remember the exact scroll position at that moment,
+  // jump to the source, and offer a way back.
   document.querySelectorAll('sup a[href^="#s"]').forEach(function (a) {
     a.addEventListener('click', function () {
       origin = { x: window.scrollX, y: window.scrollY, el: a };
@@ -240,7 +251,7 @@
     if (!origin) return;
     backBtn.classList.remove('show');
     window.scrollTo({ left: origin.x, top: origin.y, behavior: 'smooth' });
-    var para = origin.el.closest('li, p, blockquote, td, .cap') || origin.el;
+    var para = origin.el.closest('li, p, blockquote, td, .cap, .callout, .disc') || origin.el;
     flash(para);
     // Clean the #sN hash so back/refresh doesn't re-jump to the source list.
     if (history.replaceState) history.replaceState(null, '', location.pathname + location.search);
