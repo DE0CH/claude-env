@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<!--
+  Sourced-report template (Deyao's preferred format, established 2026-08-19).
+
+  How to use:
+  1. Copy this file to the Vercel project dir as index.html (see vercel skill:
+     de0ch-claude-<sid>/, deploy to prod with the vercel CLI; note HTML comments
+     cannot contain double hyphens, hence no literal CLI flags here).
+  2. Replace every {{PLACEHOLDER}} and the EXAMPLE-marked blocks with real content.
+  3. Every factual claim gets a citation: <sup><a href="#s1">[1]</a></sup> pointing
+     at a numbered <li id="s1"> in the Sources section. Number sources in the order
+     they first appear.
+  4. Keep the back-button markup/CSS/JS at the bottom EXACTLY as is — Deyao requires
+     that clicking a citation shows a floating "back" button restoring the EXACT
+     scroll position from the moment of the click (not scroll-into-view).
+  5. Components (stats grid, flow diagram, blockquote, table) are optional — delete
+     the ones the report doesn't need. Don't invent new styling; extend this palette.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{REPORT TITLE}}</title>
+<style>
+  :root {
+    --bg: #f7f7f5;
+    --paper: #ffffff;
+    --ink: #1c1e21;
+    --muted: #5b6068;
+    --accent: #7a3fd1;
+    --accent-soft: #f0e8fc;
+    --border: #e3e2de;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font: 17px/1.65 -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    padding: 0 0 4rem;
+  }
+  header {
+    background: linear-gradient(135deg, #241a3d, #46247a);
+    color: #fff;
+    padding: 3.2rem 1.5rem 2.6rem;
+  }
+  .wrap { max-width: 820px; margin: 0 auto; padding: 0 1.5rem; }
+  header .inner { max-width: 820px; margin: 0 auto; }
+  header h1 { font-size: 1.9rem; line-height: 1.25; letter-spacing: -0.01em; }
+  header p.sub { margin-top: .8rem; color: #cfc4e8; font-size: 1.02rem; max-width: 640px; }
+  header .meta { margin-top: 1.2rem; font-size: .85rem; color: #a695cc; }
+  main section { margin-top: 2.6rem; }
+  h2 { font-size: 1.35rem; letter-spacing: -0.01em; margin-bottom: .9rem; padding-top: .4rem; }
+  h3 { font-size: 1.05rem; margin: 1.4rem 0 .5rem; }
+  p { margin-bottom: .9rem; }
+  p:last-child { margin-bottom: 0; }
+  a { color: var(--accent); text-decoration: none; border-bottom: 1px solid #d8c5f2; }
+  a:hover { border-bottom-color: var(--accent); }
+  .card {
+    background: var(--paper); border: 1px solid var(--border); border-radius: 12px;
+    padding: 1.4rem 1.5rem; margin-bottom: 1rem;
+  }
+  .tldr {
+    background: var(--accent-soft); border: 1px solid #ddc9f6; border-radius: 12px;
+    padding: 1.3rem 1.5rem; margin-top: 2.2rem;
+  }
+  .tldr h2 { margin-bottom: .6rem; font-size: 1.1rem; color: #4a2582; }
+  ul, ol { margin: 0 0 .9rem 1.3rem; }
+  li { margin-bottom: .45rem; }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: .8rem; margin: 1.1rem 0; }
+  .stat { background: var(--paper); border: 1px solid var(--border); border-radius: 10px; padding: .9rem 1rem; }
+  .stat .n { font-size: 1.35rem; font-weight: 700; letter-spacing: -0.02em; }
+  .stat .l { font-size: .8rem; color: var(--muted); margin-top: .15rem; line-height: 1.35; }
+  .flow {
+    background: var(--paper); border: 1px solid var(--border); border-radius: 12px;
+    padding: 1.3rem 1.4rem; margin: 1.1rem 0; overflow-x: auto;
+  }
+  .flow .row { display: flex; align-items: stretch; gap: .5rem; min-width: 620px; }
+  .flow .node {
+    flex: 1; border-radius: 9px; padding: .7rem .8rem; font-size: .82rem; line-height: 1.4;
+    border: 1px solid var(--border); background: #fafaf8;
+  }
+  .flow .node b { display: block; font-size: .88rem; margin-bottom: .15rem; }
+  .flow .node.hl { background: var(--accent-soft); border-color: #d3bcf3; }
+  .flow .arrow { align-self: center; color: var(--muted); font-size: 1.1rem; flex: 0 0 auto; }
+  .flow .cap { font-size: .78rem; color: var(--muted); margin-top: .8rem; }
+  blockquote {
+    border-left: 3px solid var(--accent); background: var(--paper);
+    padding: .9rem 1.2rem; margin: 1rem 0; border-radius: 0 10px 10px 0;
+    font-size: .95rem; color: #333;
+  }
+  blockquote .who { display: block; margin-top: .5rem; font-size: .8rem; color: var(--muted); }
+  table { width: 100%; border-collapse: collapse; font-size: .92rem; margin: 1rem 0; background: var(--paper); border-radius: 10px; overflow: hidden; }
+  th, td { text-align: left; padding: .6rem .8rem; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { background: #f1efec; font-size: .8rem; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+  tr:last-child td { border-bottom: none; }
+  .tablebox { overflow-x: auto; }
+  .srcs { counter-reset: src; }
+  .srcs li { font-size: .9rem; margin-bottom: .55rem; color: var(--muted); }
+  .srcs li b { color: var(--ink); font-weight: 600; }
+  .note { font-size: .85rem; color: var(--muted); }
+  sup a { border-bottom: none; font-weight: 600; font-size: .75em; }
+  @media (max-width: 640px) {
+    body { font-size: 16px; }
+    header h1 { font-size: 1.5rem; }
+  }
+  /* Back-to-exact-position button — REQUIRED, do not remove or alter behavior. */
+  #backbtn {
+    position: fixed; bottom: 1.4rem; right: 1.4rem; z-index: 50;
+    display: none; align-items: center; gap: .45rem;
+    background: var(--accent); color: #fff; border: none; border-radius: 999px;
+    padding: .65rem 1.1rem; font: 600 .9rem/1 inherit; font-family: inherit;
+    cursor: pointer; box-shadow: 0 4px 16px rgba(70, 36, 122, .35);
+  }
+  #backbtn:hover { background: #6531b3; }
+  #backbtn.show { display: inline-flex; }
+  .flash { animation: flashbg 1.6s ease-out; }
+  @keyframes flashbg {
+    0%, 40% { background: #efe2ff; box-shadow: 0 0 0 4px #efe2ff; border-radius: 6px; }
+    100% { background: transparent; box-shadow: none; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="inner">
+    <h1>{{REPORT TITLE — the question being answered}}</h1>
+    <p class="sub">{{One-paragraph short answer / hook.}}</p>
+    <div class="meta">Research report · {{YYYY-MM-DD}} · all claims linked to sources at the bottom</div>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <div class="tldr">
+    <h2>TL;DR</h2>
+    <ul>
+      <li><b>{{Key point.}}</b> {{One sentence, cited.}}<sup><a href="#s1">[1]</a></sup></li>
+      <li><b>{{Key point.}}</b> {{...}}<sup><a href="#s2">[2]</a></sup></li>
+      <!-- 4-6 bullets covering the whole answer -->
+    </ul>
+  </div>
+
+  <main>
+
+  <section>
+    <h2>1. {{Section title}}</h2>
+    <div class="card">
+      <p>{{Body text with citations.<sup><a href="#s1">[1]</a></sup>}}</p>
+    </div>
+
+    <!-- OPTIONAL: stats grid for headline numbers -->
+    <div class="stats">
+      <div class="stat"><div class="n">{{64M+}}</div><div class="l">{{what the number is}}<sup><a href="#s1">[1]</a></sup></div></div>
+      <div class="stat"><div class="n">{{195}}</div><div class="l">{{...}}<sup><a href="#s2">[2]</a></sup></div></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>2. {{Section title}}</h2>
+
+    <!-- OPTIONAL: pull quote from a primary source -->
+    <blockquote>"{{Direct quote.}}"
+      <span class="who">— {{Who/where}}<sup><a href="#s1">[1]</a></sup></span>
+    </blockquote>
+
+    <!-- OPTIONAL: horizontal flow diagram for a pipeline/architecture -->
+    <div class="flow">
+      <div class="row">
+        <div class="node"><b>{{Stage 1}}</b>{{short description}}</div>
+        <div class="arrow">→</div>
+        <div class="node hl"><b>{{Stage 2 (highlighted)}}</b>{{...}}</div>
+        <div class="arrow">→</div>
+        <div class="node"><b>{{Stage 3}}</b>{{...}}</div>
+      </div>
+      <div class="cap">{{Caption explaining the diagram, cited.<sup><a href="#s3">[3]</a></sup>}}</div>
+    </div>
+
+    <!-- OPTIONAL: data table (wrap in .tablebox so wide tables scroll, not the page) -->
+    <div class="tablebox">
+    <table>
+      <tr><th>{{Col}}</th><th>{{Col}}</th><th>Source</th></tr>
+      <tr><td>{{...}}</td><td>{{...}}</td><td>{{...}}<sup><a href="#s4">[4]</a></sup></td></tr>
+    </table>
+    </div>
+    <p class="note">{{Optional footnote under the table.}}</p>
+  </section>
+
+  <section>
+    <h2>{{N}}. Bottom line</h2>
+    <div class="card">
+      <p>{{Closing synthesis paragraph — answer the original question in full, no new claims.}}</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Sources</h2>
+    <ol class="srcs">
+      <li id="s1"><b>{{Publisher — page title}}</b> ({{what claim(s) it supports}}) · <a href="{{URL}}">{{short-domain}}</a></li>
+      <li id="s2"><b>{{...}}</b> · <a href="{{URL}}">{{...}}</a></li>
+      <!-- one <li id="sN"> per source, in first-appearance order -->
+    </ol>
+    <p class="note" style="margin-top:1rem">Method note: {{how sources were used — e.g. vendor claims reported as claims and attributed; independent sources used for economics/criticism; primary sources preferred over aggregators}}.</p>
+  </section>
+
+  </main>
+</div>
+
+<!-- ============================================================
+     Citation back-button. REQUIRED by Deyao: restores the EXACT
+     scroll position from the moment the citation was clicked.
+     Keep verbatim (it auto-binds to all sup a[href^="#s"] links).
+     ============================================================ -->
+<button id="backbtn" type="button" aria-label="Back to where you were reading">↩ Back to text</button>
+
+<script>
+(function () {
+  var backBtn = document.getElementById('backbtn');
+  var origin = null;
+
+  function flash(el) {
+    el.classList.remove('flash');
+    void el.offsetWidth; // restart animation
+    el.classList.add('flash');
+  }
+
+  // Clicking a citation like [8] in the text: remember the exact scroll
+  // position at that moment, jump to the source, and offer a way back.
+  document.querySelectorAll('sup a[href^="#s"]').forEach(function (a) {
+    a.addEventListener('click', function () {
+      origin = { x: window.scrollX, y: window.scrollY, el: a };
+      backBtn.classList.add('show');
+      var target = document.getElementById(a.getAttribute('href').slice(1));
+      if (target) flash(target);
+    });
+  });
+
+  backBtn.addEventListener('click', function () {
+    if (!origin) return;
+    backBtn.classList.remove('show');
+    window.scrollTo({ left: origin.x, top: origin.y, behavior: 'smooth' });
+    var para = origin.el.closest('li, p, blockquote, td, .cap') || origin.el;
+    flash(para);
+    // Clean the #sN hash so back/refresh doesn't re-jump to the source list.
+    if (history.replaceState) history.replaceState(null, '', location.pathname + location.search);
+    origin = null;
+  });
+})();
+</script>
+</body>
+</html>

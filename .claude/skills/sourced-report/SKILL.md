@@ -7,8 +7,16 @@ description: Conventions for building a "report with sources" HTML page for Deya
 
 When Deyao asks for a **report with sources**, deliver a self-contained HTML page deployed
 to Vercel (see the `vercel` skill — never Claude Artifacts) with the following citation UX.
-First built for the IPRoyal sourcing report (`de0ch-claude-2c340d13.vercel.app`); reuse the
-pattern.
+First built for the IPRoyal sourcing report (`de0ch-claude-2c340d13.vercel.app`); Deyao
+approved this format explicitly — reuse it.
+
+**Start from `template.html` in this skill directory** — it is the full approved skeleton
+(header, TL;DR box, numbered sections in cards, optional stats grid / flow diagram /
+blockquote / table components, Sources section, and the required back-button code).
+Copy it as `index.html` into the Vercel project dir, fill in the `{{PLACEHOLDER}}`s,
+delete unused optional components, and keep the back-button markup/CSS/JS verbatim.
+The sections below document the conventions and preserve the key code in case the
+template file is unavailable.
 
 ## Structure
 
