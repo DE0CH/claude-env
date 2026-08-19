@@ -235,6 +235,12 @@ send the `https://de0ch-claude-<sid>.vercel.app` alias). These pages are public
 (unlisted, no auth) — for sensitive content or collecting private data from me,
 use the cf-tunnel flow below instead.
 
+I usually read these pages on my phone: make every page mobile-friendly and avoid
+layouts that need horizontal scrolling on a narrow screen. In particular, don't use
+wide fixed-min-width tables in a side-scrolling container — stack table rows into
+cards on small screens (media query + `data-label` cells) or pick a layout that
+wraps naturally.
+
 ## Cloudflare tunnel + local HTML content / private data drops
 
 When you need to hand me content too sensitive for a public Vercel page, or need
