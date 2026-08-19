@@ -43,10 +43,25 @@ clean the `#sN` hash afterwards so refresh/back doesn't re-jump. The full markup
 and script are in `template.html` (bottom of the file) — keep them verbatim; the script
 auto-binds to all `sup a[href^="#s"]` links.
 
+## Load the design skills before writing (like the original author did)
+
+The session that produced the approved report loaded the design guidance skills before
+writing the HTML (its theme-token / dark-mode structure matches the `artifact-design`
+patterns exactly). Do the same: **before writing or meaningfully extending the report
+page, load `artifact-design`**, and additionally load **`dataviz` if the report includes
+any chart/graph/plot** (the template has no chart component — dataviz governs any you
+add) and **`artifact-diagramming` if you add a diagram beyond the template's flow strip**.
+The template already encodes the layout, but these skills govern the judgment calls the
+template can't: content selection, density, new components, and chart/diagram design.
+They're written for Artifacts — apply the design guidance, but the delivery target
+remains Vercel, never a Claude Artifact.
+
 ## Delivery checklist
 
-1. Research with the `exa` skill; keep every claim traceable to a source entry.
-2. Fill in `template.html`; deploy per the `vercel` skill
+1. Research per the web-search skills (currently `serpapi` primary, `exa` for extracted
+   content); keep every claim traceable to a source entry.
+2. Load `artifact-design` (+ `dataviz` / `artifact-diagramming` if charts/diagrams),
+   then fill in `template.html`; deploy per the `vercel` skill
    (`de0ch-claude-<sid>` project, `--prod`, verify 200 on the alias).
 3. Discord Deyao the alias URL with a TL;DR (lobster bot).
 4. End-of-task records to the Hetzner Storage Box as usual.
