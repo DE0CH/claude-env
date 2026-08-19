@@ -21,6 +21,14 @@ extend the existing tokens if something extra is needed.
 
 ## Conventions
 
+- **Primary sources first (Deyao, 2026-08-19):** every load-bearing claim should cite a
+  primary source — the legislation/rules themselves, the regulator's own report or data
+  page, official media releases, the parliamentary bill record, the original study.
+  News articles are for political context and corroboration only; when a news story
+  states a fact, hunt down the primary document behind it and cite that instead (the
+  news piece can stay as a secondary cite). Gov/First-party badges should dominate the
+  Sources panel, not News.
+
 - **Citations:** superscript links `<sup><a href="#s1">1</a></sup>` (no brackets), pointing
   at `<li id="sN">` entries in the Sources panel, numbered in first-appearance order.
 - **Source badges:** every source gets one — `Vendor`, `Gov` (`badge gov`), `Peer-reviewed`
