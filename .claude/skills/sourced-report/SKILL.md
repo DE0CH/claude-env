@@ -16,7 +16,7 @@ section headings with accent numbers, panel cards, labeled callouts, consent-sty
 good/warn/bad tags, a Sources panel with per-source badges, and full dark-mode support
 (`prefers-color-scheme` + `data-theme` override). Copy the template as `index.html` into
 the Vercel project dir, fill in the `{{PLACEHOLDER}}`s, and delete optional components
-(flow strip, table, tags, callouts) the report doesn't need. Don't invent new styling —
+(flow strip, card stack, tags, callouts) the report doesn't need. Don't invent new styling —
 extend the existing tokens if something extra is needed.
 
 ## Conventions
@@ -29,8 +29,12 @@ extend the existing tokens if something extra is needed.
   method note at the top of the Sources panel and an attribution disclaimer in the footer.
 - **Honest scoping:** use the `.disc` box to separate what a source directly states from
   sector context or inference.
-- **Mobile (CLAUDE.md rule):** wide content scrolls inside its own `.scroll` container,
-  never the page body; the flow strip wraps via flexbox.
+- **Mobile — NO tables (Deyao, 2026-08-19):** do not use `<table>` (or any element that
+  needs horizontal scrolling or produces cramped multi-column text on a phone). For
+  comparisons/matrices use the template's **card stack** (`.cards`/`.card`): one card per
+  row-entity, labeled rows inside, verdict tag in the card header — it stacks naturally on
+  narrow screens. `.scroll` remains only as a last resort for intrinsically wide content
+  like code blocks, never as a way to keep a table; the flow strip wraps via flexbox.
 
 ## Back-to-position button (Deyao explicitly required this)
 

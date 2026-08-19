@@ -16,8 +16,9 @@
      in the Sources panel, numbered in first-appearance order. Give each source a badge:
      Vendor / Gov / Peer-reviewed (badge sec) / News / Industry / First-party.
   4. Keep the back-button markup, CSS, and script verbatim.
-  5. Mobile rule (CLAUDE.md): wide content scrolls in its own container (.scroll),
-     never the page body.
+  5. Mobile rule (Deyao, 2026-08-19): NO <table> — tables need horizontal scrolling or
+     cramp on phones. Use the .cards/.card stack for comparisons/matrices instead.
+     .scroll is a last resort for intrinsically wide content (e.g. code), never tables.
 -->
 <html lang="en">
 <head>
@@ -82,12 +83,18 @@
   .tag.good{background:var(--good-soft);color:var(--good)}
   .tag.warn{background:var(--warn-soft);color:var(--warn)}
   .tag.bad{background:var(--bad-soft);color:var(--bad)}
-  table{width:100%;border-collapse:collapse;margin:22px 0;font-size:.92rem}
-  th,td{text-align:left;padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top}
-  th{font-size:.74rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:650}
-  td code,p code,li code{background:var(--code);padding:1px 6px;border-radius:5px;font-size:.86em;
+  p code,li code,.card code{background:var(--code);padding:1px 6px;border-radius:5px;font-size:.86em;
     font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
-  .scroll{overflow-x:auto}
+  .scroll{overflow-x:auto} /* last resort for intrinsically wide content (code) — never tables */
+  /* Card stack — the mobile-safe replacement for comparison tables (Deyao, 2026-08-19) */
+  .cards{display:flex;flex-direction:column;gap:14px;margin:22px 0}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px 20px}
+  .card .head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:4px}
+  .card .name{font-weight:650;font-size:1.02rem}
+  .card .sub{color:var(--muted);font-size:.82rem;margin-top:1px}
+  .card .row{margin:10px 0 0}
+  .card .lbl{font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:650;display:block;margin-bottom:2px}
+  .card .val{font-size:.94rem;line-height:1.5}
   .src{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:8px 26px 22px;margin-top:14px}
   ol.sources{font-size:.86rem;color:var(--muted);padding-left:26px;margin:14px 0 0}
   ol.sources li{margin:11px 0;padding-left:4px;scroll-margin-top:96px} /* citation jumps land below mobile title bar (Deyao, 2026-08-19) */
@@ -150,29 +157,35 @@
     "{{Quote or key point.}}"<sup><a href="#s1">1</a></sup>
   </div>
 
-  <!-- OPTIONAL: table. Wrap in .scroll so wide tables scroll inside their
-       own container, never the page. Use .tag good/warn/bad for verdict cells. -->
-  <div class="scroll">
-  <table>
-    <thead><tr><th>{{Col}}</th><th>{{Col}}</th><th>{{Verdict col}}</th></tr></thead>
-    <tbody>
-      <tr>
-        <td><strong>{{Row title}}</strong><br><span style="color:var(--muted);font-size:.85em">{{subtext}}</span></td>
-        <td>{{Cell text, cited.<sup><a href="#s3">3</a></sup>}}</td>
-        <td><span class="tag good">{{Good}}</span></td>
-      </tr>
-      <tr>
-        <td><strong>{{Row title}}</strong></td>
-        <td>{{...}}</td>
-        <td><span class="tag warn">{{Caveat}}</span></td>
-      </tr>
-      <tr>
-        <td><strong>{{Row title}}</strong></td>
-        <td>{{...}}</td>
-        <td><span class="tag bad">{{Bad}}</span></td>
-      </tr>
-    </tbody>
-  </table>
+  <!-- OPTIONAL: card stack — for comparisons/matrices. NO <table>: tables need
+       horizontal scrolling or cramp on phones (Deyao, 2026-08-19). One .card per
+       row-entity; labeled .row entries inside; .tag good/warn/bad verdict in .head. -->
+  <div class="cards">
+    <div class="card">
+      <div class="head">
+        <div>
+          <div class="name">{{Entity name}}</div>
+          <div class="sub">{{subtext}}</div>
+        </div>
+        <span class="tag good">{{Good}}</span>
+      </div>
+      <div class="row"><span class="lbl">{{Attribute}}</span><span class="val">{{Cell text, cited.<sup><a href="#s3">3</a></sup>}}</span></div>
+      <div class="row"><span class="lbl">{{Attribute}}</span><span class="val">{{...}}</span></div>
+    </div>
+    <div class="card">
+      <div class="head">
+        <div><div class="name">{{Entity name}}</div></div>
+        <span class="tag warn">{{Caveat}}</span>
+      </div>
+      <div class="row"><span class="lbl">{{Attribute}}</span><span class="val">{{...}}</span></div>
+    </div>
+    <div class="card">
+      <div class="head">
+        <div><div class="name">{{Entity name}}</div></div>
+        <span class="tag bad">{{Bad}}</span>
+      </div>
+      <div class="row"><span class="lbl">{{Attribute}}</span><span class="val">{{...}}</span></div>
+    </div>
   </div>
 
   <!-- OPTIONAL: caveat/disclaimer box for scoping a claim honestly -->

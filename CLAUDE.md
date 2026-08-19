@@ -246,10 +246,11 @@ send the `https://de0ch-claude-<sid>.vercel.app` alias). These pages are public
 use the cf-tunnel flow below instead.
 
 I usually read these pages on my phone: make every page mobile-friendly and avoid
-layouts that need horizontal scrolling on a narrow screen. In particular, don't use
-wide fixed-min-width tables in a side-scrolling container — stack table rows into
-cards on small screens (media query + `data-label` cells) or pick a layout that
-wraps naturally.
+layouts that need horizontal scrolling on a narrow screen. In particular, avoid
+`<table>` (and any element) that would need horizontal scrolling or give cramped
+multi-column text on a phone — even inside its own scroll container. Use stacked
+cards (one card per row-entity with labeled rows; see the sourced-report skill's
+`.cards` component) or a layout that wraps naturally instead.
 
 ## Cloudflare tunnel + local HTML content / private data drops
 
