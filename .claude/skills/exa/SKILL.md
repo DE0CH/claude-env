@@ -3,18 +3,21 @@ name: exa
 description: >
   Direct Exa API (api.exa.ai) — AI-native web search that returns semantically
   ranked results WITH clean extracted page content, plus grounded LLM answers,
-  URL content fetch, and find-similar. This is the PRIMARY web-search tool: use it
-  whenever a task needs to find pages/URLs, answer a factual or current question
-  from the web, gather sources for research/RAG, look up docs/pricing, or find
-  pages like a given one. Richer than the OpenRouter route (autoprompt, filters,
-  /answer, /contents, /findSimilar). Prefer over Browserbase/ScrapingBee "type into
-  Google" flows.
+  URL content fetch, and find-similar. SECONDARY web-search tool: the `serpapi`
+  skill is the primary (Deyao, 2026-08-19) — reach for Exa when a task needs
+  extracted page content WITH the search (research/RAG over many pages), semantic
+  matching / find-similar, /contents on known URLs, or when the SerpApi quota is
+  exhausted. Richer than the OpenRouter route (autoprompt, filters, /answer,
+  /contents, /findSimilar). Prefer over Browserbase/ScrapingBee "type into Google"
+  flows.
 allowed-tools: Bash
 ---
 
 # Exa (direct API)
 
-**Default web-search tool.** Exa is a neural/embeddings search engine built for LLMs:
+**Secondary web-search tool** — the `serpapi` skill is the default (Deyao,
+2026-08-19); use Exa for content-with-search, find-similar, `/contents`, or when
+SerpApi's quota is out. Exa is a neural/embeddings search engine built for LLMs:
 one call returns ranked results *and* the extracted page text, so you get URLs +
 readable content together. Faster and richer than driving Google in a browser.
 

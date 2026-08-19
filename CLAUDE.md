@@ -37,10 +37,14 @@ notify me to update the set up script in the container set up section manually.
 If claude-in-chrome is avaliable and it's running on mac, use it and normal tools 
 (ignore the directive about Browserbase below), Browserbase is still avaliable when needed.
 
-**Web search: use the `exa` skill by default** (direct Exa API — fast, AI-native,
-returns ranked results with extracted page content plus grounded answers / find-similar,
-not just Google links). Needs the `EXA_API` key (ask Deyao to persist it; this session
-it's cached at `scratchpad/exa_key`). If that key is unavailable, fall back to the
+**Web search: use the `serpapi` skill by default** (SerpApi — real Google SERP data
+as JSON: organic results, answer box, knowledge graph, news/images/maps/scholar
+engines; key in env var `SERPAPI_KEY`, free plan = 250 searches/month so budget
+credits). SerpApi returns links/snippets, not page content — fetch the winning URLs
+with `exa contents` / ScrapingBee when you need the text. Fall back to the `exa`
+skill (direct Exa API — content-with-search, find-similar; needs `EXA_API`, ask
+Deyao to persist it; cached at `scratchpad/exa_key` on 2026-08-18) when SerpApi's
+quota is out or the task needs semantic search over page content, then to the
 `exa-search` skill (Exa via OpenRouter, no key needed, search-only). Do NOT use
 Browserbase's Search API as the default anymore — it's slow and just types into Google.
 Browserbase Search is a last-resort fallback only.
