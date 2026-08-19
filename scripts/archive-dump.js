@@ -66,12 +66,30 @@ function isCaptcha(state) {
   return /One more step|complete the security check|Verifying you are human/i.test(state.text);
 }
 
-// Wait until the CAPTCHA wall (if any) is gone. Browserbase's built-in
-// solver handles it; we just poll until the page text changes.
-async function waitPastCaptcha(page) {
+// Browserbase's built-in solver announces itself via console messages
+// ("browserbase-solving-started" / "browserbase-solving-finished").
+// Track them so we wait on the solver's own signal, with the page-text
+// check as a fallback for walls the solver doesn't announce.
+function trackCaptchaSolver(page) {
+  const solver = { active: false };
+  page.on('console', (msg) => {
+    const t = msg.text();
+    if (t === 'browserbase-solving-started') {
+      solver.active = true;
+      console.error('[+] captcha detected — Browserbase solver working...');
+    } else if (t === 'browserbase-solving-finished') {
+      solver.active = false;
+      console.error('[+] captcha solved');
+    }
+  });
+  return solver;
+}
+
+// Wait until the built-in solver is done and the CAPTCHA wall is gone.
+async function waitPastCaptcha(page, solver) {
   const start = Date.now();
   let state = await pageState(page);
-  while (isCaptcha(state)) {
+  while (solver.active || isCaptcha(state)) {
     if (Date.now() - start > CAPTCHA_WAIT_MS) {
       throw new Error('CAPTCHA wall did not clear within ' + CAPTCHA_WAIT_MS / 1000 + 's');
     }
@@ -100,16 +118,17 @@ async function main() {
     const browser = await chromium.connectOverCDP(session.connectUrl);
     const page = browser.contexts()[0].pages()[0] || (await browser.contexts()[0].newPage());
     page.setDefaultTimeout(60000);
+    const solver = trackCaptchaSolver(page);
 
     // 1) Ask for the newest snapshot. Redirects to it if one exists.
     const newestUrl = `https://${ARCHIVE_HOST}/newest/${targetUrl}`;
     console.error(`[+] opening ${newestUrl}`);
     await page.goto(newestUrl, { waitUntil: 'domcontentloaded', timeout: 90000 }).catch(() => {});
-    let state = await waitPastCaptcha(page);
+    let state = await waitPastCaptcha(page, solver);
     // If the solver bounced us to the host root, retry the /newest/ request.
     if (state.url.replace(/\/$/, '') === `https://${ARCHIVE_HOST}`) {
       await page.goto(newestUrl, { waitUntil: 'domcontentloaded', timeout: 90000 }).catch(() => {});
-      state = await waitPastCaptcha(page);
+      state = await waitPastCaptcha(page, solver);
     }
 
     let wasArchived = true;
@@ -123,7 +142,7 @@ async function main() {
       });
       if (!submitHref) throw new Error('no "archive this url" link on the No-results page');
       await page.goto(submitHref, { waitUntil: 'domcontentloaded', timeout: 90000 });
-      await waitPastCaptcha(page);
+      await waitPastCaptcha(page, solver);
       const clicked = await page.evaluate(() => {
         const btn = document.querySelector('form[action*="submit"] input[type="submit"]');
         if (btn) btn.click();
@@ -137,7 +156,7 @@ async function main() {
       for (;;) {
         await sleep(10000);
         state = await pageState(page);
-        if (isCaptcha(state)) { state = await waitPastCaptcha(page); continue; }
+        if (solver.active || isCaptcha(state)) { state = await waitPastCaptcha(page, solver); continue; }
         if (!/\/(wip|submit)\//.test(state.url) && !state.url.includes('/newest/')) break;
         if (Date.now() - start > SUBMIT_WAIT_MS) {
           throw new Error('capture did not finish in time; last url: ' + state.url);

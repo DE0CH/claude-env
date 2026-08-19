@@ -266,8 +266,10 @@ Goal was: transcript if it exists, otherwise audio → Whisper. What actually wo
 
 - **Browserbase `--verified`** is paid/Enterprise-gated on the current plan.
   **Browserbase HAS built-in captcha solving — use it FIRST** (Deyao, 2026-08-19):
-  create the session with `browserSettings: {solveCaptchas: true}` and poll the page
-  text until the wall clears. Verified working on archive.today's "One more step"
+  create the session with `browserSettings: {solveCaptchas: true}` and wait on the
+  solver's own signal — it logs `browserbase-solving-started` /
+  `browserbase-solving-finished` to the page console (Playwright `page.on('console')`);
+  keep a page-text poll as fallback. Verified working on archive.today's "One more step"
   interstitial (a session without it hit the wall; with it, sailed straight through).
   Reach for residential proxies only after the built-in solver fails. Known limit:
   it did **not** solve Cloudflare Turnstile on cobalt.tools (tested 2026-08).

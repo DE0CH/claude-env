@@ -45,5 +45,8 @@ NODE_PATH=$(npm root -g) node scripts/archive-dump.js <url> [outfile.html]
   never re-captures.
 - **Pitfall:** navigations (the `/newest/` redirect, wip meta-refreshes) destroy
   Playwright execution contexts mid-`evaluate` — wrap page-state reads in a retry loop.
-- CAPTCHA detection: body text matches `One more step|complete the security check`.
-  With solveCaptchas on, just poll every ~5 s until it clears (allow ~2 min).
+- CAPTCHA handling: the built-in solver announces itself via page console messages
+  `browserbase-solving-started` / `browserbase-solving-finished` — listen for those
+  (Playwright `page.on('console')`) and wait while solving is active. Keep a body-text
+  fallback (`One more step|complete the security check`) for walls it doesn't announce;
+  allow ~2 min. Verified live 2026-08-19: solver cleared archive.ph's wall mid-flow.
