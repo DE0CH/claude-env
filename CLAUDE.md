@@ -76,6 +76,12 @@ Avoid using direct connection to the internet if possible. Do not fall back to d
 connections (yt-dlp, curl/wget against the target site, etc.) without trying Browserbase
 first — datacenter IPs get bot-blocked anyway.
 
+**If a source is unavailable when fetched** (dead link, 404/410, domain gone, page
+deleted, paywall, or a wall you can't get past), don't give up on the content: run
+`NODE_PATH=$(npm root -g) node scripts/archive-dump.js <url>` (see the `archive-today`
+skill) to pull the archive.today copy — it fetches the newest snapshot, or submits the
+page for archiving first if none exists.
+
 For YouTube videos, try to get the transcript/subtitles first (through Browserbase). Only
 if no transcript exists, download the audio (through Browserbase) and transcribe it.
 

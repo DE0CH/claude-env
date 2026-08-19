@@ -1,6 +1,6 @@
 ---
 name: archive-today
-description: "Dump or create archive.today (archive.is / archive.ph) snapshots of web pages through Browserbase. Use whenever a task mentions archive.is/archive.today/archive.ph, needs the archived copy of a page (e.g. paywalled or deleted content), or needs to push a page into a web archive. Handles both already-archived URLs (fetch newest snapshot) and never-archived URLs (submit, wait for capture, dump)."
+description: "Dump or create archive.today (archive.is / archive.ph) snapshots of web pages through Browserbase. Use whenever a task mentions archive.is/archive.today/archive.ph, needs the archived copy of a page (e.g. paywalled or deleted content), needs to push a page into a web archive — or whenever a source URL turns out to be unavailable when fetched (dead link, 404/410, domain gone, paywall, unbeatable bot wall): standing rule is to try the archived copy via scripts/archive-dump.js before giving up on the content. Handles both already-archived URLs (fetch newest snapshot) and never-archived URLs (submit, wait for capture, dump)."
 compatibility: "Requires BROWSERBASE_API_KEY; playwright resolvable globally (NODE_PATH=$(npm root -g))."
 ---
 
