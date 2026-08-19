@@ -27,7 +27,12 @@ extend the existing tokens if something extra is needed.
   News articles are for political context and corroboration only; when a news story
   states a fact, hunt down the primary document behind it and cite that instead (the
   news piece can stay as a secondary cite). Gov/First-party badges should dominate the
-  Sources panel, not News.
+  Sources panel, not News. Deliberately hunt the deep record classes too (Deyao,
+  2026-08-19): cabinet/committee meeting records (e.g. National Cabinet's agreed
+  statements are the published "record of meeting outcomes"), court registries for any
+  litigation mentioned (e.g. hcourt.gov.au case pages give parties, filing dates,
+  grounds, orders), Hansard/committee reports and Bills Digests for legislation, and
+  the regulator's own study/report pages rather than coverage of them.
 
 - **Citations:** superscript links `<sup><a href="#s1">1</a></sup>` (no brackets), pointing
   at `<li id="sN">` entries in the Sources panel, numbered in first-appearance order.
