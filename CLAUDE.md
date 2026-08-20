@@ -30,6 +30,14 @@ billing issue — no credit left, free-plan usage exhausted, a payment failing, 
 me to recharge instead of working around it. If a workaround is reqruied, you should
 always ask me for permission first because using the workaround.
 
+**Incorrect configuration → discord me, never work around.** If the environment is
+misconfigured — an expected environment variable doesn't exist, an API key is
+missing/empty/invalid, a credential doesn't work — STOP and discord me to fix the
+misconfiguration instead of substituting a workaround. Example: if the Browserbase
+API key can't be found, do NOT fall back to the container's built-in Chrome — ping
+me to fix the env var. Same rule as billing issues: the fix is on my side; your job
+is to surface it, and only use a workaround if I explicitly approve one.
+
 When a new tool is required, for example by me asking you to add a new tool, edit claude.md,
 or add a new skill, update the setup script so that the dependencies are installed, then
 notify me to update the set up script in the container set up section manually.
