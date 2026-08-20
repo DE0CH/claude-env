@@ -312,6 +312,11 @@ for `browse` sessions: exits the moment its probe changes, waking you with a tur
 via `run_in_background`, and ALWAYS arm a `send_later` deadman alarm (~10 min)
 alongside it in case the watcher itself hangs. Details and war stories: lessons.md.
 
+**Never call `delete_trigger`** — it always fires a manual permission prompt at me,
+which is exactly the annoyance these tools are meant to avoid. A stale one-shot
+trigger/deadman is harmless: let it fire and no-op, or neutralize it with
+`update_trigger` (`enabled: false`) instead.
+
 ## Notification
 
 You should just assume that I am not paying attention to the text output that you are generating.
