@@ -142,6 +142,52 @@ Search first: this exact stack has community skills. Patterns worth stealing:
 
 Upgrade path for our pipeline: word-synced element reveals (their `timing.ts`
 pattern) and BGM ducking are the two highest-value adds we don't do yet.
+(2026-08-21 second cut: word-synced reveals + karaoke captions are now DONE —
+see the Dynamism section below. BGM ducking remains open.)
+
+## Dynamism: never let a scene sit still (2026-08-21, "make it dynamic" round)
+
+The first cut's failure mode: each scene springs its cards in during the first
+~5 s, then is a STILL IMAGE for the remaining ~30 s of narration. Feedback:
+"太多静态内容". The fix, verified end-to-end on the 24-scene cut:
+
+- **Capture word boundaries, not just SRT.** edge-tts 7.x python API:
+  `Communicate(text, voice, rate='+8%', boundary='WordBoundary')`, then
+  `.stream()` yields `WordBoundary` chunks (`offset`/`duration` in 100 ns
+  units, `text` per word) alongside the audio bytes — one network pass gives
+  the mp3 AND per-word timing. (Default boundary is SentenceBoundary — that's
+  why the CLI's `--write-subtitles` is sentence-level.) Persist per scene as
+  `s{i}.words.json`; build `cues.ts` from it (display cues split at sentence
+  enders / >58-char commas, each cue carrying `k: [t, fraction][]` karaoke
+  pairs).
+- **Phrase-anchored reveals** (the big one): every visual element declares the
+  narration phrase it belongs to. At module load, join each scene's word texts
+  into one searchable string (STRIP spaces/hyphens on both sides — word events
+  have no inter-word spaces, so `'数据中心 IP'` must be searched as
+  `'数据中心IP'`); a `usePh()` hook maps phrase → frame (minus ~5 frames of
+  anticipation). Elements appear exactly when the narrator says them, so the
+  scene keeps building for its whole duration instead of front-loading.
+  VERIFY every anchor with a python checker (search each `ph('…')` in the
+  scene's joined words) before rendering — a missed anchor silently falls back.
+- **Beat component** (focus follows narration): spring in at `at`, glow +
+  slight scale while current (until the next element's `at`), then settle to
+  ~0.75 opacity with a gentle sine bob. The viewer's eye is always pulled to
+  what's being said; nothing is ever frozen.
+- **Karaoke subtitles**: render the cue text per-character; sweep count =
+  interpolate the cue's `[t, fraction]` pairs at the current second × char
+  count; swept chars in accent orange. Reads as word-accurate for Chinese.
+- **Ambient layer in the shell** so no frame is static even between beats:
+  2-3 drifting radial-gradient glow blobs + ~16 slow-rising dust motes
+  (deterministic pseudo-random from index — no Math.random in Remotion),
+  slow gradient-angle wobble, Ken Burns on the whole body (scale →1.028 over
+  the scene), directional slide transitions (exit left / enter right),
+  pulsing kicker dot, animated title underline, progress bar with scene ticks
+  and glowing head.
+- **Continuous micro-loops** where content allows: traveling dot along chains
+  (FlowDot), packet dashes under proxy cards, rotating ↻, message-arrival
+  buzz on the phone mock, files flying into the storage box, loop-node
+  highlight cycling. Cheap, and they keep late-scene frames alive.
+- Cost: identical render pipeline, negligible render-time difference.
 
 ## Re-render policy (Deyao, 2026-08-21)
 
