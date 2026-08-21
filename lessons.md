@@ -726,3 +726,20 @@ into cloud-init so a botched first boot is fixable without recreating the server
 - Hetzner cloud + volume + firewall create-in-one-call works: `volumes:[id]` +
   `firewalls:[{firewall:id}]` in POST /v1/servers; volume device path is
   `/dev/disk/by-id/scsi-0HC_Volume_<id>`.
+
+## Long-running watches from web-container sessions (2026-08-21, 3HK queue chase)
+
+- **Background Monitors/processes die when the container idles out, and their
+  completion/timeout events do NOT re-wake a reclaimed container** — only server-side
+  triggers (send_later / Routines) revive the session. A queue watch that must survive
+  hours therefore needs a send_later heartbeat chain (~25 min) armed at all times
+  alongside the in-container watcher; on each firing, verify the watcher is alive and
+  re-arm. Skipping the deadman cost a 3h coverage gap over the lunch window (again).
+- **The DIY portal remember-me cookie survives a CLEAN session release but not a
+  timeout-expiry** — Browserbase context persistence seems to flush on release only.
+  Release sessions deliberately before their timeout if the login matters; a
+  timeout-killed session = next session needs a fresh SMS OTP.
+- 3HK 轉人工 queue observations so far: Wed ~13:05 HKT one pickup (missed, 2-3 min
+  patience then auto-close); Wed afternoon/evening and Thu 07:40-10:48 HKT continuously
+  "agents occupied" through hundreds of asks. The queue is near-unservable; treat any
+  pickup as a one-shot event that the auto-reply watcher must catch.
