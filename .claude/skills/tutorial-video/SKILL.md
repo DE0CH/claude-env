@@ -173,9 +173,9 @@ The first cut's failure mode: each scene springs its cards in during the first
   slight scale while current (until the next element's `at`), then settle to
   ~0.75 opacity with a gentle sine bob. The viewer's eye is always pulled to
   what's being said; nothing is ever frozen.
-- **Karaoke subtitles**: render the cue text per-character; sweep count =
-  interpolate the cue's `[t, fraction]` pairs at the current second × char
-  count; swept chars in accent orange. Reads as word-accurate for Chinese.
+- ~~Karaoke subtitles~~ **REJECTED by Deyao** (2026-08-21): no karaoke-style
+  subtitle sweep — plain sentence-cue subtitles only (engine-timed cue switch
+  + small pop is fine). Keep subtitle font ≥44px for mobile.
 - **Ambient layer in the shell** so no frame is static even between beats:
   2-3 drifting radial-gradient glow blobs + ~16 slow-rising dust motes
   (deterministic pseudo-random from index — no Math.random in Remotion),
@@ -188,6 +188,53 @@ The first cut's failure mode: each scene springs its cards in during the first
   buzz on the phone mock, files flying into the storage box, loop-node
   highlight cycling. Cheap, and they keep late-scene frames alive.
 - Cost: identical render pipeline, negligible render-time difference.
+
+## Motion-graphics cut, v3 (2026-08-21, "not a PowerPoint" round)
+
+Even with narration-synced reveals, card-and-text layouts still read as
+slides. Deyao's bar: **Fireship / 3Blue1Brown** — animated GRAPHICS that
+explain the concept, with a camera, not decorated bullet lists. What shipped:
+
+- **World + camera per scene**: each scene is a 1920×1080 SVG "stage"; a `Cam`
+  wrapper interpolates arrival stops `{f, x, y, s}` (translate+scale, cubic
+  in-out). CRITICAL: keys are ARRIVAL stops — hold the previous position and
+  travel only ~34 frames before each arrival. Naive keyframe spans make the
+  camera drift through empty space for seconds (looked broken in QC).
+- **SVG diagram language**: glow-filtered pipes (colored wide stroke + white
+  thin core) with draw-on via strokeDasharray and endless flowing dash pulses;
+  ~25 hand-drawn stroke icons (robot/browser/phone/key/vault/wall/db/...);
+  impact shake (`sin` decay) for wall slams; seeded pseudo-random only.
+  **No emoji in graphics** (Deyao rule) — emoji only inline in text, if at all.
+- **One protagonist motion per scene** (from video-shotcraft's aesthetic
+  rules): a query ball cascading tiers, an APK riding a chute past a crossed
+  container, a person escaping the loop ring, a minted credential shredded.
+  Everything else supports. Hold ≥1s after key info lands.
+- **Text sizes for mobile** (video-shotcraft Q11): subtitles ≥44px, any "meant
+  to be read" label ≥32px effective (after camera scale), big keywords
+  80-110px via a kinetic `BigWord` overlay. Verify on a 480px-wide thumbnail.
+- **Script style**: story-driven, not listing. The guide's leveling frame
+  (关卡/存档/装备/滚雪球, roguelike metaphor) IS the narrative spine; short
+  punchy sentences; each scene ends hooking the next bottleneck. Full
+  sentences read aloud = boring (Deyao). Symbols get read aloud —
+  `SERPAPI_KEY` becomes "SERPAPI underscore KEY" — so speak "SERPAPI KEY" and
+  map back to display text in the cues normalizer.
+- **Voice / accent fix**: zh-CN voices speak English with a Chinese accent.
+  Fix = multilingual voices (`en-US-BrianMultilingualNeural` chosen by Deyao;
+  Andrew/Ava also fine; there is NO zh-CN multilingual in edge-tts). They run
+  SLOWER than Yunxi: Andrew +8% ≈ 37% slower, Brian +8% ≈ 22% slower —
+  measure a sample line and compensate with rate (we shipped Brian +15%).
+  edge-tts 7.x: word events need `boundary='WordBoundary'` in the python API
+  (default is SentenceBoundary).
+- **Reference library**: `Vincentwei1021/video-shotcraft` (clone it — 152 shot
+  recipe cards + demos + `references/aesthetic-rules.md`, judgment cases from
+  real rework: no uniform-speed motion, accelerating batch entrances + 0.5s
+  rest, one animation trick as protagonist per film, glint restraint, finale =
+  "group photo" of all shown elements at peak energy). Also `Remocn/remocn`
+  (shadcn-style copy-paste Remotion primitives).
+- Anchor-check every `ph('phrase')` against the scene's joined word stream
+  before rendering (strip spaces/hyphens on both sides), and smoke-render
+  ~1 frame per scene and LOOK at them — every layout bug above was caught
+  that way, never by reasoning about code.
 
 ## Re-render policy (Deyao, 2026-08-21)
 
