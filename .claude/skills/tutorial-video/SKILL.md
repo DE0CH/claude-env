@@ -55,7 +55,8 @@ durations, then size every scene to its audio. Never guess durations.
 ```bash
 edge-tts --list-voices | grep zh-CN        # YunxiNeural (male, lively) is a good default
 while IFS= read -r line; do
-  edge-tts --voice zh-CN-YunxiNeural --rate=+8% --text "$line" --write-media "s$i.mp3"
+  edge-tts --voice zh-CN-YunxiNeural --rate=+8% --text "$line" \
+    --write-media "s$i.mp3" --write-subtitles "s$i.srt"
 done < lines.txt
 # measure with the full ffmpeg (imageio_ffmpeg):
 FF=$(python3 -c 'import imageio_ffmpeg as f; print(f.get_ffmpeg_exe())')
@@ -64,6 +65,16 @@ $FF -i s1.mp3 2>&1 | grep Duration
 
 Notes: `--rate=+8%` tightens delivery; digits/latin read fine; write "archive
 point today" style workarounds only when a literal dot must be spoken.
+
+**Subtitles: ALWAYS from `--write-subtitles`, never hand-timed (hard lesson).**
+Hand-written subtitle chunks with length-weighted timing drift from the speech
+and get called out immediately. edge-tts emits SRT cues from the service's
+word-boundary events — sentence-level for Chinese, timing exact. Pipeline that
+worked: parse each SRT → merge cues shorter than ~12 chars into the previous →
+split cues over ~58 chars at punctuation with char-proportional timestamps →
+normalize display text (spoken "四四三" → shown "443", "archive point today" →
+"archive.today") → emit a `cues.ts` (`{t, text}[][]` + `DUR[]`) that the
+Remotion SceneShell consumes (active cue = last cue with `t <= frame/fps`).
 
 ## 2) Remotion project (no create-video scaffold needed)
 
@@ -108,6 +119,29 @@ Throughput observed: ~8800 frames 1080p ≈ minutes-scale; run it with
 Per CLAUDE.md: upload the mp4 to the Storage Box with
 `scripts/storagebox-upload.sh` (WebDAV handles ~100MB files fine), verify by
 GET/PROPFIND, Discord the location. Don't attach video files to Discord.
+
+## Community prior art (found 2026-08-21 — read these before reinventing)
+
+Search first: this exact stack has community skills. Patterns worth stealing:
+
+- **`ajanaku1/demo-video-skill`** (GitHub, MIT) — a Claude Code skill for
+  Remotion + Edge TTS demo videos. Install: `npx claude-code skills add
+  ajanaku1/demo-video-skill`. Its good ideas: 5-act story arc scripting
+  (hook → problem → turn → journey → resolution) instead of feature lists;
+  **word-level timing parsed into a `timing.ts` so visuals appear exactly when
+  the narrator mentions them**; karaoke captions highlighting the current word;
+  scene duration = audio + 0.5s; a library of device mockups (phone/browser/
+  terminal frames), GradientBackground, TypewriterText.
+- **`MatrixReligio/ProductVideoCreator`** (GitHub, ~39★, has 中文文档) —
+  modular skills toolkit (storyboard/recording/voiceover/bgm/subtitles/
+  compositing). Its good ideas: **storyboard-first workflow with user
+  confirmation before production**; voiceover validation (duration/overlap/gap
+  checks); BGM with scene-aware volume ducking; multi-size presets (16:9/9:16/
+  1:1); Playwright screen-recording scenes composited into Remotion;
+  `@remotion/google-fonts` for consistent Chinese fonts.
+
+Upgrade path for our pipeline: word-synced element reveals (their `timing.ts`
+pattern) and BGM ducking are the two highest-value adds we don't do yet.
 
 ## Gotchas recap
 
