@@ -143,6 +143,14 @@ Search first: this exact stack has community skills. Patterns worth stealing:
 Upgrade path for our pipeline: word-synced element reveals (their `timing.ts`
 pattern) and BGM ducking are the two highest-value adds we don't do yet.
 
+## Re-render policy (Deyao, 2026-08-21)
+
+Renders are EXPENSIVE (a 15-min 1080p video ≈ 27k frames ≈ 45-85 min of CPU).
+When the companion website/guide changes, do NOT re-render the video — only
+re-render when Deyao explicitly asks for it. Treat the video as a pinned
+artifact; content drift between site and video is acceptable until an explicit
+re-render request.
+
 ## Gotchas recap
 
 - certifi append (above) or every edge-tts call dies on TLS.
