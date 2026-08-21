@@ -102,6 +102,19 @@ budgets, etc.), use **chendeyao000@gmail.com** by default. The Claude account em
 (chendeyao010@proton.me) is only for identifying me — treat it as irrelevant for tasks
 and never use it as a task/service email unless I explicitly say so for that task.
 
+## Search the community FIRST whenever doing something new
+
+Standing rule (Deyao, 2026-08-21): whenever a task involves doing something NEW — a
+new kind of deliverable, a new tool, a new pipeline — ALWAYS search online for
+community prior art BEFORE designing your own approach. Mechanically: search
+(serpapi/exa) for other people's code, skills files, templates, and lessons on the
+exact task; load the best one or two into your context; adapt rather than invent.
+Having their work in context reliably pushes your output toward higher quality, and
+it avoids re-solving solved problems. War story: the tutorial-video pipeline was
+built from scratch, and only a later search revealed ready-made community skills for
+the exact same stack (see the tutorial-video skill's "Community prior art" section) —
+including the subtitle-timing pattern whose absence cost a full re-render round.
+
 ## Make a skills file after researching a new tool
 
 Whenever you research a new tool/service/API to get a task done, always distill what you
