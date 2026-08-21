@@ -669,6 +669,13 @@ article text, no login):
 
 ## Provisioning a Hetzner box blind from a web pod (2026-08-20, Plex server)
 
+**DECOMMISSIONED 2026-08-21** per Deyao: server `plex` (162936001), its 100GB
+volume `plex-media` (106664429) and firewall `plex-fw` (11495736) were all
+deleted via the Cloud API; the `plex-box` skill was removed. The Storage Box
+(claude-records, 635000) is unaffected; its `plex-hetzner/` command-channel dir
+is just leftover files. The provisioning pattern below stays valid for future
+boxes.
+
 Built the Plex box (see the `plex-box` skill for the living runbook) entirely via
 cloud-init — no SSH from pods, so debugging happened through a **storage-box WebDAV
 command channel**: a 30s systemd timer on the server GETs `cmd.sh` from the box over
