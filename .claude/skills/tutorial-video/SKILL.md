@@ -245,6 +245,19 @@ explain the concept, with a camera, not decorated bullet lists. What shipped:
   rest, one animation trick as protagonist per film, glint restraint, finale =
   "group photo" of all shown elements at peak energy). Also `Remocn/remocn`
   (shadcn-style copy-paste Remotion primitives).
+- **SVG text vertical alignment**: `<text>` positions by alphabetic BASELINE —
+  a label with y at a box's center sits ~0.35em too high, and it reads as
+  sloppy "PPT alignment" (Deyao caught it). Give the shared Label component
+  `dominantBaseline="central"` from day one and position by visual center;
+  never hand-compensate with per-label y fudges.
+- **Glow-filter clipping**: a shared `<filter filterUnits="userSpaceOnUse">`
+  with a fixed region CLIPS any filtered element outside that region — pipes
+  drawn inside translated groups with far-reaching local coords rendered as
+  floating fragments (Deyao's screenshot). Make the filter region huge
+  (e.g. x/y -3000, 8000×7000 — Chromium intersects it with the element bbox,
+  so it costs nothing) and draw long connectors in world coordinates.
+  Connectors must visually TOUCH the nodes they join — a 95px "gap by
+  design" reads as broken, not stylish.
 - Anchor-check every `ph('phrase')` against the scene's joined word stream
   before rendering (strip spaces/hyphens on both sides), and smoke-render
   ~1 frame per scene and LOOK at them — every layout bug above was caught
