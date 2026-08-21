@@ -2,6 +2,29 @@
 
 Hard-won operational knowledge from past sessions. Check here before re-deriving a workflow.
 
+## Rebuilding a previous session's project from its archived transcript (2026-08-21)
+
+A dead container's work is fully recoverable from the session `.jsonl` on the Storage Box:
+download it and replay the `Write`/`Edit` tool_use inputs in order (apply each Edit's
+old_string→new_string against the accumulated content) — this reconstructed a complete
+Remotion project (39KB Video.tsx + 9 edits) byte-exact. Bash heredocs in the transcript
+carry the rest (package.json, narration lines, exact commands). Also: **edge-tts is
+deterministic** — regenerating the same text/voice/rate gave mp3s with identical durations
+to 0.01s, so per-scene timing survives a rebuild; only re-measure the lines you changed.
+
+## Aliyun account-wide "is anything burning money" audit (2026-08-21)
+
+Don't stop at listing service instances — query BssOpenApi with the ADMIN key for the
+authoritative answer: `QueryAccountBalance` + `QueryBillOverview` (BillingCycle=YYYY-MM)
+give per-product month totals, and `DescribeInstanceBill` (BillingDate=…, Granularity=DAILY)
+proves whether anything accrued *today*. Host `business.aliyuncs.com`, version 2017-12-14,
+same ACS3-HMAC-SHA256 signing as ecp_call.py (just parameterize the host). Gotchas: the
+eds-aic SG endpoint returns `ProfileRegion.Unsupported` when the account never activated
+the product there (that's "nothing exists", not an error to debug); HK/EU cloud phones are
+listed via the cn-shanghai endpoint with `BizRegionId=`; the auto-created OSS screenshot
+bucket (`cloudphone-saved-bucket-*`) keeps billing ~¥0.0000002/day forever after a phone
+PoC — harmless, but it's why the daily bill never reads exactly zero.
+
 ## Sourcing: never trust another AI's answer — verify the primary source (2026-08)
 
 Deyao's rule, learned the hard way on a "when does Christ Church Oxford close to tourists"
