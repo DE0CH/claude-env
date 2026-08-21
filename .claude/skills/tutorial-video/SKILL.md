@@ -280,3 +280,16 @@ re-render request.
 - No CJK font = tofu in every frame; install fonts BEFORE rendering.
 - Colons/backslashes in JSX text are fine, but keep narration lines free of
   literal double quotes or escape them when shelling out to edge-tts.
+- **Screen-space overlays must live OUTSIDE the camera rig.** Big kinetic
+  words / titles rendered as HTML overlays get transformed too if they're
+  children of the Cam component — whenever the camera isn't at the identity
+  stop they drift off-frame, clip at an edge, or slide under the subtitle
+  (several "level title" words were simply invisible for a whole video
+  version). Return `<><Cam>…</Cam><BigWord…/></>` and keep overlay y within
+  the safe band (~150 top / ~840 bottom; subtitle box top edge ≈933 at 1080p).
+- **QC = full-res screenshots at ~6 keyframes per scene, reviewed one by
+  one.** 1fps contact sheets at 480px tiles miss exactly the defects viewers
+  see (label/subtitle collisions, overlapping pills, half-cropped leftovers
+  of previous beats, clipped titles). Also: when the camera moves on, fade
+  parked elements to ~20% (restore for the finale) or their cropped fragments
+  will float at frame edges under the HUD.
