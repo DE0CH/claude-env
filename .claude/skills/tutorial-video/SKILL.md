@@ -120,6 +120,20 @@ Per CLAUDE.md: upload the mp4 to the Storage Box with
 `scripts/storagebox-upload.sh` (WebDAV handles ~100MB files fine), verify by
 GET/PROPFIND, Discord the location. Don't attach video files to Discord.
 
+**Web copy on Vercel — hard limits & verification (2026-08-21 incident):**
+- Vercel rejects any single file >100MB ("File size limit exceeded"). Ship a
+  capped re-encode for the site (motion graphics survive
+  `-crf 26 -maxrate 420k -bufsize 840k` at 1080p looking clean) and keep the
+  full-bitrate master on the Storage Box.
+- NEVER deploy or deliver a media file without probing THAT artifact first:
+  `ffmpeg -i file` must show Duration+streams, AND the first ~2MB prefix must
+  probe too (proves `+faststart` moov-up-front, which streaming needs). A
+  broken encode once shipped because `ffmpeg … | tail -1` hid the non-zero
+  exit — an interrupted faststart pass leaves ftyp/free/mdat(size 0) with NO
+  moov and the file is unplayable. Capture ffmpeg's real exit code (`2> log;
+  echo $?`), never pipe it through tail.
+- After deploying, probe the SERVED URL's byte-range prefix the same way.
+
 ## Community prior art (found 2026-08-21 — read these before reinventing)
 
 Search first: this exact stack has community skills. Patterns worth stealing:
