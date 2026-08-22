@@ -571,6 +571,12 @@ REST API (`tap`/`keyboard`/`screenshot`/`ui-state`). Specifics:
   仍然下载 dialogs. Open the finished APK from the 文件 app (`com.android.documentsui`,
   launch via PUT /apps/{pkg} with EMPTY JSON body `{}` — no body = 400). Decline the
   Play-Protect enable prompt (拒绝) — it eats the first install tap.
+- **Read device screens as TEXT, not screenshots** (Deyao, 2026-08-22): default to
+  `GET /v1/devices/{id}/ui-state` — the `a11y_tree` JSON has every element's
+  text/contentDescription + boundsInScreen (tap center = midpoint) + isClickable.
+  Flatten it (see `scratchpad/ui.py` pattern: walk children, print `'text' @(cx,cy) CLK`)
+  and grep. Far cheaper and faster than screenshot→vision. Screenshots only for genuinely
+  visual things (jigsaw captchas, image layout, seat-map colors).
 - **mobilerun API gotchas**: open-deep-link wants `{"deepLink":...}` not `url`;
   `/global` action is an integer (1=BACK); `/devices/{id}/stop` (park) is
   **unsupported** for android_cloud_phone — you cannot pause billing, terminate instead
