@@ -19,7 +19,7 @@
  *   TUNNEL_AGENT_SECRET optional; only needed if the Worker was deployed with
  *                       an AGENT_SECRET (defense-in-depth; off by default).
  *
- * Requires the `ws` package (npm install -g ws; setup.sh does this).
+ * Requires the `ws` package (npm install -g ws).
  */
 
 const { execSync } = require("node:child_process");

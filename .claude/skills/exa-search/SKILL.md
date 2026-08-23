@@ -100,8 +100,7 @@ curl -s https://openrouter.ai/api/v1/chat/completions \
   https://openrouter.ai/models for valid ids.
 - Annotation `content` is a cleaned excerpt (a few KB), not always the whole page.
   For long docs, fetch the winning URL separately.
-- No new env var needed — `OPENROUTER_API` is already present. Nothing to add to the
-  setup script.
+- No new env var needed — `OPENROUTER_API` is already present. Nothing to install.
 
 ## Alternatives (only if this is down)
 

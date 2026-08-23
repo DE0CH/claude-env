@@ -87,4 +87,4 @@ and it matches the egress-gateway notes in `lessons.md`.
 pip install curl_cffi beautifulsoup4
 ```
 
-These should be baked into the container setup script — see the Tools policy in CLAUDE.md.
+These are not persisted across pod sessions, so reinstall them if a fresh pod is missing them.

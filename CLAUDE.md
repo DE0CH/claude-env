@@ -39,8 +39,7 @@ me to fix the env var. Same rule as billing issues: the fix is on my side; your 
 is to surface it, and only use a workaround if I explicitly approve one.
 
 When a new tool is required, for example by me asking you to add a new tool, edit claude.md,
-or add a new skill, update the setup script so that the dependencies are installed, then
-notify me to update the set up script in the container set up section manually.
+or add a new skill, install its dependencies the proper way (brew/apt/pip) and notify me.
 
 If claude-in-chrome is avaliable and it's running on mac, use it and normal tools 
 (ignore the directive about Browserbase below), Browserbase is still avaliable when needed.
@@ -122,7 +121,7 @@ learned into a skills file (`SKILL.md`) at the end — either write one under
 `.claude/skills/<name>/SKILL.md`, or find and adapt an existing community `skills.md` if
 one exists. A skills file should always be generated after doing research, so the next
 session starts from the distilled knowledge instead of re-deriving it. (When the tool
-also needs installing, update the setup script and notify me, per the Tools policy above.)
+also needs installing, install it and notify me, per the Tools policy above.)
 
 ## Prompts for the next agent
 
