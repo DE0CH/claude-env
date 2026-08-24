@@ -56,6 +56,11 @@ quota is out or the task needs semantic search over page content, then to the
 Browserbase's Search API as the default anymore — it's slow and just types into Google.
 Browserbase Search is a last-resort fallback only.
 
+**When fetching web pages, always fetch the raw HTML — never markdown conversions**
+(e.g. ScrapingBee's `return_page_markdown`, Browserbase Fetch's markdown output).
+I (Claude) understand HTML just as well or better, and markdown conversion loses
+structure (tables, attributes, embedded JSON/scripts). Fetch HTML and read that.
+
 If claude-in-chrome is not avaliable, then use Browserbase for ANY content from websites 
 — not just interactive browsing: media/file downloads, YouTube videos/audio/subtitles, 
 APIs. It covers three modes:
