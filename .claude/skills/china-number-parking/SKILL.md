@@ -34,10 +34,17 @@ life never surfaces it. Unicom = 沃行讯通; Telecom has its own. Mobile's is 
 1. Have a **real, real-name-registered, ACTIVE, paid** China Mobile number (cheap ¥8/month
    保号-style plan works).
 2. Insert SIM once, log into 无忧行 (移动 users: 本机号码一键登录), enable 号码托管.
-3. **Then remove the physical SIM.** The line still lives on CM's network tied to your identity;
-   the app receives calls/SMS over IP. If the number goes 停机/停机保号, forwarding STOPS.
-   → It is fully identity-bound (实名制) and requires an active paid subscription. Not anonymous,
-   not SIM-subscription-free — only the plastic card is removable.
+3. **Then remove the physical SIM — permanently.** After setup the app is authenticated by an
+   app login (password/device session, SMS OTP), NOT by the SIM's cryptographic secure element.
+   Two DIFFERENT senses of "identity", do not conflate them:
+   - **SIM technical identity (IMSI + Ki cryptographic auth): gone.** You genuinely don't need a
+     SIM anymore; the strong hardware-rooted identity is replaced by a "flimsy" app account. This
+     is a real SECURITY DOWNGRADE — the +86 (master key to Alipay/bank/WeChat) is now only as
+     strong as that app password.
+   - **Carrier real-name registration (legal record) + active PAID subscription: still required.**
+     The number must stay active; 停机/停机保号 breaks forwarding. This is a database record, not
+     the SIM. It is not anonymous in the legal sense, but it is SIM-crypto-free in the technical
+     sense. (Earlier sessions wrongly said "more identity-bound than a SIM" by conflating these.)
 
 ### Costs / what's free
 - **Receiving calls + SMS abroad: FREE** — traffic rides the internet to the app, so it's billed
@@ -47,7 +54,15 @@ life never surfaces it. Unicom = 沃行讯通; Telecom has its own. Mobile's is 
   then paid 语音包 (voice packages) at domestic-ish rates. Recipient sees your genuine +86.
 - **You still pay**: the monthly line fee, and for **your own data/Wi-Fi** at your end (the app
   needs connectivity — in practice carry a local SIM/eSIM for data + park the +86 in 无忧行).
-- Same principle as Western Wi-Fi Calling; mainland VoWiFi just doesn't roam, hence the app.
+  Note: the outbound cost is a DOMESTIC charge, NOT an international fee.
+- **NOT the same billing outcome as Western Wi-Fi Calling** (don't repeat this earlier error).
+  Western VoWiFi virtualizes you onto your HOME network: calling a home-country number is domestic,
+  but calling any FOREIGN number (incl. China) is still billed international even over Wi-Fi.
+  无忧行 instead virtualizes your +86 as if the handset were physically IN China, so a call to a
+  Chinese number is a plain domestic-China call and incoming is free — there is NO international
+  leg at all. It's not "cheap international calling", it's "your number teleported home." The
+  shared idea with VoWiFi is only the delivery mechanism (voice over IP, no radio-roaming leg),
+  not the billing.
 
 ### Why it's the legitimate +86-origin path
 The call genuinely originates from your own real SIM/subscription via the carrier's own
