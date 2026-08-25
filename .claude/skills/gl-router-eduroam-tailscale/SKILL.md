@@ -34,6 +34,13 @@ Hard-won from setting up a **GL-SFT1200 (Opal)** on 2026-08-25. Read this before
 - Bring up with `wifi reload`. Watch `wpa_cli -i staeduroam -p /var/run/wpa_supplicant status` for `wpa_state=COMPLETED`, then DHCP on wwan, then ping.
 - **Marginal signal is the usual failure**: a travel router's antenna receives eduroam far worse than a laptop (saw -74..-85 dBm vs laptop 85%). Symptoms: intermittent association + PEAP that never completes (EAP restarts every ~38s). A fresh **spoofed MAC + a clean single retry** often succeeds where churning did not. The Siflower `lb-fmac` driver CAN do concurrent AP+STA (combos allow managed+AP); GL's repeater uses it daily.
 
+### Correct main→alt failover (don't fail over on transient!)
+A weak-signal timeout is NOT an account failure. Failing over to the backup account on any "didn't get online in N seconds" is a false positive (real war story). Fail over ONLY when:
+- **the account is genuinely rejected** — grep wpa_supplicant for `CTRL-EVENT-EAP-FAILURE` or `CTRL-EVENT-SSID-TEMP-DISABLED ... reason=AUTH_FAILED` (bad creds/disabled). A wrong password logs these within ~6s; a transient/weak-signal failure logs `reason=CONN_FAILED` / `ASSOC-REJECT status_code=1` and **no** EAP-FAILURE. That's the discriminator.
+- **or** it can't get online within a long catch-all (e.g. 10 min) despite retrying — handles a main that's broken in a non-EAP-FAILURE way (RADIUS unreachable, realm unroutable → EAP just times out forever).
+Everything else: keep retrying the SAME account (fresh MAC each attempt, alternate bands).
+- **Scope reject-detection to the current attempt** with a per-attempt `logger -t x "$mark"` written a few seconds AFTER the STA is reconfigured (so the old supplicant's lines flush first), then `logread | sed -n "/$mark/,\$p" | grep -qE 'EAP-FAILURE|reason=AUTH_FAILED'`. Counting EAP-FAILUREs across the whole buffer is racy: lingering AUTH_FAILED lines from a just-rejected main will falsely condemn a valid alt (real bug). On weak signal a genuine reject may take several attempts to actually register (EAP must complete far enough to be rejected) — the catch-all backstops that.
+
 ## 6. Tailscale on a 128MB mipsle router
 - Push the static **mipsle** build (`pkgs.tailscale.com/stable/tailscale_<ver>_mipsle.tgz`) — the combined-binary symlink trick does NOT work with this tgz, so push BOTH `tailscale` and `tailscaled`. UBIFS compresses the overlay (~40MB binary → ~24MB on disk), so space is fine.
 - procd init for tailscaled: `--state=/overlay/tailscale/state/tailscaled.state --statedir=... --socket=/var/run/tailscale/tailscaled.sock`, `respawn`.
