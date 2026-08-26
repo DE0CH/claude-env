@@ -106,6 +106,16 @@ budgets, etc.), use **chendeyao000@gmail.com** by default. The Claude account em
 (chendeyao010@proton.me) is only for identifying me — treat it as irrelevant for tasks
 and never use it as a task/service email unless I explicitly say so for that task.
 
+## Card payments & payment-page sessions
+
+Standing rule (Deyao, 2026-08-26): when a task reaches a card-payment step, do NOT
+collect card details through a drop form — hand Deyao the Browserbase live view
+(`debuggerFullscreenUrl`) and let him type the card details directly into the payment
+page himself. Also: run any browser session that will touch a payment flow on a
+**residential IP** (e.g. Browserbase `proxies:[{type:"browserbase",geolocation:
+{country:"GB",city:"LONDON"}}]`) from the start — payment fraud checks flag
+datacenter IPs, and a session's proxy can't be changed after creation.
+
 ## Search the community FIRST whenever doing something new
 
 Standing rule (Deyao, 2026-08-21): whenever a task involves doing something NEW — a
