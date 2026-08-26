@@ -61,6 +61,13 @@ Browserbase Search is a last-resort fallback only.
 I (Claude) understand HTML just as well or better, and markdown conversion loses
 structure (tables, attributes, embedded JSON/scripts). Fetch HTML and read that.
 
+**Do NOT use Baidu — it's useless (Deyao, 2026-08-26).** Skip `engine=baidu` on SerpApi
+and don't drive baidu.com; it wastes credits/turns. For **Chinese-platform content**
+(抖音/小红书/微博/B站 etc.) use the **`tikhub` skill** (TikHub API, key `TIKHUB_API`) —
+it returns platform JSON directly (video/note search, profiles, comments). Use
+SerpApi Google (with `hl=zh-CN`/`gl=cn`) for the general Chinese web and prefer
+Chinese primary sources (gov `.gov.cn`, official WeChat 公众号 via mp.weixin.qq.com).
+
 If claude-in-chrome is not avaliable, then use Browserbase for ANY content from websites 
 — not just interactive browsing: media/file downloads, YouTube videos/audio/subtitles, 
 APIs. It covers three modes:
