@@ -116,6 +116,14 @@ page himself. Also: run any browser session that will touch a payment flow on a
 {country:"GB",city:"LONDON"}}]`) from the start — payment fraud checks flag
 datacenter IPs, and a session's proxy can't be changed after creation.
 
+## Security questions = passwords
+
+Standing rule (Deyao, 2026-08-26): "security question" answers on any account are
+essentially passwords — never fill them with real facts. Generate a random string
+(like a password, via `secrets`), keep it out of the chat transcript (fill via a
+script reading from a local file, never echo it or dump field values that contain
+it), store it in the task records, and DM it to Deyao with the account password.
+
 ## Search the community FIRST whenever doing something new
 
 Standing rule (Deyao, 2026-08-21): whenever a task involves doing something NEW — a
