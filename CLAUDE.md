@@ -27,7 +27,11 @@ Examples include, a tool is not installed, in which case you should install it i
 by either using brew, apt, pip depending on the environment. If ANY service you use has a
 billing issue — no credit left, free-plan usage exhausted, a payment failing, a
 "$0.00 credits" style error — you should discord me (per the Notification section) to ask
-me to recharge instead of working around it. If a workaround is reqruied, you should
+me to recharge instead of working around it. **Exception — ScrapingBee (Deyao,
+2026-08-26): do NOT ping about its quota/billing.** He will not recharge it (too
+expensive, no pay-as-you-go); when its monthly quota is out, silently use the
+alternatives (Browserbase for fetches/screenshots, exa for content) and only
+mention ScrapingBee if a task truly cannot be done without it. If a workaround is reqruied, you should
 always ask me for permission first because using the workaround.
 
 **Incorrect configuration → discord me, never work around.** If the environment is

@@ -7,6 +7,12 @@ allowed-tools: Bash
 
 # ScrapingBee
 
+**Quota policy (Deyao, 2026-08-26):** free plan, 1000 calls/month, and he will NOT
+recharge/upgrade (no pay-as-you-go). If you get `{"message":"Monthly API calls limit
+reached"}`, do NOT ping him about it — fall back silently (Browserbase for
+fetches/screenshots, exa for page content) and mention ScrapingBee only if a task
+genuinely has no alternative. Quota was exhausted on 2026-08-26; it resets monthly.
+
 ScrapingBee is an HTTP API for fetching web pages — it handles headless browsers, proxies, and anti-bot measures server-side. Everything is a single `curl` call; no SDK or browser install needed.
 
 **Source of truth:** ScrapingBee maintains LLM-oriented reference docs at [scrapingbee.com/llms.txt](https://www.scrapingbee.com/llms.txt), an index of per-topic files ([HTML API](https://www.scrapingbee.com/llms/html-api.txt), [data extraction](https://www.scrapingbee.com/llms/data-extraction.txt), [JS scenarios](https://www.scrapingbee.com/llms/js-scenario.txt), [Google Search](https://www.scrapingbee.com/llms/google-search-api.txt), and more — including Amazon/Walmart/YouTube endpoints). Fetch the relevant file for anything not covered here; those files carry the full contract, constraints, and costs.
