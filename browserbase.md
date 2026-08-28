@@ -27,27 +27,6 @@ signed in as me — do NOT create a new context.
 - **Known logged-in accounts:** YouTube/Google. In a context-backed session youtube.com
   shows `LOGGED_IN: true` and bot-walled videos are playable.
 
-## "privileged" context — sensitive accounts, avoid unless necessary
-
-There is a second persistent context named **privileged** where I keep logins for
-more sensitive accounts.
-
-- **Context ID:** `6da1d16b-9f4e-4a67-b89e-92ba9824f3b7` (CLI alias: `privileged`)
-- **Only use this context when I explicitly ask for it.** Default to the regular
-  context above for everything. If you think a task requires `privileged` but I
-  haven't explicitly said to use it, ALWAYS ask me and get my permission first —
-  never decide on your own, no matter how obvious it seems.
-- **ALWAYS use a UK proxy (London if possible)** for any session on this context —
-  never connect to it without one. Verified working (exits via a London
-  residential ISP):
-
-  ```bash
-  browse cloud sessions create --body '{"projectId":"8f2c3e0b-53ae-4425-828e-79e5fd52a180","browserSettings":{"context":{"id":"6da1d16b-9f4e-4a67-b89e-92ba9824f3b7","persist":true}},"proxies":[{"type":"browserbase","geolocation":{"country":"GB","city":"LONDON"}}],"keepAlive":true,"timeout":3600}'
-  ```
-
-- Same usage rules as the regular context (one session at a time, persist,
-  `timeout 3600`, release sessions when done).
-
 ## How to use it
 
 Create sessions on top of the context. Pass `--persist` so any new logins/cookies

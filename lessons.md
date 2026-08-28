@@ -69,9 +69,6 @@ What the classifier blocks in remote/auto sessions — don't retry these, route 
   same data (head/cat), `cp`, `gzip` usually pass — but it's inconsistent: an identical
   `cp`/`split` can pass one minute and be blocked the next; loops over transcript chunks
   get blocked where single simple commands pass.
-- **Creating Browserbase sessions on the `privileged` context is blocked** (both
-  `--body` and `--context-id` forms; the regular context creates fine). If a task needs
-  the privileged context, ask Deyao to intervene.
 - **Drive connector `share_file` (granting another account access) is blocked.**
 - A classifier denial is not a user denial: per the Tools policy, ping Deyao and ask
   instead of silently working around or giving up.
