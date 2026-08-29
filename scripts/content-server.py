@@ -115,15 +115,37 @@ class Handler(BaseHTTPRequestHandler):
         if not os.path.isfile(full):
             return self._send(404, "not found")
         ctype = "text/html; charset=utf-8"
-        for ext, t in {
-            ".css": "text/css", ".js": "text/javascript", ".json": "application/json",
-            ".png": "image/png", ".jpg": "image/jpeg", ".svg": "image/svg+xml",
-            ".txt": "text/plain; charset=utf-8", ".pdf": "application/pdf",
+        attach = False  # binary/media types download instead of rendering inline
+        for ext, (t, a) in {
+            ".css": ("text/css", False), ".js": ("text/javascript", False),
+            ".json": ("application/json", False),
+            ".png": ("image/png", False), ".jpg": ("image/jpeg", False),
+            ".svg": ("image/svg+xml", False),
+            ".txt": ("text/plain; charset=utf-8", False),
+            ".pdf": ("application/pdf", False),
+            ".mp4": ("video/mp4", True), ".mp3": ("audio/mpeg", True),
+            ".zip": ("application/zip", True),
+            ".bin": ("application/octet-stream", True),
         }.items():
             if full.endswith(ext):
-                ctype = t
+                ctype, attach = t, a
+        size = os.path.getsize(full)
+        self.send_response(200)
+        self.send_header("Content-Type", ctype)
+        self.send_header("Content-Length", str(size))
+        self.send_header("Cache-Control", "no-store")
+        if attach:
+            self.send_header(
+                "Content-Disposition",
+                f'attachment; filename="{os.path.basename(full)}"',
+            )
+        self.end_headers()
         with open(full, "rb") as f:
-            return self._send(200, f.read(), ctype)
+            while True:
+                chunk = f.read(1024 * 1024)
+                if not chunk:
+                    return
+                self.wfile.write(chunk)
 
     # ---- HTTP methods ------------------------------------------------------
 

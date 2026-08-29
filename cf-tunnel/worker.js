@@ -218,7 +218,7 @@ export class Tunnel {
       }
       const { readable, writable } = new TransformStream();
       const writer = writable.getWriter();
-      const stream = { writer, timer: null };
+      const stream = { writer, timer: null, q: Promise.resolve(), dead: false };
       stream.arm = () => {
         clearTimeout(stream.timer);
         stream.timer = setTimeout(() => {
@@ -234,14 +234,25 @@ export class Tunnel {
 
     if (msg.type === "res-chunk") {
       const stream = this.streams.get(msg.id);
-      if (!stream || !stream.writer) return;
+      if (!stream || !stream.writer || stream.dead) return;
       stream.arm();
-      stream.writer.write(new Uint8Array(b64decode(msg.data_b64))).catch(() => {
-        // reader gone (client disconnected): drop the stream, tell the agent
-        clearTimeout(stream.timer);
-        this.streams.delete(msg.id);
-        try { ws.send(JSON.stringify({ type: "res-cancel", id: msg.id })); } catch {}
-      });
+      const bytes = new Uint8Array(b64decode(msg.data_b64));
+      // Await each write and ack it: writes only complete as the client
+      // consumes the body, and the agent caps unacked chunks in flight, so a
+      // slow client throttles the agent instead of ballooning DO memory.
+      stream.q = stream.q
+        .then(async () => {
+          await stream.writer.write(bytes);
+          try { ws.send(JSON.stringify({ type: "res-ack", id: msg.id })); } catch {}
+        })
+        .catch(() => {
+          // reader gone (client disconnected): drop the stream, tell the agent
+          if (stream.dead) return;
+          stream.dead = true;
+          clearTimeout(stream.timer);
+          this.streams.delete(msg.id);
+          try { ws.send(JSON.stringify({ type: "res-cancel", id: msg.id })); } catch {}
+        });
       return;
     }
 
@@ -250,7 +261,9 @@ export class Tunnel {
       if (!stream) return;
       clearTimeout(stream.timer);
       this.streams.delete(msg.id);
-      if (stream.writer) stream.writer.close().catch(() => {});
+      if (stream.writer) {
+        stream.q.then(() => stream.writer.close()).catch(() => {});
+      }
       return;
     }
   }

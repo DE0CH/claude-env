@@ -65,6 +65,7 @@ if (!ACCESS_ID || !ACCESS_SECRET) {
 // bigger than ~700KB). CHUNK*4/3 must stay well under that cap.
 const CHUNK = 512 * 1024;
 const WS_BUFFER_MAX = 8 * 1024 * 1024;
+const MAX_INFLIGHT = 8; // unacked chunks per request (worker acks each write)
 let backoff = 1000;
 
 function connect() {
@@ -87,11 +88,25 @@ function connect() {
   });
 
   const cancelled = new Set(); // req ids the worker told us to stop streaming
+  const inflight = new Map();  // req id -> {count, wake, legacy}
 
   ws.on("message", async (raw) => {
     let msg;
     try { msg = JSON.parse(raw.toString()); } catch { return; }
-    if (msg.type === "res-cancel") { cancelled.add(msg.id); return; }
+    if (msg.type === "res-cancel") {
+      cancelled.add(msg.id);
+      const f = inflight.get(msg.id);
+      if (f && f.wake) { const w = f.wake; f.wake = null; w(); }
+      return;
+    }
+    if (msg.type === "res-ack") {
+      const f = inflight.get(msg.id);
+      if (f) {
+        f.count--;
+        if (f.wake) { const w = f.wake; f.wake = null; w(); }
+      }
+      return;
+    }
     if (msg.type !== "req") return;
     const send = (obj) => ws.send(JSON.stringify(obj));
     let started = false;
@@ -112,6 +127,8 @@ function connect() {
       started = true;
       if (resp.body && msg.method !== "HEAD") {
         const reader = resp.body.getReader();
+        const flow = { count: 0, wake: null, legacy: false };
+        inflight.set(msg.id, flow);
         let pending = Buffer.alloc(0);
         const sendChunks = async (final) => {
           while (pending.length >= CHUNK || (final && pending.length)) {
@@ -119,6 +136,15 @@ function connect() {
             const piece = pending.subarray(0, CHUNK);
             pending = pending.subarray(piece.length);
             send({ type: "res-chunk", id: msg.id, data_b64: piece.toString("base64") });
+            flow.count++;
+            // Window on worker acks: each ack means the client consumed a
+            // chunk, so a slow client throttles us here. A worker that never
+            // acks (stale deploy) is detected once and the window disabled.
+            while (!flow.legacy && flow.count >= MAX_INFLIGHT && !cancelled.has(msg.id)) {
+              const before = flow.count;
+              await new Promise((r) => { flow.wake = r; setTimeout(r, 15_000); });
+              if (flow.count === before && flow.count >= MAX_INFLIGHT) flow.legacy = true;
+            }
             while (ws.bufferedAmount > WS_BUFFER_MAX) {
               await new Promise((r) => setTimeout(r, 50));
             }
@@ -144,6 +170,7 @@ function connect() {
       }
     }
     cancelled.delete(msg.id);
+    inflight.delete(msg.id);
     try { send({ type: "res-end", id: msg.id }); } catch (e) {
       console.error("[agent] send failed:", e.message);
     }
