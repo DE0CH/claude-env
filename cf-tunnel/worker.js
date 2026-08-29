@@ -86,14 +86,16 @@ export default {
   },
 };
 
-const MAX_BODY = 25 * 1024 * 1024; // bytes, request and response alike
-const AGENT_TIMEOUT_MS = 60_000;
+const MAX_BODY = 25 * 1024 * 1024; // bytes, request bodies only
+const AGENT_TIMEOUT_MS = 60_000;   // waiting for the agent's res-start
+const STREAM_IDLE_MS = 120_000;    // max gap between body chunks
 
 export class Tunnel {
   constructor(state, env) {
     this.state = state;
     this.env = env;
     this.pending = new Map(); // reqId -> {resolve, timer}
+    this.streams = new Map(); // reqId -> {writer, timer, arm}
     this.nextId = 1;
   }
 
@@ -187,18 +189,70 @@ export class Tunnel {
       try { ws.send(JSON.stringify({ type: "pong" })); } catch {}
       return;
     }
-    if (msg.type !== "res") return;
-    const entry = this.pending.get(msg.id);
-    if (!entry) return;
-    clearTimeout(entry.timer);
-    this.pending.delete(msg.id);
-    const headers = new Headers();
-    for (const [k, v] of Object.entries(msg.headers || {})) {
-      if (["content-length", "transfer-encoding", "connection"].includes(k.toLowerCase())) continue;
-      try { headers.set(k, v); } catch {}
+    // Legacy single-message protocol (old agents): whole body in one message.
+    if (msg.type === "res") {
+      const entry = this.pending.get(msg.id);
+      if (!entry) return;
+      clearTimeout(entry.timer);
+      this.pending.delete(msg.id);
+      const headers = respHeaders(msg.headers);
+      const body = msg.body_b64 ? b64decode(msg.body_b64) : null;
+      entry.resolve(new Response(body, { status: msg.status || 502, headers }));
+      return;
     }
-    const body = msg.body_b64 ? b64decode(msg.body_b64) : null;
-    entry.resolve(new Response(body, { status: msg.status || 502, headers }));
+
+    // Streaming protocol: res-start opens the response, res-chunk messages
+    // carry the body (each well under Cloudflare's ~1MB WS message cap),
+    // res-end closes it. This is what lets large files through the tunnel.
+    if (msg.type === "res-start") {
+      const entry = this.pending.get(msg.id);
+      if (!entry) return;
+      clearTimeout(entry.timer);
+      this.pending.delete(msg.id);
+      const headers = respHeaders(msg.headers);
+      const status = msg.status || 502;
+      if ([101, 204, 205, 304].includes(status)) {
+        entry.resolve(new Response(null, { status, headers }));
+        this.streams.set(msg.id, { writer: null, timer: null, arm: () => {} });
+        return;
+      }
+      const { readable, writable } = new TransformStream();
+      const writer = writable.getWriter();
+      const stream = { writer, timer: null };
+      stream.arm = () => {
+        clearTimeout(stream.timer);
+        stream.timer = setTimeout(() => {
+          this.streams.delete(msg.id);
+          try { writer.abort("stream idle timeout"); } catch {}
+        }, STREAM_IDLE_MS);
+      };
+      stream.arm();
+      this.streams.set(msg.id, stream);
+      entry.resolve(new Response(readable, { status, headers }));
+      return;
+    }
+
+    if (msg.type === "res-chunk") {
+      const stream = this.streams.get(msg.id);
+      if (!stream || !stream.writer) return;
+      stream.arm();
+      stream.writer.write(new Uint8Array(b64decode(msg.data_b64))).catch(() => {
+        // reader gone (client disconnected): drop the stream, tell the agent
+        clearTimeout(stream.timer);
+        this.streams.delete(msg.id);
+        try { ws.send(JSON.stringify({ type: "res-cancel", id: msg.id })); } catch {}
+      });
+      return;
+    }
+
+    if (msg.type === "res-end") {
+      const stream = this.streams.get(msg.id);
+      if (!stream) return;
+      clearTimeout(stream.timer);
+      this.streams.delete(msg.id);
+      if (stream.writer) stream.writer.close().catch(() => {});
+      return;
+    }
   }
 
   webSocketClose() {
@@ -215,7 +269,21 @@ export class Tunnel {
       entry.resolve(new Response(reason, { status: 502 }));
     }
     this.pending.clear();
+    for (const [, stream] of this.streams) {
+      clearTimeout(stream.timer);
+      if (stream.writer) { try { stream.writer.abort(reason); } catch {} }
+    }
+    this.streams.clear();
   }
+}
+
+function respHeaders(raw) {
+  const headers = new Headers();
+  for (const [k, v] of Object.entries(raw || {})) {
+    if (["content-length", "transfer-encoding", "connection"].includes(k.toLowerCase())) continue;
+    try { headers.set(k, v); } catch {}
+  }
+  return headers;
 }
 
 function b64encode(buf) {

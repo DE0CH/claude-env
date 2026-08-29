@@ -59,7 +59,12 @@ if (!ACCESS_ID || !ACCESS_SECRET) {
   process.exit(1);
 }
 
-const MAX_BODY = 25 * 1024 * 1024;
+// Streaming protocol: response bodies are sent as res-start / res-chunk* /
+// res-end messages so a body is never one giant WS message (Cloudflare caps
+// WS messages at ~1MB, which the old single-message protocol hit on any file
+// bigger than ~700KB). CHUNK*4/3 must stay well under that cap.
+const CHUNK = 512 * 1024;
+const WS_BUFFER_MAX = 8 * 1024 * 1024;
 let backoff = 1000;
 
 function connect() {
@@ -81,11 +86,15 @@ function connect() {
     }, 30_000);
   });
 
+  const cancelled = new Set(); // req ids the worker told us to stop streaming
+
   ws.on("message", async (raw) => {
     let msg;
     try { msg = JSON.parse(raw.toString()); } catch { return; }
+    if (msg.type === "res-cancel") { cancelled.add(msg.id); return; }
     if (msg.type !== "req") return;
-    let status = 502, respHeaders = {}, bodyBuf = Buffer.alloc(0);
+    const send = (obj) => ws.send(JSON.stringify(obj));
+    let started = false;
     try {
       const resp = await fetch(TARGET + msg.path, {
         method: msg.method,
@@ -97,24 +106,45 @@ function connect() {
             : undefined,
         redirect: "manual",
       });
-      status = resp.status;
+      const respHeaders = {};
       resp.headers.forEach((v, k) => { respHeaders[k] = v; });
-      const ab = await resp.arrayBuffer();
-      bodyBuf = Buffer.from(ab.slice(0, MAX_BODY));
+      send({ type: "res-start", id: msg.id, status: resp.status, headers: respHeaders });
+      started = true;
+      if (resp.body && msg.method !== "HEAD") {
+        const reader = resp.body.getReader();
+        let pending = Buffer.alloc(0);
+        const sendChunks = async (final) => {
+          while (pending.length >= CHUNK || (final && pending.length)) {
+            if (cancelled.has(msg.id)) return false;
+            const piece = pending.subarray(0, CHUNK);
+            pending = pending.subarray(piece.length);
+            send({ type: "res-chunk", id: msg.id, data_b64: piece.toString("base64") });
+            while (ws.bufferedAmount > WS_BUFFER_MAX) {
+              await new Promise((r) => setTimeout(r, 50));
+            }
+          }
+          return true;
+        };
+        for (;;) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          pending = pending.length ? Buffer.concat([pending, Buffer.from(value)]) : Buffer.from(value);
+          if (!(await sendChunks(false))) { await reader.cancel().catch(() => {}); break; }
+        }
+        await sendChunks(true);
+      }
     } catch (e) {
-      status = 502;
-      respHeaders = { "content-type": "text/plain" };
-      bodyBuf = Buffer.from(`agent: local fetch failed: ${e.message}`);
+      if (!started) {
+        try {
+          send({ type: "res-start", id: msg.id, status: 502, headers: { "content-type": "text/plain" } });
+          send({ type: "res-chunk", id: msg.id, data_b64: Buffer.from(`agent: local fetch failed: ${e.message}`).toString("base64") });
+        } catch {}
+      } else {
+        console.error("[agent] stream failed:", e.message);
+      }
     }
-    try {
-      ws.send(JSON.stringify({
-        type: "res",
-        id: msg.id,
-        status,
-        headers: respHeaders,
-        body_b64: bodyBuf.length ? bodyBuf.toString("base64") : "",
-      }));
-    } catch (e) {
+    cancelled.delete(msg.id);
+    try { send({ type: "res-end", id: msg.id }); } catch (e) {
       console.error("[agent] send failed:", e.message);
     }
   });
