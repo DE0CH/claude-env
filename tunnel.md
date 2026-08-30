@@ -44,12 +44,18 @@ Deyao's standing preference: when asking him for specific data (logins, 2FA,
 keys), do NOT link the generic `/drop` form. Serve a custom, mobile-friendly
 page with exactly the fields needed as `~/tunnel-share/index.html` — start from
 `cf-tunnel/form-template.html`. It submits to the `drop` endpoint (urlencoded
-`label` + `text`=JSON, so drops land in `~/drop` and wake the watcher) and
+`label` + `text`=JSON, so drops land in `~/drop`) and
 polls `status.json` for dynamic state changes: write
 `{"state":"need_2fa","message":"..."}` (or `need_credentials` / `processing` /
 `done` / `error` with optional `retry":"creds"` and `otp_label`) to
 `~/tunnel-share/status.json` and the open page switches views instantly —
 no reload, no new link, phone-friendly.
+
+**No watching for submissions (Deyao, 2026-08-30).** Do not run background
+watchers on `~/drop` or heartbeat/deadman chains polling for Deyao's tunnel
+activity — it's a waste of wakeups. He tells the session in chat when he has
+submitted something; only then read `~/drop` and act. Keeping content-server
+and the agent running is fine.
 
 ## cf-tunnel: a private, Access-gated tunnel that works from web containers
 

@@ -324,12 +324,17 @@ generic `/drop` form.** Build a task-specific page instead — polished,
 mobile-friendly, with exactly the named fields needed (email, password, 2FA…)
 — as `~/tunnel-share/index.html` so the bare session URL opens it. Start from
 `cf-tunnel/form-template.html` (a worked example from the Hetzner setup): it
-POSTs each submission to the `drop` endpoint as JSON (so the wake-on-drop
-watcher fires instantly), and polls `status.json` in `~/tunnel-share` every 2 s
-so the agent can flip it between states (`need_credentials` → `need_2fa` →
-`processing` → `done` / `error` + message) — meaning a 2FA field appears on my
-phone the moment it's needed, with no new link. Always pair the wait with a
-background watcher on `~/drop` (wakes on submit) + a `send_later` deadman.
+POSTs each submission to the `drop` endpoint as JSON, and polls `status.json`
+in `~/tunnel-share` every 2 s so the agent can flip it between states
+(`need_credentials` → `need_2fa` → `processing` → `done` / `error` + message)
+— meaning a 2FA field appears on my phone the moment it's needed, with no new
+link.
+
+**Do NOT watch for tunnel submissions (Deyao, 2026-08-30).** No background
+watcher on `~/drop`, no heartbeat/deadman chain polling for my edits — it's a
+waste. I will tell you in chat when I've submitted something; process
+`~/drop` then. (Keeping the tunnel processes alive is fine; just don't burn
+wakeups waiting on me.)
 
 The container is ephemeral, so anything not in this repo comes from the
 environment: my secrets are environment variables, not files. The Cloudflare
