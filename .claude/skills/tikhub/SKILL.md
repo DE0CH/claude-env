@@ -80,6 +80,40 @@ curl -sS -X POST -H "Authorization: Bearer $TIKHUB_API" -H "Content-Type: applic
   "https://api.tikhub.io/api/v1/douyin/billboard/fetch_hot_total_search_list"
 ```
 
+## Verified social-search endpoints (2026-09-04, Huanggang-port rumour sweep)
+
+```bash
+# Threads — recent posts by keyword (data.searchResults → posts with caption.text, taken_at, code, user.username)
+curl -sS -G -H "Authorization: Bearer $TIKHUB_API" --data-urlencode "query=新皇崗口岸" \
+  "https://api.tikhub.io/api/v1/threads/web/search_recent"      # search_top for ranked
+# Threads post detail by URL (fetch_post_detail_v2) returned posts_count=0 for a public post — unreliable; rely on search results.
+
+# Weibo — `weibo/web/fetch_search` is dead (404 "Database did not find endpoint data").
+# Working: web_v2 realtime search / app comprehensive search; BOTH take `query=` (not keyword=)
+curl -sS -G -H "Authorization: Bearer $TIKHUB_API" --data-urlencode "query=新皇岗口岸 开通" \
+  "https://api.tikhub.io/api/v1/weibo/web_v2/fetch_realtime_search"
+curl -sS -G -H "Authorization: Bearer $TIKHUB_API" --data-urlencode "query=皇岗口岸 开通时间" --data-urlencode "search_type=1" \
+  "https://api.tikhub.io/api/v1/weibo/app/fetch_search_all"
+# → cards with text_raw / text (HTML), created_at ("Sat Aug 29 20:17:27 +0800 2026"), mid, user.screen_name,
+#   reposts_count / comments_count / attitudes_count. Post URL: https://m.weibo.cn/detail/<mid>
+
+# Xiaohongshu — note search (keyword=; sort_type=time_descending; time_filter=一周内) and note body
+curl -sS -G -H "Authorization: Bearer $TIKHUB_API" --data-urlencode "keyword=新皇岗口岸" --data-urlencode "time_filter=一周内" \
+  "https://api.tikhub.io/api/v1/xiaohongshu/app_v2/search_notes"          # items: note_id/id, title, desc, user.nickname, liked_count, time
+curl -sS -G -H "Authorization: Bearer $TIKHUB_API" --data-urlencode "note_id=<note_id>" \
+  "https://api.tikhub.io/api/v1/xiaohongshu/app_v2/get_image_note_detail"  # full desc, no xsec_token needed (web_v3 detail requires it)
+
+# Twitter/X — fetch_search_timeline (keyword=, search_type=Latest): data.timeline[] with text, created_at, screen_name,
+#   favorites/retweets/views. Note: CJK keyword searches returned mostly unrelated results; X has little HK-port chatter.
+# Reddit — reddit/app/fetch_dynamic_search (query=, sort=NEW, time_range=month, need_format=true): deeply nested GraphQL; posts under
+#   data.search.dynamic.components.main.edges[].node.children[].post (postTitle, url, content.markdown, createdAt).
+# Douyin — POST douyin/search/fetch_video_search_v1 {"keyword","sort_type":"2","publish_time":"7"}: items with desc, create_time, author.nickname, statistics.
+```
+
+Parsing tip: responses nest differently per platform — walk the JSON recursively for dicts carrying the
+text field (`caption.text` / `text_raw` / `desc`) instead of hard-coding paths. LIHKG is not on TikHub and
+blocks ScrapingBee, Browserbase Fetch and Exa (Cloudflare 403) — use Google-indexed titles/snippets via SerpApi.
+
 ## Gotchas
 
 - Always `-G --data-urlencode` for query params with spaces/URLs/CJK.
