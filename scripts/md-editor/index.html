@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>OKR.md</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="vendor/toastui-editor.css">
+<link rel="stylesheet" href="vendor/toastui-editor-dark.css" media="(prefers-color-scheme: dark)">
+<style>
+  :root { --bg:#fff; --fg:#222; --muted:#777; --ok:#2e7d32; --warn:#b26a00; --err:#c62828; --bar:#f6f6f6; --line:#e5e5e5; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#232428; --fg:#eee; --muted:#9a9a9a; --bar:#2b2c31; --line:#3a3b40; }
+  }
+  html, body { height:100%; margin:0; background:var(--bg); color:var(--fg);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Noto Sans CJK SC", sans-serif; }
+  body { display:flex; flex-direction:column; }
+  #bar { display:flex; align-items:center; gap:.75rem; padding:.45rem .9rem; background:var(--bar);
+    border-bottom:1px solid var(--line); font-size:.9rem; flex:0 0 auto;
+    padding-top: calc(.45rem + env(safe-area-inset-top)); }
+  #bar b { font-weight:600; }
+  #status { margin-left:auto; color:var(--muted); white-space:nowrap; }
+  #status.saving { color:var(--warn); } #status.saved { color:var(--ok); } #status.error { color:var(--err); }
+  #editor { flex:1 1 auto; min-height:0; }
+  .toastui-editor-defaultUI { border:0 !important; border-radius:0 !important; height:100% !important; }
+  .toastui-editor-defaultUI .ProseMirror, .toastui-editor-contents { font-size:17px; line-height:1.6; }
+  .toastui-editor-md-container .toastui-editor { font-size:15px; }
+  @media (min-width: 900px) {
+    .toastui-editor-ww-container .toastui-editor-contents,
+    .toastui-editor-md-container .toastui-editor { max-width: 860px; margin: 0 auto; }
+  }
+</style>
+</head>
+<body>
+<div id="bar"><b>OKR.md</b><span id="status">loading…</span></div>
+<div id="editor"></div>
+<script src="vendor/toastui-editor-all.min.js"></script>
+<script>
+(function () {
+  const statusEl = document.getElementById('status');
+  const dark = matchMedia('(prefers-color-scheme: dark)').matches;
+  let version = null;        // X-Doc-Version of what we last loaded/saved
+  let lastSaved = null;      // markdown text last confirmed on disk
+  let dirty = false, saving = false, timer = null, editor = null;
+
+  const setStatus = (cls, text) => { statusEl.className = cls; statusEl.textContent = text; };
+  const now = () => new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+
+  async function load() {
+    const r = await fetch('doc', {cache:'no-store'});
+    if (!r.ok) throw new Error('load ' + r.status);
+    version = r.headers.get('X-Doc-Version');
+    lastSaved = await r.text();
+    return lastSaved;
+  }
+
+  async function save() {
+    if (!editor || saving) return;
+    const text = editor.getMarkdown();
+    if (text === lastSaved) { dirty = false; setStatus('saved', 'saved'); return; }
+    saving = true; setStatus('saving', 'saving…');
+    try {
+      const r = await fetch('doc', {method:'POST', cache:'no-store',
+        headers: {'Content-Type':'text/plain; charset=utf-8', 'X-Doc-Version': version || ''}, body: text});
+      if (r.status === 409) {
+        // file changed on disk (e.g. edited from the container) — take the disk copy
+        version = r.headers.get('X-Doc-Version');
+        lastSaved = await r.text();
+        editor.setMarkdown(lastSaved, false);
+        dirty = false;
+        setStatus('error', 'reloaded from disk (changed elsewhere) ' + now());
+        return;
+      }
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      version = r.headers.get('X-Doc-Version');
+      lastSaved = text;
+      dirty = editor.getMarkdown() !== lastSaved;
+      setStatus('saved', 'saved ' + now());
+      if (dirty) schedule(300);
+    } catch (e) {
+      setStatus('error', 'save failed — retrying');
+      schedule(3000);
+    } finally { saving = false; }
+  }
+
+  function schedule(ms) { clearTimeout(timer); timer = setTimeout(save, ms); }
+
+  function onChange() { dirty = true; setStatus('', 'unsaved'); schedule(800); }
+
+  load().then(text => {
+    editor = new toastui.Editor({
+      el: document.getElementById('editor'),
+      height: '100%',
+      initialEditType: 'wysiwyg',
+      previewStyle: 'tab',
+      initialValue: text,
+      usageStatistics: false,
+      theme: dark ? 'dark' : 'light',
+      placeholder: 'Start writing…',
+      toolbarItems: [
+        ['heading', 'bold', 'italic', 'strike'],
+        ['hr', 'quote'],
+        ['ul', 'ol', 'task'],
+        ['table', 'link', 'code', 'codeblock'],
+      ],
+      events: { change: onChange },
+    });
+    setStatus('saved', 'loaded');
+  }).catch(e => setStatus('error', 'load failed: ' + e.message));
+
+  // flush on backgrounding / navigation
+  const flush = () => { if (dirty) { clearTimeout(timer); save(); } };
+  document.addEventListener('visibilitychange', () => { if (document.hidden) flush(); });
+  window.addEventListener('pagehide', flush);
+  window.addEventListener('beforeunload', e => { if (dirty || saving) { e.preventDefault(); e.returnValue = ''; } });
+
+  // pick up edits made on disk while idle (never while there are local unsaved changes)
+  setInterval(async () => {
+    if (!editor || dirty || saving) return;
+    try {
+      const r = await fetch('doc', {method:'GET', cache:'no-store'});
+      const v = r.headers.get('X-Doc-Version');
+      if (v && version && v !== version) {
+        const text = await r.text();
+        version = v; lastSaved = text;
+        editor.setMarkdown(text, false);
+        setStatus('saved', 'reloaded from disk ' + now());
+      }
+    } catch (_) {}
+  }, 5000);
+})();
+</script>
+</body>
+</html>
