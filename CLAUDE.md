@@ -306,6 +306,16 @@ multi-column text on a phone — even inside its own scroll container. Use stack
 cards (one card per row-entity with labeled rows; see the sourced-report skill's
 `.cards` component) or a layout that wraps naturally instead.
 
+**But the page must ALSO have a good layout on desktop (Deyao, 2026-09-03).**
+Mobile-first does not mean mobile-only: a single narrow column stretched across a
+wide window is not acceptable. Use responsive breakpoints (e.g. `@media
+(min-width: 900px)`) and put the width to use — for map/report pages, a full-height
+map (or main visual) on the left with the cards/text in a scrolling column on the
+right; for text pages, a comfortable max-width column, not a full-bleed line. Never
+ship a "wide but short" map strip on desktop. Verify BOTH viewports before sending
+the link: screenshot the deployed page at a phone size (~390 px) AND a desktop size
+(~1600 px) through Browserbase (see lessons/33 for the screenshot mechanics).
+
 ## Cloudflare tunnel + local HTML content / private data drops
 
 When you need to hand me content too sensitive for a public Vercel page, or need
