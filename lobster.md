@@ -42,3 +42,11 @@ curl -s -X POST \
   -d '{"content":"lobster online from the new environment"}' \
   https://discord.com/api/v10/channels/1531422588247474266/messages
 ```
+
+## Attachments: non-ASCII filenames are stripped
+
+Verified 2026-09-05: bot uploads via the messages endpoint lose every non-ASCII
+character in the filename server-side (`双翼…2013-201507.xlsx` → `2013-201507.xlsx`,
+all-Chinese names → a random hex name). Declaring `attachments:[{id,filename}]` in
+`payload_json` does not help. If the Chinese filename matters, put the files in a zip
+(Python `zipfile` writes UTF-8 names) and send the zip under an ASCII name.
