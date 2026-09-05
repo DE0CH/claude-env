@@ -289,33 +289,32 @@ Default to Tier 1 (Evomi datacenter) for general traffic; escalate to Tier 2 onl
 IP gets blocked or a task genuinely needs residential/mobile reputation. Both are SOCKS5 with
 user:pass — hand them straight to mobilerun's `POST /v1/devices/{id}/proxy`.
 
-## Showing me HTML content — Discord the file (no Vercel, no Artifacts)
+## Showing me HTML content — Vercel, NOT Claude Artifacts
 
-Standing rule (Deyao, 2026-09-05): **do not deploy pages to Vercel anymore**, and never
-use Claude Artifacts. When a deliverable is an HTML report/page (or any file), send the
-file itself to me as a Discord attachment from the lobster bot. Discord strips non-ASCII
-attachment filenames, so if the Chinese filename matters, zip the files (Python `zipfile`
-keeps UTF-8 names) and send the zip under an ASCII name (see lobster.md). The `vercel`
-skill stays in the repo only for history.
+When you need to show me an HTML page/report/demo, **never use Claude Artifacts** —
+deploy it to Vercel and discord me the URL. Each session starts its own fresh
+project named **`de0ch-claude-<short-session-id>`** (see the `vercel` skill for the
+exact proven flow: directory name = project name, `vercel deploy --prod --yes`,
+send the `https://de0ch-claude-<sid>.vercel.app` alias). These pages are public
+(unlisted, no auth) — for sensitive content or collecting private data from me,
+use the cf-tunnel flow below instead.
 
-I usually open these on my phone: make every page mobile-friendly and avoid layouts that
-need horizontal scrolling on a narrow screen — no `<table>` or other element that would
-scroll sideways or cram multi-column text on a phone; use stacked cards (one card per
-row-entity with labeled rows; see the sourced-report skill's `.cards` component) or a
-layout that wraps naturally instead.
+I usually read these pages on my phone: make every page mobile-friendly and avoid
+layouts that need horizontal scrolling on a narrow screen. In particular, avoid
+`<table>` (and any element) that would need horizontal scrolling or give cramped
+multi-column text on a phone — even inside its own scroll container. Use stacked
+cards (one card per row-entity with labeled rows; see the sourced-report skill's
+`.cards` component) or a layout that wraps naturally instead.
 
 **But the page must ALSO have a good layout on desktop (Deyao, 2026-09-03).**
-Mobile-first does not mean mobile-only: a single narrow column stretched across a wide
-window is not acceptable. Use responsive breakpoints (e.g. `@media (min-width: 900px)`)
-and put the width to use — for map/report pages, a full-height map (or main visual) on
-the left with the cards/text in a scrolling column on the right; for text pages, a
-comfortable max-width column, not a full-bleed line. Never ship a "wide but short" map
-strip on desktop. Verify BOTH viewports before sending: render the local file at a phone
-size (~390 px) AND a desktop size (~1600 px) with Playwright/Chromium and check the
-screenshots.
-
-For content too sensitive even for a Discord DM, or when I must hand data to you, use
-the cf-tunnel flow below.
+Mobile-first does not mean mobile-only: a single narrow column stretched across a
+wide window is not acceptable. Use responsive breakpoints (e.g. `@media
+(min-width: 900px)`) and put the width to use — for map/report pages, a full-height
+map (or main visual) on the left with the cards/text in a scrolling column on the
+right; for text pages, a comfortable max-width column, not a full-bleed line. Never
+ship a "wide but short" map strip on desktop. Verify BOTH viewports before sending
+the link: screenshot the deployed page at a phone size (~390 px) AND a desktop size
+(~1600 px) through Browserbase (see lessons/33 for the screenshot mechanics).
 
 ## Cloudflare tunnel + local HTML content / private data drops
 
