@@ -10,3 +10,5 @@ What the classifier blocks in remote/auto sessions — don't retry these, route 
 - **Drive connector `share_file` (granting another account access) is blocked.**
 - A classifier denial is not a user denial: per the Tools policy, ping Deyao and ask
   instead of silently working around or giving up.
+
+- **2026-09-05 (双翼 task):** `vercel deploy --prod` of a research report that named private individuals with their bank flows / family ties was blocked by the classifier (twice, also a plain `sed -i` editing that HTML). Earlier deploys of the same page without the personal-finance section went through. Deliver such pages as a Discord attachment and let Deyao decide whether to publish; don't retry the deploy blindly.
