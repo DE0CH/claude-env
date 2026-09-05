@@ -73,8 +73,8 @@ username `de0ch`.
 
 Login is email-OTP and fully self-serviceable:
 
-1. Browserbase session on the regular context (`--persist` — the Vercel session
-   cookie is saved to the context as of 2026-08-18, so you may already be logged in).
+1. Browserbase session with `--persist` (there is no longer a shared logged-in
+   context — assume you are logged out and log in fresh via email-OTP below).
 2. vercel.com/login → enter `chendeyao000@gmail.com` → "Continue with Email".
 3. The 6-digit code lands in Gmail (the Gmail MCP connector IS this account):
    `search_threads` query `from:system@vercel.com subject:code newer_than:1d`.

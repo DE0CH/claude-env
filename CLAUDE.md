@@ -76,8 +76,9 @@ If claude-in-chrome is not avaliable, then use Browserbase for ANY content from 
 — not just interactive browsing: media/file downloads, YouTube videos/audio/subtitles, 
 APIs. It covers three modes:
 the `browse` CLI for interactive browser sessions, the Fetch API for plain page/content
-retrieval, and the Search API for web search (fallback only — prefer `exa-search`). There
-is a persistent logged-in browser context — see @browserbase.md.
+retrieval, and the Search API for web search (fallback only — prefer `exa-search`).
+There is no longer a persistent logged-in browser context — assume nothing is signed
+in and create a fresh context per task if you need one. See @browserbase.md.
 
 Always create Browserbase sessions with `--timeout 3600` (1 hour). The default timeout
 is ~5 minutes and kills the session mid-task whenever you're waiting on something slow
