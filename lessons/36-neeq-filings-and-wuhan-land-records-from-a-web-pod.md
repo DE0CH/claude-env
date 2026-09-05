@@ -47,3 +47,24 @@ ScrapingBee (quota out) and with tianyancha/qcc/qichamao all login-walled.
   the bare tab — `exa contents <url>` returned shareholder tables for 上海博达; but qcc
   serves a login wall for some firms (双翼科技), and qichamao/tianyancha search pages are
   login-walled everywhere.
+
+## Corporate-registry graph walking without a qcc login (added 2026-09-05)
+
+- `exa /contents` on `https://m.qcc.com/firm/<KeyNo>.html` returns the page's
+  `window.__INITIAL_STATE__` JSON for most firms (some, e.g. 双翼科技, are login-walled).
+  Parse `"StockName"…"StockPercent"` (percent is `******` for anonymous users) and
+  `"Name":…,"Job":…` for officers; `"KeyNo"` values inside the blob give you the
+  KeyNos of shareholders (32-hex) and people (`p…` 32 chars) — no search page needed.
+- Person pages `https://m.qcc.com/pl/<pKeyNo>.html` list the person's real 关联企业
+  first, then a long "recommended" tail; only trust an entry after opening that firm's
+  own page. Batch 5–10 URLs per `/contents` call; some URLs silently drop out, retry
+  them in the next batch.
+- Address strings are evidence: firms of one circle cluster in the same 小区/楼层
+  (将军帽小区33号 C栋101 / D栋201 / D栋202 / D栋301; 中信楼 104-2 / 104-3).
+- Drive connector `download_file_content` returns base64 into the conversation —
+  fine for a 15 KB xlsx, unusable for MB-scale statements. Read small docx/xlsx with
+  `read_file_content` instead; for big binaries use another transfer path.
+- Audio: 3 m4a → 16 kHz mono 48 kbps mp3 chunks (≤4 min) → OpenRouter `openai/gpt-audio`
+  chat completion with `input_audio`; ~10 min of Mandarin transcribed cleanly with
+  speaker labels. Trailing <30 s chunks may come back "请提供录音" — re-prompt saying it's
+  the tail of a conversation.
