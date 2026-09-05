@@ -319,7 +319,7 @@ the cf-tunnel flow below.
 
 ## Cloudflare tunnel + local HTML content / private data drops
 
-When you need to hand me content too sensitive even for a Discord DM, or need
+When you need to hand me content too sensitive for a public Vercel page, or need
 me to hand you data that must
 not end up in the chat transcript: build the content as local files under
 `~/tunnel-share`, serve it with `scripts/content-server.py`, and expose it through
