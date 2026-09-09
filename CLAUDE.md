@@ -208,6 +208,22 @@ through it (e.g. `ipv4.icanhazip.com`), never bulk traffic. Check an exit IP's r
 ping0.cc via a SEPARATE Browserbase session (Browserbase's own IP), **never through the proxy
 under test**.
 
+**Prefer IPRoyal MOBILE over residential (Deyao, 2026-09-09).** Deyao keeps ~2 GB on the
+**mobile** product and near-zero on residential — so mobile is the one with balance. When
+Deyao says "residential", he means **mobile** — default to the mobile product. Mobile
+endpoints are country hosts like `cn.4g.iproyal.com:<port>` (HTTP/SOCKS5 ports from the
+dashboard order / mobile API, NOT the residential `geo.iproyal.com:12321/32325`), auth is a
+plain `user:pass` from the order (get it via the mobile API with `$IPROYAL_API`), and mobile
+IPs carry far better reputation for Chinese services (抖音/QQ/etc.) than residential.
+
+**Container egress is 443-ONLY — you CANNOT reach any IPRoyal proxy port from the container
+directly (Deyao env, 2026-09-09).** Connections to IPRoyal ports (mobile `:7001`, residential
+`:12321`/`:32325`) time out from the pod. So a **local** Chromium/curl in the container cannot
+use IPRoyal. To get a China-exit BROWSER, run it where egress is open: a **mobilerun cloud
+phone** with the IPRoyal mobile SOCKS5 attached as the device proxy (`POST
+/v1/devices/{id}/proxy`), then drive the phone's Chrome/app. Browserbase silently ignores
+external proxies (lesson 30), so it can't do CN-exit either.
+
 ## Installing apps on phones — on-device only
 
 Install apps ON the phone itself, through an app store app; NEVER download an APK to
