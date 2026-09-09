@@ -397,6 +397,20 @@ screenshot current state), and clips to the QR via `#qrlogin_img` (for QQ). Poin
 tunnel at it with `TUNNEL_TARGET=http://127.0.0.1:8900 node cf-tunnel/agent.js`. Adapt
 the action/clip per site for other latency-sensitive captures.
 
+**Interactive relay for captchas/drags you must solve by hand (Deyao, 2026-09-09).**
+For a slider/drag captcha (e.g. Tencent TCaptcha `drag_ele`, which Browserbase's solver
+and 2captcha can't do), don't try to auto-solve and don't make me use the Browserbase
+live view (it doesn't work on a phone). Instead relay it: `scripts/captcha-relay-server.js
+--session <bb_session.json> --port 8901 --phone <num>` serves a phone-friendly page where
+a **button** raises the captcha (the triggering action = the button) + screenshots the
+captcha region to my phone with its page-coord clip box in `X-Clip-*` headers; I **drag
+the slider with my finger** on the image; on release the page POSTs my full touch
+trajectory (page coords + per-point timing) to `/drag`, which replays it as CDP mouse
+down/move…/up on the Browserbase page — no LLM turn in the loop. Replaying my REAL human
+trajectory + timing is what passes Tencent's bot-detection (an automated drag fails). The
+pod process must stay warm during the drag (keep-alive via send_later), since it dies on
+idle. After it passes, the site sends an SMS code to my phone — I give it in chat.
+
 ## Waiting on external events (live chats, OTPs, slow pages)
 
 Never wait inside a long foreground Bash loop — you get no turn until it exits and
