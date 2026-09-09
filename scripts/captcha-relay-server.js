@@ -69,6 +69,7 @@ async function triggerCaptcha() {
   // wait for captcha box
   let box = null;
   for (let i = 0; i < 20; i++) { box = await captchaBox(p); if (box && box.w > 200) break; await p.waitForTimeout(500); }
+  if (box) await p.waitForTimeout(3000); // let the slider image actually render
   return box;
 }
 
@@ -78,7 +79,9 @@ async function snap() {
   if (!box) box = await triggerCaptcha();
   if (!box) return null;
   const clip = { x: Math.max(0, box.x), y: Math.max(0, box.y), width: box.w, height: box.h };
-  const png = await p.screenshot({ clip });
+  let png = await p.screenshot({ clip });
+  // retry once if the capture looks blank (still loading)
+  if (png.length < 15000) { await p.waitForTimeout(2500); png = await p.screenshot({ clip }); }
   return { png, clip };
 }
 
