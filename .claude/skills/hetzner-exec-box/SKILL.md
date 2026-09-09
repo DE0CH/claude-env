@@ -37,12 +37,23 @@ port, and run any tool.
 | DNS | Cloudflare zone `deyaochen.com` (`f51ca95ee5e6c664372000f887c96a92`), A record `hexec` → IP, **DNS-only / grey-cloud** (NOT the CF proxy, NOT Access) |
 | Debug SSH | `ssh core@2.28.17.142`. Authorized `core` keys: Deyao's key + the jump server's `id_ed25519`. To change, edit `files/butane.yaml` under `passwd.users` and rebuild (or drop a file in `/home/core/.ssh/authorized_keys.d/` + `update-ssh-keys`). |
 
-Env vars to set for consumers (Mac `~/.secrets` and the pod environment):
+### Where the key lives
+
+The API key is read from the env var **`HEXEC_KEY`**, and the endpoint from
+**`HEXEC_URL`**:
 
 ```
 HEXEC_URL=https://hexec.deyaochen.com
-HEXEC_KEY=<the 64-hex key>
+HEXEC_KEY=<64-hex key>
 ```
+
+- **Mac:** both are in `~/.secrets` (added 2026-09-09). Load with
+  `set -a; . ~/.secrets; set +a`.
+- **Pod:** add the same two vars to the pod's session environment. Env vars are
+  fixed at session start, so they take effect the **next** session, not mid-run.
+- The raw key was also DM'd via lobster. To rotate: change it in `HEXEC_KEY`,
+  re-render the Caddyfile, and `docker restart caddy` (or just run `rebuild.sh`
+  with the new `HEXEC_KEY`).
 
 ## Calling it
 
