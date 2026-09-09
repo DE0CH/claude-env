@@ -406,6 +406,13 @@ reply from me. I will reply directly in the chat session.
 Deliver Discord content (summaries, transcripts, etc.) as plain text messages split
 across Discord's 2000-character limit — never as file attachments.
 
+**Copyable values go in their own message (Deyao, 2026-09-09).** Whenever I'll want
+to copy-paste something you send — a code, a phone number, an address, a URL, an
+authorization code, an SMS destination, etc. — send that value as a SINGLE Discord
+message containing ONLY that value (no label, no surrounding prose), so I can
+long-press/copy it cleanly. Put the explanation in a separate message before it. If
+there are several copyable values, send each in its own bare message.
+
 ## YouTube video summary / transcript
 
 When I ask for a **summary** and/or **transcript** of a YouTube video, this is what I mean:
