@@ -366,6 +366,21 @@ it uses the Cloudflare API token in env var `CLOUDFLARE_API` and prints the two
 service-token vars to add to the environment config. Full workflow,
 transcript-hygiene rules, and no-tunnel fallbacks are in @tunnel.md.
 
+**Latency-sensitive captures = a BUTTON in the tunnel, not you driving it
+(Deyao, 2026-09-09).** Whenever I need a latency-sensitive screenshot — a QR code
+that expires, a live page state, "show me what it looks like right now" — do NOT
+drive the screenshot yourself (your click→capture round-trip is too slow; the QR
+expires before you react). Instead put a **button** on the tunnel page: I click it,
+and the server performs the action **just before** the capture (regenerate the QR /
+refresh) then returns the fresh image, all in that one request. You are NOT in the
+loop between button-click → action → capture → display. Reusable server:
+`scripts/tunnel-live-capture.js --session <bb_session.json> --port 8900` — holds a
+persistent Playwright/CDP connection to a Browserbase session, serves a buttons page
+(`New QR` = reload+re-activate the QR tab then screenshot the QR; `Refresh view` =
+screenshot current state), and clips to the QR via `#qrlogin_img` (for QQ). Point the
+tunnel at it with `TUNNEL_TARGET=http://127.0.0.1:8900 node cf-tunnel/agent.js`. Adapt
+the action/clip per site for other latency-sensitive captures.
+
 ## Waiting on external events (live chats, OTPs, slow pages)
 
 Never wait inside a long foreground Bash loop — you get no turn until it exits and
