@@ -397,19 +397,36 @@ screenshot current state), and clips to the QR via `#qrlogin_img` (for QQ). Poin
 tunnel at it with `TUNNEL_TARGET=http://127.0.0.1:8900 node cf-tunnel/agent.js`. Adapt
 the action/clip per site for other latency-sensitive captures.
 
-**Interactive relay for captchas/drags you must solve by hand (Deyao, 2026-09-09).**
-For a slider/drag captcha (e.g. Tencent TCaptcha `drag_ele`, which Browserbase's solver
-and 2captcha can't do), don't try to auto-solve and don't make me use the Browserbase
-live view (it doesn't work on a phone). Instead relay it: `scripts/captcha-relay-server.js
---session <bb_session.json> --port 8901 --phone <num>` serves a phone-friendly page where
-a **button** raises the captcha (the triggering action = the button) + screenshots the
-captcha region to my phone with its page-coord clip box in `X-Clip-*` headers; I **drag
-the slider with my finger** on the image; on release the page POSTs my full touch
-trajectory (page coords + per-point timing) to `/drag`, which replays it as CDP mouse
-down/move…/up on the Browserbase page — no LLM turn in the loop. Replaying my REAL human
-trajectory + timing is what passes Tencent's bot-detection (an automated drag fails). The
-pod process must stay warm during the drag (keep-alive via send_later), since it dies on
-idle. After it passes, the site sends an SMS code to my phone — I give it in chat.
+**Interactive INSTANT-REPLAY relay for captchas/drags I solve by hand (Deyao,
+2026-09-09, refined 2026-09-10).** Standing rule: whenever a captcha/interaction has to
+be solved by ME (a slider/drag like Tencent TCaptcha `drag_ele`, which Browserbase's
+solver and 2captcha can't do), don't auto-solve and don't hand me the Browserbase live
+view (it doesn't render on a phone). Relay it to my phone with **real-time instant
+replay** — a **button** raises the captcha (the triggering action = a button), the
+captcha region streams to my phone, and as I **drag with my finger** each move is
+dispatched to the browser IMMEDIATELY (CDP `Input.dispatchMouseEvent` down/move…/up)
+while frames stream back so I watch the puzzle piece move and align it live. Replaying my
+REAL finger movement in real time is what both passes Tencent's bot-detection AND lets me
+aim. Reusable server: `scripts/realtime-captcha-relay.js --session <bb.json> --port <p>
+--phone <num>` (SSE frames = self-scheduling CDP `Page.captureScreenshot` clipped to the
+captcha box; `/input` dispatches each move; `/trigger`+`/box` raise+locate it; `/pass`
+checks for the code field). The older batched `scripts/captcha-relay-server.js` (replays
+the whole trajectory only on release) does NOT work — the release-latency and dragging
+blind fail; use the real-time one.
+
+**Hosting: it must run on hexec, NOT the pod/cf-tunnel (hard-won 2026-09-10).** Two walls
+kill a pod-hosted real-time relay: (1) **the cf-tunnel BUFFERS streaming responses** — SSE
+frames don't flow through `tunnel.deyaochen.com/t/<id>/` live (0 bytes until the response
+ends), so real-time framing over the cf-tunnel is impossible; (2) **the pod suspends when
+idle**, freezing the relay during my async drag ("load failed"). Fix: run the relay on the
+always-on **hexec** box, bound to `0.0.0.0` on an open port (hexec has NO Hetzner firewall
+— all ports open), and give me `http://hexec.deyaochen.com:<port>/` directly (plain HTTP is
+fine for a captcha; native Node SSE streams with no buffering, low latency, never idles).
+hexec already has node+chromium+playwright-core+ws; it reaches the Browserbase session via
+its `connectUrl` (open egress). NOTE: deploying the relay code to hexec via `POST /exec`
+heredoc got auto-mode-classifier-blocked this session — if that recurs, ask Deyao to add a
+Bash permission allowance rather than working around it. After the slider passes, the site
+SMSes a code to my phone — I give it in chat.
 
 ## Waiting on external events (live chats, OTPs, slow pages)
 
