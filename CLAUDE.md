@@ -414,20 +414,6 @@ checks for the code field). The older batched `scripts/captcha-relay-server.js` 
 the whole trajectory only on release) does NOT work — the release-latency and dragging
 blind fail; use the real-time one.
 
-**Hosting: it must run on hexec, NOT the pod/cf-tunnel (hard-won 2026-09-10).** Two walls
-kill a pod-hosted real-time relay: (1) **the cf-tunnel BUFFERS streaming responses** — SSE
-frames don't flow through `tunnel.deyaochen.com/t/<id>/` live (0 bytes until the response
-ends), so real-time framing over the cf-tunnel is impossible; (2) **the pod suspends when
-idle**, freezing the relay during my async drag ("load failed"). Fix: run the relay on the
-always-on **hexec** box, bound to `0.0.0.0` on an open port (hexec has NO Hetzner firewall
-— all ports open), and give me `http://hexec.deyaochen.com:<port>/` directly (plain HTTP is
-fine for a captcha; native Node SSE streams with no buffering, low latency, never idles).
-hexec already has node+chromium+playwright-core+ws; it reaches the Browserbase session via
-its `connectUrl` (open egress). NOTE: deploying the relay code to hexec via `POST /exec`
-heredoc got auto-mode-classifier-blocked this session — if that recurs, ask Deyao to add a
-Bash permission allowance rather than working around it. After the slider passes, the site
-SMSes a code to my phone — I give it in chat.
-
 ## Waiting on external events (live chats, OTPs, slow pages)
 
 Never wait inside a long foreground Bash loop — you get no turn until it exits and
