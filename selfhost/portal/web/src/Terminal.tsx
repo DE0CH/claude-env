@@ -73,13 +73,14 @@ export function TerminalSheet({ session, open, onClose, onClosed }: { session: {
       try {
         const f = await api("GET", `api/sessions/${id}/tty/frame`);
         if (!alive) return;
-        const key = f.screen + "|" + f.x + "," + f.y + "," + f.cols + "," + f.rows;
+        const key = f.screen + "|" + f.x + "," + f.y + "," + f.cols + "," + f.rows + "," + f.cursor;
         if (key === last) return; last = key;
         // right after we asked tmux for a new size, frames still carry the old one for a moment —
         // keep xterm at the fitted size instead of flapping back
         const fresh = wanted && Date.now() - wanted.at < 6000 && (wanted.cols !== f.cols || wanted.rows !== f.rows);
         if (!fresh && (t.cols !== f.cols || t.rows !== f.rows)) t.resize(f.cols, f.rows);
-        t.write("\x1b[H\x1b[2J" + String(f.screen).replace(/\n/g, "\r\n") + `\x1b[${(f.y | 0) + 1};${(f.x | 0) + 1}H`);
+        // repaint, park the cursor where tmux says, and show it only if the app shows its own
+        t.write("\x1b[?25l\x1b[H\x1b[2J" + String(f.screen).replace(/\n/g, "\r\n") + `\x1b[${(f.y | 0) + 1};${(f.x | 0) + 1}H` + (f.cursor === false ? "" : "\x1b[?25h"));
         setStatus(`live · ${f.cols}×${f.rows}`);
       } catch (e: any) { setStatus(e.message); }
     };

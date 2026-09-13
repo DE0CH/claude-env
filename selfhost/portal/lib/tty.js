@@ -6,15 +6,17 @@ const crypto = require("crypto");
 const fly = require("./fly");
 
 const AS_CLAUDE = ["/usr/bin/sudo", "-u", "claude", "-H"];
-const SNAP = "tmux capture-pane -p -e -t claude; printf '\\n__CUR__%s\\n' \"$(tmux display-message -p -t claude '#{cursor_x},#{cursor_y},#{pane_width},#{pane_height}')\"";
+// cursor_flag: 0 when the app hid the cursor (Ink/claude draws its own) — the mirror must hide
+// xterm's too, or a blinking block shows wherever the app last parked the real cursor.
+const SNAP = "tmux capture-pane -p -e -t claude; printf '\\n__CUR__%s\\n' \"$(tmux display-message -p -t claude '#{cursor_x},#{cursor_y},#{pane_width},#{pane_height},#{cursor_flag}')\"";
 
 async function snapshot(machineId) {
   const r = await fly.exec(machineId, [...AS_CLAUDE, "/bin/bash", "-lc", SNAP], 10);
   const out = String(r.stdout || "");
   const i = out.lastIndexOf("\n__CUR__");
   if (i < 0) throw new Error("no tmux session (is claude running?)" + (r.stderr ? ": " + String(r.stderr).slice(0, 120) : ""));
-  const [x, y, cols, rows] = out.slice(i + 8).trim().split(",").map((n) => parseInt(n, 10));
-  return { screen: out.slice(0, i), x, y, cols, rows };
+  const [x, y, cols, rows, flag] = out.slice(i + 8).trim().split(",").map((n) => parseInt(n, 10));
+  return { screen: out.slice(0, i), x, y, cols, rows, cursor: flag !== 0 };
 }
 
 function stream(machineId, res, { interval = 1000 } = {}) {
@@ -25,7 +27,7 @@ function stream(machineId, res, { interval = 1000 } = {}) {
     if (!alive) return;
     try {
       const s = await snapshot(machineId);
-      const h = crypto.createHash("sha1").update(`${s.screen}|${s.x},${s.y},${s.cols},${s.rows}`).digest("hex");
+      const h = crypto.createHash("sha1").update(`${s.screen}|${s.x},${s.y},${s.cols},${s.rows},${s.cursor}`).digest("hex");
       if (h !== last) { last = h; res.write(`event: frame\ndata: ${JSON.stringify(s)}\n\n`); }
       else res.write(": tick\n\n");
     } catch (e) { res.write(`event: error\ndata: ${JSON.stringify({ error: e.message })}\n\n`); }

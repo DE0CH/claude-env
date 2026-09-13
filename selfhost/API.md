@@ -41,7 +41,7 @@ All bodies are JSON; errors are `{"error": "..."}` with a 4xx/5xx status.
 | POST | `/api/sessions/:id/stop`, `/start` | stop (pause) / start (wake) the Fly machine. A stopped machine keeps its rootfs; on start the session image resumes the same conversation |
 | POST | `/api/sessions/:id/autopause` | `{enabled:bool}` → `{ok,autoPause}`. Toggle auto-pause for this session (metadata `autoPause=on\|off`); resets its idle countdown |
 | GET | `/api/sessions/:id/tty` | SSE stream of the session's tmux screen (`event: frame`) |
-| GET | `/api/sessions/:id/tty/frame` | one snapshot `{screen,x,y,cols,rows}` |
+| GET | `/api/sessions/:id/tty/frame` | one snapshot `{screen,x,y,cols,rows,cursor}` (`cursor:false` = the app hid it) |
 | POST | `/api/sessions/:id/tty/input` | `{text}` or `{key}` (Enter, Escape, Tab, Up, C-c, …) |
 | POST | `/api/sessions/:id/tty/resize` | `{cols, rows}` |
 

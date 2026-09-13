@@ -26,7 +26,7 @@ app.post("/api/sessions/:id/tty/resize", (req, res) => { size = { cols: +req.bod
 app.post("/api/sessions/:id/tty/input", (req, res) => { console.log("input", JSON.stringify(req.body)); res.json({ ok: true }); });
 app.get("/api/sessions/:id/tty/frame", (req, res) => {
   const lines = []; for (let r = 0; r < size.rows; r++) lines.push(r === 0 ? `╭${"─".repeat(size.cols - 2)}╮` : r === size.rows - 1 ? `╰${"─".repeat(size.cols - 2)}╯` : `│ line ${String(r).padStart(3)} ${"·".repeat(Math.max(0, size.cols - 12))} │`);
-  res.json({ screen: lines.join("\n"), x: 3, y: 2, cols: size.cols, rows: size.rows });
+  res.json({ screen: lines.join("\n"), x: 3, y: 2, cols: size.cols, rows: size.rows, cursor: false });
 });
 app.post("/api/sessions/:id/autopause", (req, res) => { const s = sessions.find((x) => x.id === req.params.id); setTimeout(() => { s.autoPause = req.body.enabled ? "on" : "off"; }, 3000); res.json({ ok: true }); });
 app.post("/api/sessions/:id/stop", (req, res) => { const s = sessions.find((x) => x.id === req.params.id); setTimeout(() => { s.state = "stopped"; s.status = undefined; }, 3000); res.json({ ok: true }); });
