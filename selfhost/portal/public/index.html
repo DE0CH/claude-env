@@ -124,6 +124,9 @@ async function api(method,path,body){
   return j;
 }
 function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+const REGION={arn:'Stockholm',fra:'Frankfurt',ams:'Amsterdam',lhr:'London',cdg:'Paris',waw:'Warsaw',mad:'Madrid',iad:'Virginia',ord:'Chicago',sjc:'San Jose',lax:'Los Angeles',sin:'Singapore',nrt:'Tokyo',hkg:'Hong Kong',syd:'Sydney'};
+function ago(iso){const s=Math.max(0,(Date.now()-new Date(iso).getTime())/1000);
+  if(s<60)return 'just now';if(s<3600)return Math.floor(s/60)+' min ago';if(s<86400)return Math.floor(s/3600)+' h ago';return Math.floor(s/86400)+' d ago';}
 function tab(t){TAB=t;['sessions','envs','repos'].forEach(x=>{$('#view-'+x).hidden=x!==t;$('#t-'+x).classList.toggle('on',x===t);});$('#fab').style.display=t==='sessions'?'block':'none';render();}
 
 // ---- polling: 15s idle, 2s while something is settling -----------------------
@@ -168,9 +171,10 @@ function sessionPill(m){
   return `<span class="pill dim">${esc(m.state)}</span>`;
 }
 function renderSessions(){
-  const s=STATE.sessions||[];
+  // stable order (newest first) so cards never swap between polls
+  const s=[...(STATE.sessions||[])].sort((a,b)=>String(b.created||'').localeCompare(String(a.created||''))||String(a.id).localeCompare(String(b.id)));
   const v=$('#view-sessions');
-  const cool=coolAfterShift('sessions',s.map(m=>m.id).join('|'));
+  const cool=coolAfterShift('sessions',s.map(m=>m.id).sort().join('|'));
   if(!s.length){v.innerHTML='<div class="empty">No sessions running.<br>Tap “New session”.</div>';return;}
   v.innerHTML=s.map(m=>{
     const title=(m.liveName&&m.nameSource&&m.nameSource!=='derived')?m.liveName:(m.label||m.name);
@@ -179,7 +183,7 @@ function renderSessions(){
     return `<div class="card${busy?' pending':''}">
     <div class="row" style="justify-content:space-between"><h3>${esc(title)}</h3>${sessionPill(m)}</div>
     <div class="meta">${m.environment?('env: '+esc(m.environment)):''}${repos?(' · '+esc(repos)):''}</div>
-    <div class="meta">${esc(m.name)} · ${esc(m.region)}</div>
+    <div class="meta">${esc(REGION[m.region]||m.region||'')}${m.created?' · created '+ago(m.created):''}</div>
     <div class="spacer"></div>
     <div class="row">
       ${pbtn('rename:'+m.id,'ghost sm',`renameSession('${m.id}','${esc(title).replace(/'/g,'')}')`,'Rename')}
@@ -191,7 +195,7 @@ function renderSessions(){
 function renderEnvs(){
   const e=STATE.environments||{};
   const v=$('#view-envs');
-  const cool=coolAfterShift('envs',Object.keys(e).join('|'));
+  const cool=coolAfterShift('envs',Object.keys(e).sort().join('|'));
   const cards=Object.entries(e).map(([n,d])=>`<div class="card${PENDING.has('env:'+n)?' pending':''}">
     <div class="row" style="justify-content:space-between"><h3>${esc(n)}</h3><span class="meta">${(d.keys||[]).length} keys</span></div>
     <div class="meta">${(d.keys||[]).map(esc).join(', ')||'—'}</div>
@@ -204,7 +208,7 @@ function renderEnvs(){
 function renderRepos(){
   const r=STATE.repos||[];
   const v=$('#view-repos');
-  const cool=coolAfterShift('repos',r.map(x=>x.name).join('|'));
+  const cool=coolAfterShift('repos',r.map(x=>x.name).sort().join('|'));
   const cards=r.map(x=>`<div class="card${PENDING.has('repo:'+x.name)?' pending':''}">
     <div class="row" style="justify-content:space-between"><h3>${esc(x.name)}</h3>
       ${pbtn('repo:'+x.name,'ghost sm',`delRepo('${esc(x.name)}')`,'Remove from list',cool)}</div>

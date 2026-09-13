@@ -105,6 +105,8 @@ app.get("/api/state", async (req, res) => {
           repos: m.config?.metadata?.repos || "",
           label: m.config?.metadata?.label || "",
         }));
+        // stable order: newest first, id as tie-break (Fly's list order is not deterministic)
+        sessions.sort((a, b) => String(b.created || "").localeCompare(String(a.created || "")) || a.id.localeCompare(b.id));
         // enrich running machines with the live name/status from inside
         await Promise.all(sessions.map(async (s) => {
           if (s.state !== "started") return;
