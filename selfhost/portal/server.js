@@ -194,11 +194,11 @@ app.get("/api/auth/status", (req, res) => res.json(auth.status()));
 // Machine size presets (Fly on-demand prices, 2026-09): the dashboard offers these; anything
 // else in `guest` is rejected so a typo can't provision a 128 GB machine.
 const SIZES = {
-  small:  { cpu_kind: "shared",      cpus: 2, memory_mb: 2048,  label: "2 shared vCPU · 2 GB · ~$0.016/h" },
-  medium: { cpu_kind: "shared",      cpus: 4, memory_mb: 4096,  label: "4 shared vCPU · 4 GB · ~$0.033/h" },
-  large:  { cpu_kind: "shared",      cpus: 8, memory_mb: 8192,  label: "8 shared vCPU · 8 GB · ~$0.066/h" },
-  xlarge: { cpu_kind: "shared",      cpus: 8, memory_mb: 16384, label: "8 shared vCPU · 16 GB · ~$0.12/h" },
-  perf:   { cpu_kind: "performance", cpus: 2, memory_mb: 4096,  label: "2 dedicated vCPU · 4 GB · ~$0.09/h" },
+  small:  { cpu_kind: "shared",      cpus: 2, memory_mb: 2048,  label: "2 shared vCPU · 2 GB · ~$0.016/h · ~$11.52/mo" },
+  medium: { cpu_kind: "shared",      cpus: 4, memory_mb: 4096,  label: "4 shared vCPU · 4 GB · ~$0.033/h · ~$23.76/mo" },
+  large:  { cpu_kind: "shared",      cpus: 8, memory_mb: 8192,  label: "8 shared vCPU · 8 GB · ~$0.066/h · ~$47.52/mo" },
+  xlarge: { cpu_kind: "shared",      cpus: 8, memory_mb: 16384, label: "8 shared vCPU · 16 GB · ~$0.12/h · ~$86.40/mo" },
+  perf:   { cpu_kind: "performance", cpus: 2, memory_mb: 4096,  label: "2 dedicated vCPU · 4 GB · ~$0.09/h · ~$64.80/mo" },
 };
 const DEFAULT_SIZE = "medium";
 app.get("/api/sizes", (req, res) => res.json({ sizes: SIZES, default: DEFAULT_SIZE }));
