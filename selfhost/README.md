@@ -54,9 +54,29 @@ Manual image (re)build: `selfhost/deploy-session-image.sh`.
 Destroy controller: `selfhost/controller/destroy.sh` (Fly sessions are separate — stop
 them in the dashboard first).
 
+## Dashboard behavior (as specified)
+
+- **Names**: set once when starting a session (auto-generated if blank). It is passed as
+  `claude --remote-control <name> --name <name>`, so the Claude app and the dashboard start
+  identical; afterwards the dashboard **mirrors whatever you rename it to in the Claude app**
+  (it reads the session's live registry `~/.claude/sessions/<pid>.json` via Fly exec).
+  No renaming from the dashboard.
+- **Only Destroy** (no Start/Stop). Destroy first inspects the container (`git status`,
+  unpushed commits per repo, whether Claude is still working) and lists exactly what would
+  be lost before asking.
+- **Two-phase UI, never optimistic**: every button acks instantly with a disabled
+  `Starting…/Destroying…/Saving…` label; the card only changes when the server confirms
+  (`creating… → booting… → idle/working`; destroyed cards linger as `destroying` until Fly
+  drops them). Polling is 2s while something settles, 15s otherwise.
+- **Layout-shift guard**: after a list's items change, its destructive buttons are faded
+  and inert for 250ms.
+- Sessions are sorted newest-first (stable). "Remove from list" on a repo only forgets the
+  dashboard entry — GitHub is never touched.
+
 ## Known limitations (v1)
 
 - **Shared OAuth refresh token across sessions.** Each session gets a copy of the same
   Claude credentials. If Anthropic rotates refresh tokens, many long concurrent sessions
   could churn auth. Fine for a handful of sessions; a central token broker is the v2 fix.
-- Sessions don't auto-stop on idle yet — stop/destroy them from the dashboard.
+- Sessions don't auto-destroy on idle — destroy them from the dashboard when done
+  (~1–2¢/hour while running).

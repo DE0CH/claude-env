@@ -566,8 +566,15 @@ rebuilds it identically.
 - **New env vars this needs (persist in the environment config):** `FLY_API_TOKEN` (Fly org
   token, mints/kills session machines) and `PORTAL_ENC_KEY` (64-hex; encrypts the S3 config —
   **if lost, all saved environments are unreadable**). Fly login: `flyctl auth login --email/--password`.
-- Cost: controller ~€6.59/mo fixed; Fly sessions ~1–2¢/session-hour, ~free when stopped.
-  Stop/destroy sessions from the dashboard when done (no idle auto-stop yet).
+- Cost: controller ~€6.59/mo fixed; Fly sessions ~1–2¢/session-hour. Destroy sessions from
+  the dashboard when done (no idle auto-destroy yet). Dashboard rules Deyao set: name chosen
+  once at creation and then mirrored from the Claude app; only Destroy (no Start/Stop) with a
+  pre-destroy uncommitted/unpushed check; two-phase UI (instant ack, change only on confirmed
+  state — never optimistic); 250ms cooldown on destructive buttons after a list shifts.
+- Deploying a dashboard/portal change: commit+push (`GITHUB_TOKEN` in `~/.secrets`), then on
+  the controller `git fetch && git reset --hard origin/main` (+ `systemctl restart
+  claude-portal` if `server.js`/`lib/` changed). Session-image changes need
+  `selfhost/deploy-session-image.sh` (rebuild on Fly, ~5 min).
 - Known v1 limit: sessions share the Claude OAuth refresh token (fine for a few concurrent).
 
 ## Other files
