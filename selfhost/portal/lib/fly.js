@@ -42,6 +42,9 @@ module.exports = {
         guest: guest || { cpu_kind: "shared", cpus: 1, memory_mb: 1024 },
       },
     }),
+  // Run a command inside a started machine; returns {stdout, stderr, exit_code}.
+  exec: (id, command, timeout = 15) =>
+    call("POST", `/apps/${app()}/machines/${id}/exec`, { command, timeout }),
   stopMachine: (id) => call("POST", `/apps/${app()}/machines/${id}/stop`),
   startMachine: (id) => call("POST", `/apps/${app()}/machines/${id}/start`),
   destroyMachine: (id) => call("DELETE", `/apps/${app()}/machines/${id}?force=true`),

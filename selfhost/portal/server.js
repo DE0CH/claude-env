@@ -48,6 +48,40 @@ function maskEnv(env) {
   return out;
 }
 
+// ---- live session registry (inside each machine) ---------------------------
+// claude keeps ~/.claude/sessions/<pid>.json with the live display name and
+// busy/idle status. Read it via Fly exec so the dashboard reflects the current
+// name/state on refresh. Cached briefly; failures just fall back to metadata.
+const regCache = new Map();
+async function readRegistry(machineId) {
+  const c = regCache.get(machineId);
+  if (c && Date.now() - c.at < 8000) return c.data;
+  let data = null;
+  try {
+    const r = await Promise.race([
+      fly.exec(machineId, ["bash", "-lc", "cat /home/claude/.claude/sessions/*.json 2>/dev/null"], 10),
+      new Promise((_, rej) => setTimeout(() => rej(new Error("exec timeout")), 12000)),
+    ]);
+    const entries = String(r.stdout || "").split("\n")
+      .filter((l) => l.trim().startsWith("{"))
+      .map((l) => { try { return JSON.parse(l); } catch { return null; } })
+      .filter(Boolean)
+      .sort((a, b) => (a.startedAt || 0) - (b.startedAt || 0));
+    const host = entries.find((e) => e.bridgeSessionId) || entries[0] || null;
+    if (host) {
+      data = {
+        liveName: host.name || "",
+        nameSource: host.nameSource || "",
+        status: host.status || "",
+        bridgeSessionId: host.bridgeSessionId || "",
+        sessionsInside: entries.length,
+      };
+    }
+  } catch (e) { data = null; }
+  regCache.set(machineId, { at: Date.now(), data });
+  return data;
+}
+
 // ---- state ----------------------------------------------------------------
 app.get("/api/state", async (req, res) => {
   try {
@@ -70,6 +104,12 @@ app.get("/api/state", async (req, res) => {
           environment: m.config?.metadata?.environment || "",
           repos: m.config?.metadata?.repos || "",
           label: m.config?.metadata?.label || "",
+        }));
+        // enrich running machines with the live name/status from inside
+        await Promise.all(sessions.map(async (s) => {
+          if (s.state !== "started") return;
+          const reg = await readRegistry(s.id);
+          if (reg) Object.assign(s, reg);
         }));
       } catch (e) { flyError = e.message; }
     } else { flyError = "FLY_API_TOKEN not set"; }

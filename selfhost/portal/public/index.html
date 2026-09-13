@@ -121,10 +121,14 @@ function renderSessions(){
   const s=STATE.sessions||[];
   const v=$('#view-sessions');
   if(!s.length){v.innerHTML='<div class="empty">No sessions running.<br>Tap “New session”.</div>';return;}
-  v.innerHTML=s.map(m=>`<div class="card">
+  v.innerHTML=s.map(m=>{
+    // live name from inside the session when it's a real (non-derived) name
+    const title=(m.liveName&&m.nameSource&&m.nameSource!=='derived')?m.liveName:(m.label||m.name);
+    const live=m.state==='started'&&m.status?`<span class="pill ${m.status==='busy'?'starting':'started'}">${m.status==='busy'?'working':'idle'}</span>`:'';
+    return `<div class="card">
     <div class="row" style="justify-content:space-between">
-      <h3>${esc(m.label||m.name)}</h3>
-      <span class="pill ${esc(m.state)}">${esc(m.state)}</span>
+      <h3>${esc(title)}</h3>
+      <span class="row">${live}<span class="pill ${esc(m.state)}">${esc(m.state)}</span></span>
     </div>
     <div class="meta">${m.environment?('env: '+esc(m.environment)):''}${m.repos?(' · '+esc(m.repos.split(' ').map(u=>u.split('/').pop().replace(/\.git$/,'')).join(', '))):''}</div>
     <div class="meta">${esc(m.name)} · ${esc(m.region)}</div>
@@ -134,7 +138,7 @@ function renderSessions(){
       <button class="btn danger sm" onclick="destroy('${m.id}')">Destroy</button>
     </div>
     <div class="hint">Open the Claude app to chat with this session.</div>
-  </div>`).join('');
+  </div>`}).join('');
 }
 function renderEnvs(){
   const e=STATE.environments||{};
