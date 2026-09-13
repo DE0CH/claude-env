@@ -1,53 +1,65 @@
-// Bottom sheets on vaul (the drawer behind shadcn/ui): the library owns the gestures — drag the
-// handle/sheet down to dismiss, drag up to the next snap point (full screen), keyboard-aware
-// input repositioning on iOS. We only add chrome: a handle, a header with the actions
-// (Cancel · title · primary), and a scrolling body — styled with Bootstrap.
-import { useState, type ReactNode } from "react";
-import { Drawer } from "vaul";
+// Bottom sheets on react-modal-sheet (Framer Motion): iOS-style detents with the scroll/drag
+// hand-off done by the library — opens half, flick up on the handle OR the content expands to
+// full, at full the content scrolls, a drag down from scrollTop 0 brings it back to half, then
+// dismisses. Keyboard avoidance (avoidKeyboard) is built in. Chrome is Radix Themes.
+import type { ReactNode } from "react";
+import { Sheet as RMS } from "react-modal-sheet";
+import { Button, Heading, Text, Flex, Box, Separator } from "@radix-ui/themes";
+import { usePortalContainer } from "./theme";
+
+// snap points: 0 = closed, 0.62 = half (initial), 1 = full  → indices 0 / 1 / 2
+const SNAPS = [0, 0.62, 1], HALF = 1, FULL = 2;
+const box = { backgroundColor: "var(--color-panel-solid)", color: "var(--gray-12)", boxShadow: "none", borderTopLeftRadius: "var(--radius-6)", borderTopRightRadius: "var(--radius-6)", border: "1px solid var(--gray-a6)", borderBottom: "none", maxWidth: 600, margin: "0 auto", left: 0, right: 0 } as const;
 
 export function Sheet({ open, onClose, title, left, right, snap, children, onClosed, className }: {
   open: boolean; onClose: () => void; title?: string; left?: ReactNode; right?: ReactNode; snap?: boolean; children: ReactNode; onClosed?: () => void; className?: string;
 }) {
-  const [snapPt, setSnapPt] = useState<number | string | null>(0.62);
-  const common = { open, onOpenChange: (o: boolean) => { if (!o) onClose(); }, onAnimationEnd: (o: boolean) => { if (!o) onClosed?.(); } };
-  const content = (
-    <Drawer.Portal>
-      <Drawer.Overlay className="sheet-overlay" />
-      <Drawer.Content className={`sheet${snap ? " snap" : ""}${className ? " " + className : ""}`} aria-describedby={undefined} onCloseAutoFocus={(e) => { e.preventDefault(); (document.activeElement as HTMLElement | null)?.blur?.(); }}>
-        <div className="handle-wrap"><Drawer.Handle className="handle" /></div>
-        {title !== undefined ? (
-          <div className="head">
-            <div className="side">{left}</div>
-            <Drawer.Title className="ttl">{title}</Drawer.Title>
-            <div className="side r">{right}</div>
-          </div>
-        ) : <Drawer.Title className="visually-hidden">Menu</Drawer.Title>}
-        <div className="body">{children}</div>
-      </Drawer.Content>
-    </Drawer.Portal>
+  const mount = usePortalContainer();
+  return (
+    <RMS isOpen={open} onClose={onClose} onCloseEnd={onClosed} mountPoint={mount}
+      {...(snap ? { snapPoints: SNAPS, initialSnap: HALF } : { detent: "content" as const })}>
+      <RMS.Container className={`sheet${snap ? " snap" : ""}${className ? " " + className : ""}`} style={box}>
+        <RMS.Header>
+          <div className="handle-wrap"><RMS.DragIndicator className="handle" /></div>
+          {title !== undefined && (
+            <div className="head">
+              <div className="side">{left}</div>
+              <Heading as="h2" size="3" className="ttl">{title}</Heading>
+              <div className="side r">{right}</div>
+            </div>
+          )}
+        </RMS.Header>
+        <RMS.Content className="body"
+          disableScroll={snap ? (s) => s.currentSnap !== FULL : false}
+          disableDrag={snap ? (s) => s.currentSnap === FULL && s.scrollPosition !== "top" : (s) => s.scrollPosition !== "top" && s.scrollPosition !== undefined}>
+          <div className="body-in">{children}</div>
+        </RMS.Content>
+      </RMS.Container>
+      <RMS.Backdrop onTap={onClose} style={{ backgroundColor: "var(--color-overlay)" }} />
+    </RMS>
   );
-  // snapPoints + fadeFromIndex are a typed pair in vaul, hence the two branches
-  return snap
-    ? <Drawer.Root {...common} snapPoints={[0.62, 1]} fadeFromIndex={0} activeSnapPoint={snapPt} setActiveSnapPoint={setSnapPt}>{content}</Drawer.Root>
-    : <Drawer.Root {...common}>{content}</Drawer.Root>;
 }
 
-// Action sheet: a list group of actions + Cancel.
+// Action sheet: a list of actions + Cancel.
 export type MenuItem = { label: string; sub?: string; danger?: boolean; disabled?: boolean; onClick: () => void };
 export function ActionSheet({ open, onClose, onClosed, title, items }: { open: boolean; onClose: () => void; onClosed?: () => void; title?: string; items: MenuItem[] }) {
   return (
     <Sheet open={open} onClose={onClose} onClosed={onClosed} className="menu-sheet">
-      <div className="menu">
-        {title && <div className="text-body-secondary small text-center mb-2 text-truncate">{title}</div>}
-        <div className="list-group mb-3">
+      <Box className="menu" pb="2">
+        {title && <Text as="div" size="1" color="gray" align="center" mb="2" truncate>{title}</Text>}
+        <Flex direction="column" mb="3" className="mlist">
           {items.map((it, i) => (
-            <button key={i} type="button" className={`list-group-item list-group-item-action mi${it.danger ? " text-danger" : ""}`} disabled={it.disabled} onClick={() => { onClose(); it.onClick(); }}>
-              <div className="fw-semibold">{it.label}</div>{it.sub && <small className="text-body-secondary">{it.sub}</small>}
-            </button>
+            <Box key={i}>
+              {i > 0 && <Separator size="4" />}
+              <button type="button" className="mi" disabled={it.disabled} onClick={() => { onClose(); it.onClick(); }}>
+                <Text as="div" size="3" weight="medium" color={it.danger ? "red" : undefined}>{it.label}</Text>
+                {it.sub && <Text as="div" size="1" color="gray">{it.sub}</Text>}
+              </button>
+            </Box>
           ))}
-        </div>
-        <button className="btn btn-outline-secondary w-100 cancel" onClick={onClose}>Cancel</button>
-      </div>
+        </Flex>
+        <Button size="3" variant="soft" color="gray" className="cancel" style={{ width: "100%" }} onClick={onClose}>Cancel</Button>
+      </Box>
     </Sheet>
   );
 }

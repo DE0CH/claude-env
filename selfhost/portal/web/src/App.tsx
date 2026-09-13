@@ -1,6 +1,8 @@
 import { useState } from "react";
+import { Button, Callout, Flex, Heading, IconButton, Tabs } from "@radix-ui/themes";
 import { api } from "./api";
 import { useStore, setTab, refresh, pend, type Tab } from "./store";
+import { THEME, Theme, PortalCtx } from "./theme";
 import { Sessions } from "./views/Sessions";
 import { Android } from "./views/Android";
 import { Envs } from "./views/Envs";
@@ -9,19 +11,20 @@ import { Settings } from "./views/Settings";
 import { NewSession } from "./sheets/NewSession";
 import { EnvEditor } from "./sheets/EnvEditor";
 import { Relogin } from "./sheets/Relogin";
-import { TerminalSheet } from "./Terminal";
+import { TerminalPage } from "./Terminal";
 
 type SheetSpec = { kind: "new" } | { kind: "env"; name: string } | { kind: "relogin"; url: string } | { kind: "term"; id: string; title: string };
 const TABS: [Tab, string][] = [["sessions", "Sessions"], ["android", "Android"], ["envs", "Envs"], ["repos", "Repos"], ["settings", "Settings"]];
 
 function Banners() {
   const st = useStore((s) => s.state);
+  const B = ({ color, children }: { color: "red" | "amber"; children: React.ReactNode }) => <Callout.Root color={color} size="1" mb="3"><Callout.Text>{children}</Callout.Text></Callout.Root>;
   return (
     <div id="banners">
-      {st.hasCreds === false ? <div className="alert alert-danger py-2">No Claude credentials — sessions can't authenticate. Re-login from Settings.</div>
-        : (st.creds || {}).stale ? <div className="alert alert-danger py-2">Claude login expired and the token refresh was rejected — new sessions can't sign in. Re-login from Settings.</div> : null}
-      {!st.sessionImage && <div className="alert alert-warning py-2">No session image pinned yet — run the session-image workflow on GitHub (see Settings).</div>}
-      {st.flyError && <div className="alert alert-danger py-2">Fly: {st.flyError}</div>}
+      {st.hasCreds === false ? <B color="red">No Claude credentials — sessions can't authenticate. Re-login from Settings.</B>
+        : (st.creds || {}).stale ? <B color="red">Claude login expired and the token refresh was rejected — new sessions can't sign in. Re-login from Settings.</B> : null}
+      {!st.sessionImage && <B color="amber">No session image pinned yet — run the session-image workflow on GitHub (see Settings).</B>}
+      {st.flyError && <B color="red">Fly: {st.flyError}</B>}
     </div>
   );
 }
@@ -29,6 +32,7 @@ function Banners() {
 export function App() {
   const tab = useStore((s) => s.tab);
   const refreshing = useStore((s) => s.refreshing);
+  const [root, setRoot] = useState<HTMLElement | null>(null);
   // one sheet at a time; `open` flips false first so vaul can play its exit animation, then
   // onClosed unmounts it
   const [sheet, setSheet] = useState<SheetSpec | null>(null);
@@ -42,33 +46,35 @@ export function App() {
     catch (e: any) { pend("auth", null); alert("Could not start login: " + e.message); }
   }
   return (
-    <>
-      <nav className="navbar bg-body-tertiary border-bottom sticky-top" style={{ paddingTop: "max(.5rem, env(safe-area-inset-top))" }}>
-        <div className="container-fluid wrap">
-          <span className="navbar-brand mb-0 h1">Claude sessions</span>
-          <div className="d-flex gap-2">
-            <button className="btn btn-outline-secondary btn-sm" id="refreshBtn" onClick={() => refresh(true)} aria-label="Refresh" disabled={refreshing}>
-              {refreshing ? <span className="spinner-border spinner-border-sm" /> : "↻"}
-            </button>
-            {tab === "sessions" && <button className="btn btn-primary btn-sm" id="newBtn" onClick={() => show({ kind: "new" })}>+ New session</button>}
+    <Theme {...THEME} ref={setRoot}>
+      <PortalCtx.Provider value={root}>
+        <div className="topbar">
+          <Flex className="wrap" align="center" justify="between" py="3">
+            <Heading size="5">Claude sessions</Heading>
+            <Flex gap="2">
+              <IconButton variant="soft" color="gray" id="refreshBtn" onClick={() => refresh(true)} aria-label="Refresh" loading={refreshing}>↻</IconButton>
+              {tab === "sessions" && <Button id="newBtn" onClick={() => show({ kind: "new" })}>+ New session</Button>}
+            </Flex>
+          </Flex>
+        </div>
+        <div className="wrap" style={{ paddingTop: 16 }}>
+          <Banners />
+          <Tabs.Root value={tab} onValueChange={(v) => setTab(v as Tab)}>
+            <Tabs.List size="2" mb="3" className="tablist">{TABS.map(([k, l]) => <Tabs.Trigger key={k} value={k} data-tab={k}>{l}</Tabs.Trigger>)}</Tabs.List>
+          </Tabs.Root>
+          <div id={"view-" + tab}>
+            {tab === "sessions" && <Sessions onTerminal={(id, title) => show({ kind: "term", id, title })} />}
+            {tab === "android" && <Android />}
+            {tab === "envs" && <Envs onEdit={(name) => show({ kind: "env", name })} />}
+            {tab === "repos" && <Repos />}
+            {tab === "settings" && <Settings onRelogin={relogin} />}
           </div>
         </div>
-      </nav>
-      <div className="container-fluid wrap py-3">
-        <Banners />
-        <ul className="nav nav-tabs nav-fill mb-3">{TABS.map(([k, l]) => <li className="nav-item" key={k}><button id={"t-" + k} className={`nav-link${tab === k ? " active" : ""}`} onClick={() => setTab(k)}>{l}</button></li>)}</ul>
-        <div id={"view-" + tab}>
-          {tab === "sessions" && <Sessions onTerminal={(id, title) => show({ kind: "term", id, title })} />}
-          {tab === "android" && <Android />}
-          {tab === "envs" && <Envs onEdit={(name) => show({ kind: "env", name })} />}
-          {tab === "repos" && <Repos />}
-          {tab === "settings" && <Settings onRelogin={relogin} />}
-        </div>
-      </div>
-      {sheet?.kind === "new" && <NewSession open={open} onClose={close} onClosed={closed} />}
-      {sheet?.kind === "env" && <EnvEditor name={sheet.name} open={open} onClose={close} onClosed={closed} />}
-      {sheet?.kind === "relogin" && <Relogin url={sheet.url} open={open} onClose={close} onClosed={closed} />}
-      {sheet?.kind === "term" && <TerminalSheet session={sheet} open={open} onClose={close} onClosed={closed} />}
-    </>
+        {sheet?.kind === "new" && <NewSession open={open} onClose={close} onClosed={closed} />}
+        {sheet?.kind === "env" && <EnvEditor name={sheet.name} open={open} onClose={close} onClosed={closed} />}
+        {sheet?.kind === "relogin" && <Relogin url={sheet.url} open={open} onClose={close} onClosed={closed} />}
+        {sheet?.kind === "term" && <TerminalPage session={sheet} onClose={closed} />}
+      </PortalCtx.Provider>
+    </Theme>
   );
 }

@@ -1,17 +1,18 @@
 // Live terminal: a tmux mirror of the session (lib/tty.js) — one snapshot per second over the
 // API, keystrokes forwarded as tmux send-keys. xterm.js renders the frame.
 //
-// Layout: a full-screen vaul drawer (drag the handle down to dismiss) whose box is sized to the
-// VISUAL viewport, not the layout viewport — on iOS Safari the software keyboard shrinks only
-// the former, so a plain fixed/100dvh panel keeps its input row hidden under the keys. Any
-// change of the terminal area (open, rotation, keyboard) refits xterm and resizes the remote
-// tmux window to match, so the session is always rendered at the size you can actually see.
-import { useEffect, useRef, useState } from "react";
-import { Drawer } from "vaul";
+// A plain full-screen page (no sheet gestures around xterm): close with ✕ or the browser's
+// Back (a history entry is pushed on open). The box is sized to the VISUAL viewport, not the
+// layout viewport — on iOS Safari the software keyboard shrinks only the former, so a plain
+// fixed/100dvh panel keeps its input row hidden under the keys. Any change of the terminal
+// area (open, rotation, keyboard) refits xterm and resizes the remote tmux window to match.
+import { useEffect, useState } from "react";
+import { Button, Heading, TextField } from "@radix-ui/themes";
 import { Terminal as XTerm } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import "@xterm/xterm/css/xterm.css";
 import { api } from "./api";
+import { THEME, Theme } from "./theme";
 
 function useVisualViewport() {
   const read = () => { const v = window.visualViewport; return v ? { top: Math.round(v.offsetTop), height: Math.round(v.height), kb: window.innerHeight - v.height > 120 } : { top: 0, height: window.innerHeight, kb: false }; };
@@ -26,13 +27,11 @@ function useVisualViewport() {
 
 const KEYS: [string, string][] = [["Enter", "Enter"], ["Esc", "Escape"], ["Tab", "Tab"], ["⇧Tab", "S-Tab"], ["↑", "Up"], ["↓", "Down"], ["←", "Left"], ["→", "Right"], ["⌫", "BSpace"], ["^C", "C-c"], ["^D", "C-d"], ["^L", "C-l"], ["^U", "C-u"]];
 
-export function TerminalSheet({ session, open, onClose, onClosed }: { session: { id: string; title: string }; open: boolean; onClose: () => void; onClosed: () => void }) {
+export function TerminalPage({ session, onClose }: { session: { id: string; title: string }; onClose: () => void }) {
   const vv = useVisualViewport();
-  const [screen, setScreen] = useState<HTMLDivElement | null>(null); // callback ref: set once the drawer content is mounted
-  const term = useRef<{ t: XTerm; fit: FitAddon } | null>(null);
+  const [screen, setScreen] = useState<HTMLDivElement | null>(null); // callback ref: xterm opens once the element exists
   const [status, setStatus] = useState("connecting…");
   const [text, setText] = useState("");
-  const input = useRef<HTMLInputElement>(null);
   const id = session.id;
 
   async function send(body: { text?: string; keys?: string[] }) {
@@ -40,11 +39,19 @@ export function TerminalSheet({ session, open, onClose, onClosed }: { session: {
   }
   function sendText() { const t = text; setText(""); send(t ? { text: t, keys: ["Enter"] } : { keys: ["Enter"] }); }
 
+  // browser Back closes the terminal (one history entry per open)
+  useEffect(() => {
+    history.pushState({ term: id }, "");
+    const pop = () => onClose();
+    window.addEventListener("popstate", pop);
+    return () => { window.removeEventListener("popstate", pop); if (history.state && history.state.term === id) history.back(); };
+  }, [id]);
+
   useEffect(() => {
     if (!screen) return;
     const coarse = matchMedia("(pointer: coarse)").matches;
     const t = new XTerm({ cursorBlink: true, fontSize: coarse ? 12 : 13, convertEol: false, scrollback: 0, theme: { background: "#0b0d11" }, allowProposedApi: true, disableStdin: coarse });
-    const fit = new FitAddon(); t.loadAddon(fit); t.open(screen); term.current = { t, fit };
+    const fit = new FitAddon(); t.loadAddon(fit); t.open(screen);
     // desktop keyboard: translate xterm input into tmux keys
     t.onData((data) => {
       const map: Record<string, string> = { "\r": "Enter", "\x7f": "BSpace", "\x1b": "Escape", "\x03": "C-c", "\t": "Tab", "\x1b[A": "Up", "\x1b[B": "Down", "\x1b[C": "Right", "\x1b[D": "Left", "\x1b[Z": "S-Tab", "\x04": "C-d", "\x0c": "C-l", "\x15": "C-u" };
@@ -63,8 +70,7 @@ export function TerminalSheet({ session, open, onClose, onClosed }: { session: {
     };
     const ro = new ResizeObserver(() => refit());
     ro.observe(screen);
-    // fonts may still be loading at mount: measure again once they are
-    (document as any).fonts?.ready?.then(() => refit());
+    (document as any).fonts?.ready?.then(() => refit()); // fonts may still be loading at mount
     refit();
     // ---- poll one snapshot per second (only repaint when it changed); SSE doesn't survive the tunnel relay
     let last = "", alive = true;
@@ -87,32 +93,30 @@ export function TerminalSheet({ session, open, onClose, onClosed }: { session: {
     tick(); const iv = setInterval(tick, 1000);
     // nothing behind the terminal should scroll while it is up
     const prev = document.documentElement.style.overflow; document.documentElement.style.overflow = "hidden";
-    return () => { alive = false; clearInterval(iv); clearTimeout(timer); ro.disconnect(); t.dispose(); term.current = null; document.documentElement.style.overflow = prev; };
+    return () => { alive = false; clearInterval(iv); clearTimeout(timer); ro.disconnect(); t.dispose(); document.documentElement.style.overflow = prev; };
   }, [id, screen]);
 
   // key chips must not steal focus from the input (that would drop the keyboard on iOS)
   const keep = (e: React.PointerEvent) => e.preventDefault();
   return (
-    <Drawer.Root open={open} onOpenChange={(o) => { if (!o) onClose(); }} onAnimationEnd={(o) => { if (!o) onClosed(); }} handleOnly repositionInputs={false} autoFocus={false}>
-      <Drawer.Portal>
-        <Drawer.Overlay className="sheet-overlay" style={{ zIndex: 30 }} />
-        <Drawer.Content className={`term${vv.kb ? " kb" : ""}`} style={{ top: vv.top, height: vv.height }} aria-describedby={undefined} onCloseAutoFocus={(e) => { e.preventDefault(); (document.activeElement as HTMLElement | null)?.blur?.(); }}>
-          <div className="thandle"><Drawer.Handle className="handle" /></div>
+    <Theme {...THEME} appearance="dark" asChild>
+      <div className={`term${vv.kb ? " kb" : ""}`} style={{ top: vv.top, height: vv.height }} role="dialog" aria-label="Terminal">
+        <div className="term-in">
           <div className="bar">
-            <Drawer.Title className="title">{session.title}</Drawer.Title>
+            <Heading as="h2" size="3" className="title">{session.title}</Heading>
             <span className="status" id="term-status">{status}</span>
-            <button className="btn btn-dark btn-sm border-secondary" onClick={onClose} aria-label="Close">✕</button>
+            <Button variant="soft" color="gray" size="1" onClick={onClose} aria-label="Close">✕</Button>
           </div>
           <div className="screen"><div id="term" ref={setScreen} style={{ height: "100%" }} /></div>
           <div className="keys">
-            {KEYS.map(([l, k]) => <button key={k} className="btn btn-dark btn-sm border-secondary" onPointerDown={keep} onClick={() => send({ keys: [k] })}>{l}</button>)}
+            {KEYS.map(([l, k]) => <Button key={k} variant="soft" color="gray" size="1" onPointerDown={keep} onClick={() => send({ keys: [k] })}>{l}</Button>)}
           </div>
-          <div className="inrow input-group input-group-sm">
-            <input ref={input} id="term-in" className="form-control" type="text" autoComplete="off" autoCorrect="off" autoCapitalize="none" spellCheck={false} enterKeyHint="send" placeholder="type, then Send (adds Enter)" value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); sendText(); } }} />
-            <button className="btn btn-dark border-secondary" onPointerDown={keep} onClick={sendText}>Send</button>
+          <div className="inrow">
+            <TextField.Root id="term-in" size="2" type="text" autoComplete="off" autoCorrect="off" autoCapitalize="none" spellCheck={false} enterKeyHint="send" placeholder="type, then Send (adds Enter)" value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); sendText(); } }} />
+            <Button variant="soft" color="gray" size="2" onPointerDown={keep} onClick={sendText}>Send</Button>
           </div>
-        </Drawer.Content>
-      </Drawer.Portal>
-    </Drawer.Root>
+        </div>
+      </div>
+    </Theme>
   );
 }

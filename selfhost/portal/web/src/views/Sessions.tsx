@@ -1,16 +1,17 @@
 import { useState } from "react";
+import { Button, Card, Flex, Heading, Text } from "@radix-ui/themes";
 import { api, ago, REGION, sessionTitle, type Session } from "../api";
 import { useStore, pendUntil, pend, refresh, settle, setTab } from "../store";
-import { PButton, Pill, Spinner, useCoolAfterShift } from "../ui";
+import { PButton, Pill, Spinner, Muted, useCoolAfterShift } from "../ui";
 import { ActionSheet } from "../Sheet";
 
 function SessionPill({ m }: { m: Session }) {
   // Real state only. Fly state first; then whether claude inside has actually come up.
-  if (m.state === "destroying" || m.state === "destroyed") return <Pill kind="bad"><Spinner />{m.state}</Pill>;
-  if (m.state === "created" || m.state === "starting") return <Pill kind="wait"><Spinner />creating…</Pill>;
+  if (m.state === "destroying" || m.state === "destroyed") return <Pill kind="bad"><Spinner size="1" />{m.state}</Pill>;
+  if (m.state === "created" || m.state === "starting") return <Pill kind="wait"><Spinner size="1" />creating…</Pill>;
   if (m.state === "stopped" || m.state === "suspended") return <Pill kind="dim">paused</Pill>;
   if (m.state === "started") {
-    if (!m.status) return <Pill kind="wait"><Spinner />booting…</Pill>;
+    if (!m.status) return <Pill kind="wait"><Spinner size="1" />booting…</Pill>;
     if (m.status === "busy") return <Pill kind="wait">working</Pill>;
     if (m.status === "waiting") return <Pill kind="bad">needs you</Pill>;
     return m.bgTasks ? <Pill kind="wait">idle · {m.bgTasks} background</Pill> : <Pill kind="ok">idle</Pill>;
@@ -84,7 +85,7 @@ export function Sessions({ onTerminal }: { onTerminal: (id: string, title: strin
   // stable order (newest first) so cards never swap between polls
   const list = [...sessions].sort((a, b) => String(b.created || "").localeCompare(String(a.created || "")) || String(a.id).localeCompare(String(b.id)));
   const cool = useCoolAfterShift(list.map((m) => m.id).join("|"));
-  if (!list.length) return <div className="text-center text-body-secondary py-5">No sessions running.<br />Tap “New session”.</div>;
+  if (!list.length) return <Text as="div" align="center" color="gray" my="8">No sessions running.<br />Tap “New session”.</Text>;
   const menuFor = menu ? list.find((m) => m.id === menu.id) : undefined;
   return (
     <>
@@ -99,20 +100,18 @@ export function Sessions({ onTerminal }: { onTerminal: (id: string, title: strin
           : m.state === "started" ? (m.autoPause === "off" ? "Auto-pause off — stays running while idle."
             : (m.pauseInMs != null ? `Pauses in ~${Math.max(1, Math.round(m.pauseInMs / 60000))} min if still idle.` : "Auto-pauses after ~1h idle.")) : "";
         return (
-          <div className={`card mb-3${busy ? " opacity-75" : ""}`} key={m.id}>
-            <div className="card-body">
-              <div className="d-flex justify-content-between align-items-start gap-2 mb-1"><h5 className="card-title mb-0 text-break">{title}</h5><SessionPill m={m} /></div>
-              <div className="text-body-secondary small">{m.environment ? "env: " + m.environment : ""}{repos ? " · " + repos : ""}{m.permissionMode === "bypass" ? <> · <Pill kind="bad">skip perms</Pill></> : (m.permissionMode ? " · auto" : "")}</div>
-              <div className="text-body-secondary small">{REGION[m.region] || m.region || ""}{m.guest ? " · " + m.guest : ""}{modelName ? " · " + modelName : ""}{m.created ? " · created " + ago(m.created) : ""}</div>
-              {apInfo && <div className="text-body-secondary small mt-1">{apInfo}</div>}
-              <div className="d-flex gap-2 mt-3 actions">
-                {m.state === "started" && <button className="btn btn-primary btn-sm" onClick={() => onTerminal(m.id, title)}>Terminal</button>}
-                {paused && <PButton pkey={"s:" + m.id} cls="btn-success" onClick={() => wakeSession(m.id)} label="Start" />}
-                {busy ? (m.state === "started" ? <button className="btn btn-outline-secondary btn-sm" disabled><Spinner />{busy}</button> : null)
-                  : <button className={`btn btn-outline-secondary btn-sm${cool ? " cool" : ""}`} aria-label="More actions" onClick={() => setMenu({ id: m.id, open: true })}>More ▾</button>}
-              </div>
-            </div>
-          </div>
+          <Card size="2" mb="3" className="scard" key={m.id} style={{ opacity: busy ? .75 : 1 }}>
+            <Flex justify="between" align="start" gap="2" mb="1"><Heading size="3" style={{ wordBreak: "break-word" }}>{title}</Heading><SessionPill m={m} /></Flex>
+            <Muted>{m.environment ? "env: " + m.environment : ""}{repos ? " · " + repos : ""}{m.permissionMode === "bypass" ? <> · <Pill kind="bad">skip perms</Pill></> : (m.permissionMode ? " · auto" : "")}</Muted>
+            <Muted>{REGION[m.region] || m.region || ""}{m.guest ? " · " + m.guest : ""}{modelName ? " · " + modelName : ""}{m.created ? " · created " + ago(m.created) : ""}</Muted>
+            {apInfo && <Muted mt="1">{apInfo}</Muted>}
+            <Flex gap="2" mt="3" className="actions">
+              {m.state === "started" && <Button onClick={() => onTerminal(m.id, title)}>Terminal</Button>}
+              {paused && <PButton pkey={"s:" + m.id} color="green" onClick={() => wakeSession(m.id)} label="Start" />}
+              {busy ? (m.state === "started" ? <Button variant="soft" color="gray" disabled><Spinner size="1" />{busy}</Button> : null)
+                : <Button variant="soft" color="gray" className={cool ? "cool" : undefined} disabled={cool} aria-label="More actions" onClick={() => setMenu({ id: m.id, open: true })}>More ▾</Button>}
+            </Flex>
+          </Card>
         );
       })}
       <ActionSheet open={!!menu?.open} onClose={() => setMenu((m) => (m ? { ...m, open: false } : m))} onClosed={() => setMenu(null)}

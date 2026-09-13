@@ -1,6 +1,7 @@
+import { Button, Card, Flex, Heading, Text } from "@radix-ui/themes";
 import { api } from "../api";
 import { useStore, pend, refresh } from "../store";
-import { PButton, useCoolAfterShift } from "../ui";
+import { PButton, Muted, useCoolAfterShift } from "../ui";
 
 export function Envs({ onEdit }: { onEdit: (name: string) => void }) {
   const envs = useStore((s) => s.state.environments) || {};
@@ -16,12 +17,12 @@ export function Envs({ onEdit }: { onEdit: (name: string) => void }) {
   return (
     <>
       {names.map((n) => { const d = envs[n]; return (
-        <div className={`card mb-3${pending.has("env:" + n) ? " opacity-75" : ""}`} key={n}><div className="card-body">
-          <div className="d-flex justify-content-between align-items-start gap-2 mb-1"><h5 className="card-title mb-0">{n}</h5><span className="text-body-secondary small">{(d.keys || []).length} keys</span></div>
-          <div className="text-body-secondary small text-break">{(d.keys || []).join(", ") || "—"}</div>
-          <div className="d-flex gap-2 mt-3"><button className="btn btn-outline-secondary btn-sm" onClick={() => onEdit(n)}>Edit secrets</button><PButton pkey={"env:" + n} cls="btn-outline-danger" onClick={() => del(n)} label="Delete" cool={cool} /></div>
-        </div></div>); })}
-      <button className="btn btn-primary" onClick={() => onEdit("")}>+ Add environment</button>
+        <Card size="2" mb="3" className="scard" key={n} style={{ opacity: pending.has("env:" + n) ? .75 : 1 }}>
+          <Flex justify="between" align="start" gap="2" mb="1"><Heading size="3">{n}</Heading><Text size="1" color="gray">{(d.keys || []).length} keys</Text></Flex>
+          <Muted>{(d.keys || []).join(", ") || "—"}</Muted>
+          <Flex gap="2" mt="3"><Button variant="soft" color="gray" onClick={() => onEdit(n)}>Edit secrets</Button><PButton pkey={"env:" + n} color="red" variant="soft" onClick={() => del(n)} label="Delete" cool={cool} /></Flex>
+        </Card>); })}
+      <Button onClick={() => onEdit("")}>+ Add environment</Button>
     </>
   );
 }

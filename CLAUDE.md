@@ -606,11 +606,14 @@ up in the Claude phone app. Isolated microVM per session (install tools freely).
   destructive buttons after a list shifts; Terminal panel = tmux mirror via Fly exec that
   auto-fits to the visible area (keyboard included); Re-login = real `claude auth login` in the
   auth-broker pod (portal rollouts are stateless: builds in CI, PTY in the broker). Look & feel
-  rules (Deyao, 2026-09-13): **stock Bootstrap 5** styling, no custom theme, no purple, no
-  gradients, no drop shadows, no iOS look-alike chrome; sheets are vaul drawers (drag handle to
-  expand/dismiss); per-card actions = one primary button + a "More" action sheet, never a wall
-  of buttons; nothing optimistic — a toggle's spinner stays until the server reports the new
-  state.
+  rules (Deyao, 2026-09-13): a **commonly used component package used as shipped** — currently
+  Radix Themes, configured only via its documented `<Theme>` props (never override a framework's
+  CSS; Bootstrap-with-overrides was rejected); no purple, no gradients, no drop shadows, no
+  hand-rolled iOS look-alike chrome, soft rounded corners; sheets = react-modal-sheet with iOS
+  detents (half → full on flick up incl. over content, down to dismiss) — don't hand-roll
+  gestures; terminal = plain full-screen page; per-card actions = one primary button + a "More"
+  action sheet, never a wall of buttons; nothing optimistic — a toggle's spinner stays until the
+  server reports the new state.
 - Known limit: sessions share the Claude OAuth refresh token (fine for a few concurrent).
 
 ## Other files

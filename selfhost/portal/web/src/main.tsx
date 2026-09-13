@@ -1,12 +1,12 @@
 import { createRoot } from "react-dom/client";
 import { App } from "./App";
-import "bootstrap/dist/css/bootstrap.min.css";
+import "@radix-ui/themes/styles.css";
 import "./styles.css";
 import "./store";
 
-// Bootstrap's colour modes are opt-in per element: follow the OS setting
+// Radix Themes reads a `light`/`dark` class from an ancestor when appearance="inherit" — follow the OS
 const mq = matchMedia("(prefers-color-scheme: dark)");
-const theme = () => { document.documentElement.setAttribute("data-bs-theme", mq.matches ? "dark" : "light"); };
+const theme = () => { document.documentElement.classList.toggle("dark", mq.matches); document.documentElement.classList.toggle("light", !mq.matches); };
 theme(); mq.addEventListener("change", theme);
 
 // iOS Safari ignores user-scalable=no in a normal tab (honoured only when added to the Home

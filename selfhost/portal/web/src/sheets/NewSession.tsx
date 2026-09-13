@@ -1,57 +1,53 @@
 import { useState } from "react";
+import { Button, CheckboxCards, RadioCards, Text, TextArea, TextField } from "@radix-ui/themes";
 import { api } from "../api";
 import { useStore, refresh, settle, setTab } from "../store";
 import { Sheet } from "../Sheet";
-import { Lbl, Spinner, useBusy } from "../ui";
+import { Lbl, Muted, Spinner, useBusy } from "../ui";
 
 export function NewSession({ open, onClose, onClosed }: { open: boolean; onClose: () => void; onClosed: () => void }) {
   const st = useStore((s) => s.state), SIZES = useStore((s) => s.sizes), MODELS = useStore((s) => s.models);
   const envs = Object.keys(st.environments || {}), repos = st.repos || [];
   const [env, setEnv] = useState(envs[0] || "");
-  const [picked, setPicked] = useState<Set<string>>(() => new Set(repos.filter((r) => r.name === "claude-env" || repos.length === 1).map((r) => r.name)));
-  const [perm, setPerm] = useState("auto"), [model, setModel] = useState(MODELS.default), [size, setSize] = useState(SIZES.default), [autoPause, setAutoPause] = useState(true);
+  const [picked, setPicked] = useState<string[]>(() => repos.filter((r) => r.name === "claude-env" || repos.length === 1).map((r) => r.name));
+  const [perm, setPerm] = useState("auto"), [model, setModel] = useState(MODELS.default), [size, setSize] = useState(SIZES.default), [autoPause, setAutoPause] = useState<string[]>(["on"]);
   const [label, setLabel] = useState(""), [prompt, setPrompt] = useState("");
   const [busy, run] = useBusy();
   async function start() {
     await run("Starting…", async () => {
       try {
-        const r = await api("POST", "api/sessions", { environment: env, repos: [...picked], label: label.trim(), permissionMode: perm, size, model, prompt: prompt.trim(), autoPause });
+        const r = await api("POST", "api/sessions", { environment: env, repos: picked, label: label.trim(), permissionMode: perm, size, model, prompt: prompt.trim(), autoPause: autoPause.includes("on") });
         onClose();
         await refresh(false);                                 // card appears in its REAL state (creating…)
         settle((s) => { const m = (s.sessions || []).find((x) => x.id === r.id); return !!(m && m.state === "started" && m.status); }); // fast-poll until claude is actually up
       } catch (e: any) { alert("Start failed: " + e.message); if (/Re-login/.test(e.message)) { onClose(); setTab("settings"); } }
     });
   }
-  // Bootstrap list group of radio / checkbox rows
-  const Row = ({ type, name, value, checked, onChange, t, sub }: { type: "radio" | "checkbox"; name: string; value: string; checked: boolean; onChange: (c: boolean) => void; t: React.ReactNode; sub?: React.ReactNode }) => (
-    <label className="list-group-item d-flex gap-3 align-items-center">
-      <input className="form-check-input flex-shrink-0 m-0" type={type} name={name} value={value} checked={checked} onChange={(e) => onChange(e.target.checked)} />
-      <span className="flex-grow-1 text-break">{t}{sub && <small className="d-block text-body-secondary">{sub}</small>}</span>
-    </label>);
+  const Item = ({ t, sub }: { t: React.ReactNode; sub?: React.ReactNode }) => <div style={{ minWidth: 0, width: "100%", textAlign: "left" }}><Text as="div" size="2" weight="medium" style={{ wordBreak: "break-word" }}>{t}</Text>{sub && <Text as="div" size="1" color="gray" style={{ wordBreak: "break-all" }}>{sub}</Text>}</div>;
   return (
     <Sheet open={open} onClose={onClose} onClosed={onClosed} title="New session" snap
-      left={<button className="btn btn-link text-decoration-none px-1" onClick={onClose}>Cancel</button>}
-      right={<button className="btn btn-primary btn-sm" id="ns-start" disabled={!!busy} onClick={start}>{busy ? <><Spinner />{busy}</> : "Start"}</button>}>
+      left={<Button variant="ghost" onClick={onClose}>Cancel</Button>}
+      right={<Button id="ns-start" disabled={!!busy} onClick={start}>{busy ? <><Spinner size="1" />{busy}</> : "Start"}</Button>}>
       <Lbl>Environment</Lbl>
-      <div className="list-group">{envs.length ? envs.map((n) => <Row key={n} type="radio" name="ns-env" value={n} checked={env === n} onChange={() => setEnv(n)} t={n} sub={`${(st.environments[n].keys || []).length} keys`} />) : <div className="text-body-secondary small">No environments yet — add one in the Environments tab.</div>}</div>
+      {envs.length ? <RadioCards.Root id="ns-env" columns="1" gap="2" size="1" value={env} onValueChange={setEnv}>{envs.map((n) => <RadioCards.Item key={n} value={n}><Item t={n} sub={`${(st.environments[n].keys || []).length} keys`} /></RadioCards.Item>)}</RadioCards.Root> : <Muted>No environments yet — add one in the Environments tab.</Muted>}
       <Lbl>Repos</Lbl>
-      <div className="list-group">{repos.length ? repos.map((r) => <Row key={r.name} type="checkbox" name="ns-repo" value={r.name} checked={picked.has(r.name)} onChange={(c) => setPicked((p) => { const n = new Set(p); c ? n.add(r.name) : n.delete(r.name); return n; })} t={r.name} sub={r.url} />) : <div className="text-body-secondary small">No repos yet — add some in the Repos tab.</div>}</div>
+      {repos.length ? <CheckboxCards.Root id="ns-repo" columns="1" gap="2" size="1" value={picked} onValueChange={setPicked}>{repos.map((r) => <CheckboxCards.Item key={r.name} value={r.name}><Item t={r.name} sub={r.url} /></CheckboxCards.Item>)}</CheckboxCards.Root> : <Muted>No repos yet — add some in the Repos tab.</Muted>}
       <Lbl>Permission mode</Lbl>
-      <div className="list-group">
-        <Row type="radio" name="ns-perm" value="auto" checked={perm === "auto"} onChange={() => setPerm("auto")} t="Auto" sub="Auto-approve safe actions; the permission classifier gates the rest." />
-        <Row type="radio" name="ns-perm" value="bypass" checked={perm === "bypass"} onChange={() => setPerm("bypass")} t="Dangerously skip permissions" sub="No prompts at all (--dangerously-skip-permissions)." />
-      </div>
+      <RadioCards.Root id="ns-perm" columns="1" gap="2" size="1" value={perm} onValueChange={setPerm}>
+        <RadioCards.Item value="auto"><Item t="Auto" sub="Auto-approve safe actions; the permission classifier gates the rest." /></RadioCards.Item>
+        <RadioCards.Item value="bypass"><Item t="Dangerously skip permissions" sub="No prompts at all (--dangerously-skip-permissions)." /></RadioCards.Item>
+      </RadioCards.Root>
       <Lbl>Model</Lbl>
-      <div className="list-group">{Object.entries(MODELS.models || {}).map(([k, v]) => <Row key={k} type="radio" name="ns-model" value={k} checked={model === k} onChange={() => setModel(k)} t={v.label || k} sub={k} />)}</div>
+      <RadioCards.Root id="ns-model" columns="1" gap="2" size="1" value={model} onValueChange={setModel}>{Object.entries(MODELS.models || {}).map(([k, v]) => <RadioCards.Item key={k} value={k}><Item t={v.label || k} sub={k} /></RadioCards.Item>)}</RadioCards.Root>
       <Lbl>Machine size</Lbl>
-      <div className="list-group">{Object.entries(SIZES.sizes || {}).map(([k, v]) => <Row key={k} type="radio" name="ns-size" value={k} checked={size === k} onChange={() => setSize(k)} t={k[0].toUpperCase() + k.slice(1)} sub={v.label} />)}</div>
+      <RadioCards.Root id="ns-size" columns="1" gap="2" size="1" value={size} onValueChange={setSize}>{Object.entries(SIZES.sizes || {}).map(([k, v]) => <RadioCards.Item key={k} value={k}><Item t={k[0].toUpperCase() + k.slice(1)} sub={v.label} /></RadioCards.Item>)}</RadioCards.Root>
       <Lbl>Idle</Lbl>
-      <div className="list-group"><Row type="checkbox" name="ns-autopause" value="on" checked={autoPause} onChange={setAutoPause} t="Auto-pause when idle" sub="Stops the machine after ~1h with nothing running to save compute. Wake it with Start — files and the conversation are kept." /></div>
+      <CheckboxCards.Root id="ns-autopause" columns="1" gap="2" size="1" value={autoPause} onValueChange={setAutoPause}><CheckboxCards.Item value="on"><Item t="Auto-pause when idle" sub="Stops the machine after ~1h with nothing running to save compute. Wake it with Start — files and the conversation are kept." /></CheckboxCards.Item></CheckboxCards.Root>
       <Lbl>Session title (optional)</Lbl>
-      <input id="ns-title" className="form-control" type="text" name="session-topic" autoComplete="off" autoCorrect="off" autoCapitalize="sentences" spellCheck={false} placeholder="e.g. refactor billing module" value={label} onChange={(e) => setLabel(e.target.value)} />
-      <div className="form-text">Shows as the session title in the Claude app too. Leave blank and the Claude session names itself.</div>
+      <TextField.Root id="ns-title" type="text" name="session-topic" autoComplete="off" autoCorrect="off" autoCapitalize="sentences" spellCheck={false} placeholder="e.g. refactor billing module" value={label} onChange={(e) => setLabel(e.target.value)} />
+      <Muted mt="1">Shows as the session title in the Claude app too. Leave blank and the Claude session names itself.</Muted>
       <Lbl>First prompt (optional)</Lbl>
-      <textarea id="ns-prompt" className="form-control" rows={4} name="session-first-prompt" autoComplete="off" autoCapitalize="sentences" spellCheck placeholder="Typed into the session as its first message once Claude is up — leave blank to start it yourself from the app." value={prompt} onChange={(e) => setPrompt(e.target.value)} />
+      <TextArea id="ns-prompt" rows={4} name="session-first-prompt" autoComplete="off" autoCapitalize="sentences" spellCheck placeholder="Typed into the session as its first message once Claude is up — leave blank to start it yourself from the app." value={prompt} onChange={(e) => setPrompt(e.target.value)} />
     </Sheet>
   );
 }

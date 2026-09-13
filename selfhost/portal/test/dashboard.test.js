@@ -71,11 +71,11 @@ async function run(viewport, tag) {
   ok(`${tag}: no horizontal overflow`, await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));
   const sessions = await page.evaluate(() => (window.getState().sessions || []).map((s) => ({ id: s.id, state: s.state, status: s.status })));
   ok(`${tag}: state loaded`, sessions.length >= 0, `${sessions.length} session(s)`);
-  ok(`${tag}: one action row per card, no button wall`, await page.evaluate(() => [...document.querySelectorAll(".card .actions")].every((r) => r.querySelectorAll("button").length <= 2)));
+  ok(`${tag}: one action row per card, no button wall`, await page.evaluate(() => [...document.querySelectorAll(".scard .actions")].every((r) => r.querySelectorAll("button").length <= 2)));
 
   const live = sessions.find((s) => s.state === "started" && s.status);
   if (live) {
-    await page.click('.card button:has-text("Terminal")');
+    await page.click('.scard button:has-text("Terminal")');
     await page.waitForFunction(() => /^live/.test(document.getElementById("term-status")?.textContent || ""), null, { timeout: 20000 }).catch(() => {});
     const st = await page.locator("#term-status").textContent();
     ok(`${tag}: terminal live frame`, /^live/.test(st), st);
@@ -100,17 +100,20 @@ async function run(viewport, tag) {
       await page.fill("#term-in", "hello"); await page.press("#term-in", "Enter");
       ok(`${tag}: input row cleared after send`, (await page.inputValue("#term-in")) === "");
     }
-    // drag the handle down → dismiss
-    const hb = await page.locator(".term .thandle").boundingBox();
-    await drag(page, touch, hb.x + hb.width / 2, hb.y + hb.height / 2, hb.y + viewport.height * 0.7);
-    await sleep(700);
-    ok(`${tag}: terminal dismissed by dragging its handle`, (await page.locator(".term").count()) === 0);
+    // ✕ closes the page (a plain full-screen page, no gestures around xterm)
+    await page.click('.term button[aria-label="Close"]');
+    await sleep(500);
+    ok(`${tag}: terminal closes with ✕`, (await page.locator(".term").count()) === 0);
+    // reopen and use the browser's Back
+    await page.click('.scard button:has-text("Terminal")'); await sleep(800);
+    await page.goBack(); await sleep(500);
+    ok(`${tag}: terminal closes with browser Back`, (await page.locator(".term").count()) === 0);
     // put the live session's tmux back to its boot size (the test just refitted it to this viewport)
     if (LIVE) await page.evaluate((id) => fetch(`api/sessions/${id}/tty/resize`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cols: 120, rows: 40 }) }), live.id);
   } else console.log(`skip  ${tag}: no live session to open a terminal on`);
 
   // action menu
-  const more = page.locator('.card button[aria-label="More actions"]').first();
+  const more = page.locator('.scard button[aria-label="More actions"]').first();
   if (await more.count()) {
     await more.click(); await sleep(600);
     ok(`${tag}: action sheet opens`, (await page.locator(".menu button.mi").count()) >= 1, `${await page.locator(".menu button.mi").count()} items`);
@@ -122,10 +125,11 @@ async function run(viewport, tag) {
   // New session sheet: opens at the lower snap point, handle drags to full, drags down to dismiss
   await page.click("#newBtn");
   await page.waitForSelector(".sheet.snap"); await sleep(700);
-  ok(`${tag}: claude-env pre-checked`, await page.evaluate(() => { const c = document.querySelector('input[name=ns-repo][value="claude-env"]'); return !c || c.checked; }));
-  ok(`${tag}: size default = medium`, await page.evaluate(() => document.querySelector("input[name=ns-size]:checked")?.value === "medium"));
-  ok(`${tag}: model default = opus 4.8`, await page.evaluate(() => document.querySelector("input[name=ns-model]:checked")?.value === "claude-opus-4-8"));
-  ok(`${tag}: auto perm default`, await page.evaluate(() => document.querySelector("input[name=ns-perm]:checked")?.value === "auto"));
+  const checked = (sel) => page.evaluate((sel) => document.querySelector(sel + ' [data-state="checked"]')?.getAttribute("value"), sel);
+  ok(`${tag}: claude-env pre-checked`, await page.evaluate(() => { const c = document.querySelector('#ns-repo [value="claude-env"]'); return !c || c.getAttribute("data-state") === "checked"; }));
+  ok(`${tag}: size default = medium`, (await checked("#ns-size")) === "medium");
+  ok(`${tag}: model default = opus 4.8`, (await checked("#ns-model")) === "claude-opus-4-8");
+  ok(`${tag}: auto perm default`, (await checked("#ns-perm")) === "auto");
   const top1 = (await page.locator(".sheet.snap").boundingBox()).y;
   ok(`${tag}: sheet opens part-way (snap point)`, top1 > viewport.height * 0.25, `top ${Math.round(top1)}px of ${viewport.height}`);
   await shot("5-newsession-snap");
@@ -136,13 +140,15 @@ async function run(viewport, tag) {
   ok(`${tag}: handle drag expands to full screen`, top2 < top1 - 50 && top2 < viewport.height * 0.12, `top ${Math.round(top2)}px`);
   ok(`${tag}: header actions visible`, await page.locator('.sheet .head button:has-text("Start")').isVisible());
   await shot("6-newsession-full");
-  // a flick down (vaul dismisses a snap-point sheet on velocity, or from the lowest snap point)
-  hb = await page.locator(".sheet.snap .handle-wrap").boundingBox();
-  await drag(page, touch, hb.x + hb.width / 2, hb.y + hb.height / 2, hb.y + 420, 5);
-  await sleep(800);
+  // flick down: full → half (or closed), flick again → closed
+  for (let i = 0; i < 2 && (await page.locator(".sheet.snap").count()); i++) {
+    hb = await page.locator(".sheet.snap .handle-wrap").boundingBox();
+    await drag(page, touch, hb.x + hb.width / 2, hb.y + hb.height / 2, hb.y + 400, 4);
+    await sleep(700);
+  }
   ok(`${tag}: handle flick down dismisses`, (await page.locator(".sheet").count()) === 0);
 
-  await page.click("#t-envs"); await sleep(200);
+  await page.click("[data-tab=envs]"); await sleep(200);
   await page.click('button:has-text("Edit secrets")').catch(() => {});
   await page.waitForSelector(".sheet").catch(() => {}); await sleep(600);
   const leak = await page.evaluate(() => [...document.querySelectorAll(".sheet input, .sheet textarea")].map((i) => i.value).filter(Boolean).filter((v) => !/^[a-z0-9-]+$/.test(v)));
@@ -151,10 +157,10 @@ async function run(viewport, tag) {
   await shot("7-envedit");
   await page.click('.sheet .head button:has-text("Cancel")').catch(() => {}); await sleep(600);
   // Bootstrap's own dark mode follows the OS: the page must set data-bs-theme
-  ok(`${tag}: colour mode set`, await page.evaluate(() => ["light", "dark"].includes(document.documentElement.getAttribute("data-bs-theme"))));
+  ok(`${tag}: colour mode set`, await page.evaluate(() => ["light", "dark"].some((c) => document.documentElement.classList.contains(c))));
 
   // Repos tab: the GitHub picker lists the token's repos, filters on typing, and a pick fills the URL
-  await page.click("#t-repos");
+  await page.click("[data-tab=repos]");
   await page.click("#repo-search");
   await page.waitForFunction(() => document.querySelectorAll("#repo-dd .it").length > 0, null, { timeout: 30000 }).catch(() => {});
   const ddCount = await page.evaluate(() => document.querySelectorAll("#repo-dd .it").length);
@@ -176,7 +182,7 @@ async function run(viewport, tag) {
   await page.fill("#repo-url", "https://example.com/x/y.git");
   await page.evaluate(() => window.__refresh()); await sleep(300);
   ok(`${tag}: add card survives re-render`, (await page.inputValue("#repo-url")) === "https://example.com/x/y.git");
-  await page.click("#t-settings"); await sleep(300); await shot("9-settings");
+  await page.click("[data-tab=settings]"); await sleep(300); await shot("9-settings");
 
   const benign = (s) => /favicon/.test(s);
   ok(`${tag}: no console errors`, consoleErrors.length === 0, consoleErrors.join(" | ").slice(0, 300));
