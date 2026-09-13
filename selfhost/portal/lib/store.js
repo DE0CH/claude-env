@@ -46,7 +46,10 @@ async function streamToBuffer(stream) {
   return Buffer.concat(chunks);
 }
 
-let cache = null;
+// Short-lived cache: S3 is the source of truth and other processes (deploy script,
+// another controller) may write it, so re-read after TTL instead of caching forever.
+let cache = null, cacheAt = 0;
+const CACHE_TTL_MS = 15000;
 async function load() {
   try {
     const r = await s3().send(new GetObjectCommand({ Bucket: BUCKET(), Key: KEY }));
@@ -55,11 +58,15 @@ async function load() {
     if (e.name === "NoSuchKey" || e.$metadata?.httpStatusCode === 404) cache = { ...DEFAULT };
     else throw e;
   }
+  cacheAt = Date.now();
   return cache;
 }
-async function get() { return cache || (await load()); }
+async function get() {
+  if (cache && Date.now() - cacheAt < CACHE_TTL_MS) return cache;
+  return load();
+}
 async function save(cfg) {
-  cache = cfg;
+  cache = cfg; cacheAt = Date.now();
   await s3().send(new PutObjectCommand({
     Bucket: BUCKET(), Key: KEY, Body: encrypt(cfg), ContentType: "application/octet-stream",
   }));
