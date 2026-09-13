@@ -69,6 +69,7 @@ async function run(viewport, tag) {
   await page.waitForSelector("#dlg[open]");
   ok(`${tag}: claude-env pre-checked`, await page.evaluate(() => { const c = document.querySelector('input[name=ns-repo][value="claude-env"]'); return !c || c.checked; }));
   ok(`${tag}: size default = medium`, await page.evaluate(() => document.querySelector('input[name=ns-size]:checked')?.value === "medium"));
+  ok(`${tag}: model default = opus 4.8`, await page.evaluate(() => document.querySelector('input[name=ns-model]:checked')?.value === "claude-opus-4-8"));
   ok(`${tag}: auto perm default`, await page.evaluate(() => document.querySelector('input[name=ns-perm]:checked')?.value === "auto"));
   await shot("3-newsession");
   // action bar must sit at the very bottom of the dialog viewport

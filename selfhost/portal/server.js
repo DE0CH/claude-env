@@ -149,6 +149,7 @@ app.get("/api/state", async (req, res) => {
           label: m.config?.metadata?.label || "",
           permissionMode: m.config?.metadata?.permissionMode || "",
           size: m.config?.metadata?.size || "",
+          model: m.config?.metadata?.model || "",
           guest: m.config?.guest ? `${m.config.guest.cpus}×${m.config.guest.cpu_kind} · ${Math.round((m.config.guest.memory_mb || 0) / 1024)} GB` : "",
         }));
         // stable order: newest first, id as tie-break (Fly's list order is not deterministic)
@@ -280,6 +281,16 @@ const SIZES = {
 const DEFAULT_SIZE = "medium";
 app.get("/api/sizes", (req, res) => res.json({ sizes: SIZES, default: DEFAULT_SIZE }));
 
+// Model presets the dashboard offers for a new session (passed to the session image as
+// SESSION_MODEL -> `claude --model <id>`); anything else is rejected so a typo can't
+// silently pick a wrong/unavailable model.
+const MODELS = {
+  "claude-opus-4-8":  { label: "Opus 4.8 — most capable" },
+  "claude-fable-5-1": { label: "Fable 5.1 — fast" },
+};
+const DEFAULT_MODEL = "claude-opus-4-8";
+app.get("/api/models", (req, res) => res.json({ models: MODELS, default: DEFAULT_MODEL }));
+
 app.post("/api/sessions", async (req, res) => {
   try {
     if (!process.env.FLY_API_TOKEN) return res.status(400).json({ error: "FLY_API_TOKEN not set on the portal" });
@@ -290,11 +301,12 @@ app.post("/api/sessions", async (req, res) => {
     catch (e) { if (e.needLogin) return res.status(409).json({ error: e.message, needLogin: true }); console.error(`[creds] ${e.message}`); }
     const creds = await store.getClaudeCredentials();
     if (!creds.credentials) return res.status(409).json({ error: "no Claude credentials — Re-login from Settings", needLogin: true });
-    const { environment, repos = [], label, permissionMode, size, prompt } = req.body || {};
+    const { environment, repos = [], label, permissionMode, size, model, prompt } = req.body || {};
     const env = cfg.environments[environment];
     if (environment && !env) return res.status(400).json({ error: `unknown environment '${environment}'` });
     const sizeKey = size && SIZES[size] ? size : DEFAULT_SIZE;
     const { label: _sizeLabel, ...guest } = SIZES[sizeKey];
+    const modelId = model && MODELS[model] ? model : DEFAULT_MODEL;
 
     const repoUrls = (repos || [])
       .map((n) => (cfg.repos || []).find((r) => r.name === n || r.url === n))
@@ -325,6 +337,7 @@ app.post("/api/sessions", async (req, res) => {
       SESSION_REPOS: repoUrls.join(","),
       SESSION_LABEL: userLabel, // blank => the Claude session names itself
       SESSION_PERMISSION_MODE: permMode,
+      SESSION_MODEL: modelId,
       SESSION_PROMPT: firstPrompt, // blank => nothing is typed; the app sends the first message
       PORTAL_URL: PUBLIC_URL, // the session pushes refreshed Claude credentials back here
     };
@@ -341,10 +354,11 @@ app.post("/api/sessions", async (req, res) => {
         label: userLabel,
         permissionMode: permMode,
         size: sizeKey,
+        model: modelId,
         hasPrompt: firstPrompt ? "1" : "",
       },
     });
-    res.json({ ok: true, id: machine.id, name, label: userLabel, state: machine.state, size: sizeKey, hasPrompt: !!firstPrompt });
+    res.json({ ok: true, id: machine.id, name, label: userLabel, state: machine.state, size: sizeKey, model: modelId, hasPrompt: !!firstPrompt });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 // Pre-destroy check: uncommitted / unpushed work in each repo inside the session.
