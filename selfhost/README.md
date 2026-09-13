@@ -4,7 +4,8 @@ A self-hosted clone of Claude cloud code's phone flow, escaping the 443-only net
 and the permission classifier:
 
 - pick an **environment** (a named set of secrets),
-- pick one or more **repos**, a **permission mode** (auto / dangerously-skip),
+- pick one or more **repos** (added on the Repos tab from a searchable dropdown of your own
+  GitHub repos, listed via the portal's `GITHUB_TOKEN`, or by pasting any git URL), a **permission mode** (auto / dangerously-skip),
 - **start a session** — which runs in its own isolated container (install tools freely),
 - chat with it from the **Claude phone app** (each session runs `claude --remote-control`),
 - watch/nudge its terminal from the dashboard, re-login Claude from the dashboard.

@@ -17,6 +17,13 @@ RUN curl -fsSL -o /usr/local/bin/kubectl "https://dl.k8s.io/release/v1.33.4/bin/
 # sops (+ age above): edit/encrypt the selfhost SOPS secrets by hand (see selfhost-k8s skill)
 RUN curl -fsSL -o /usr/local/bin/sops "https://github.com/getsops/sops/releases/download/v3.13.3/sops-v3.13.3.linux.amd64" \
  && chmod +x /usr/local/bin/sops
+# gh (GitHub CLI): watch CI runs (`gh run list -w portal-image`), PRs, releases; GITHUB_TOKEN auths it
+RUN mkdir -p -m 755 /etc/apt/keyrings \
+ && curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg -o /etc/apt/keyrings/githubcli-archive-keyring.gpg \
+ && chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg \
+ && echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" > /etc/apt/sources.list.d/github-cli.list \
+ && apt-get update && apt-get install -y --no-install-recommends gh && rm -rf /var/lib/apt/lists/* \
+ && gh --version
 # yt-dlp: YouTube audio-download fallback when no transcript exists (CLAUDE.md YouTube section)
 RUN curl -fsSL -o /usr/local/bin/yt-dlp "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp" \
  && chmod +x /usr/local/bin/yt-dlp

@@ -37,7 +37,8 @@ kubectl --server "$KUBE_SERVER" --token "$KUBE_TOKEN" --insecure-skip-tls-verify
 curl -sS -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
   https://tunnel.deyaochen.com/t/portal/api/state
 # same base for POST /api/sessions {environment,repos,label,permissionMode}, /api/environments,
-# /api/repos, /api/image/rebuild, /api/auth/start|code, /api/sessions/<id>/tty (SSE) …
+# /api/repos, /api/github/repos (the Add-repo picker's list: every repo the portal's GITHUB_TOKEN
+# can see, 5-min cache, ?refresh=1), /api/image/rebuild, /api/auth/start|code, /api/sessions/<id>/tty (SSE) …
 ```
 
 ## Everyday operations
