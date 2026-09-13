@@ -84,6 +84,8 @@ Destroy: `selfhost/cluster/destroy.sh` (Fly sessions are separate — destroy th
   so the Claude app and dashboard match; blank → the Claude session names itself and the
   dashboard mirrors whatever it (or you, in the app) calls it. No renaming from the dashboard.
 - **Permission mode** per session: Auto (default) or Dangerously skip permissions.
+- **Secret values are write-only**: the dashboard lists key names and lets you set a new value, delete
+  a key, or add keys; values are never sent to the browser (there is no reveal endpoint).
 - **Terminal**: mirrors the session's tmux pane (1 Hz `capture-pane` over the Fly exec API,
   keys via `send-keys`) — no WireGuard/PTY; works through the tunnel; "Fit" resizes tmux.
 - **Re-login** (Settings): drives the real `claude auth login --claudeai` in a PTY inside the

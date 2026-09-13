@@ -352,27 +352,41 @@ async function destroy(id){
   settle(st=>!(st.sessions||[]).some(x=>x.id===id),60000);
 }
 
-async function editEnv(name){
-  let secrets={};
-  if(name){try{const r=await api('GET',`api/environments/${encodeURIComponent(name)}/secrets`);secrets=r.secrets||{};}catch(e){}}
-  const text=Object.entries(secrets).map(([k,v])=>`${k}=${/[\n\r]/.test(v)?JSON.stringify(v):v}`).join('\n');
+// Secret values never reach the browser: the editor lists key names and lets you set a new
+// value (blank = unchanged), delete a key, or add keys. Only the changes are sent.
+const EV_DEL=new Set();
+function editEnv(name){
+  EV_DEL.clear();
+  const keys=name?((STATE.environments[name]||{}).keys||[]).slice().sort():[];
   dlg(`<h3>${name?'Edit ':'New '}environment</h3>
     <label>Environment id</label><input id="ev-title" type="text" name="env-id" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" value="${esc(name)}" ${name?'readonly':''} placeholder="e.g. default (lowercase, dashes)">
-    <label>Secrets (KEY=VALUE, one per line)</label>
-    <textarea id="ev-secrets" placeholder="LOBSTER_TOKEN=...\nSERPAPI_KEY=...">${esc(text)}</textarea>
-    <div class="hint">Committed to git encrypted (sops) and applied to the cluster. Blank value on an existing key deletes it. Multi-line values: wrap in JSON quotes ("...\\n...").</div>
+    ${keys.length?'<label>Existing keys — type a new value to update, leave blank to keep</label>':''}
+    <div id="ev-keys">${keys.map(k=>`<div class="row evk" data-k="${esc(k)}" style="flex-wrap:nowrap;margin:.3rem 0">
+      <input type="password" class="evv" placeholder="${esc(k)}  (unchanged)" autocomplete="new-password" autocapitalize="none" spellcheck="false" style="flex:1;min-width:0;font-family:ui-monospace,Menlo,monospace;font-size:.85rem">
+      <button class="btn danger sm" onclick="evDel(this)" title="delete ${esc(k)}">✕</button></div>`).join('')}</div>
+    <label>Add keys (KEY=VALUE, one per line)</label>
+    <textarea id="ev-add" placeholder="NEW_KEY=value" style="min-height:4rem"></textarea>
+    <div class="hint">Committed to git encrypted (sops), then applied. Values are write-only — the dashboard never shows them. Multi-line values: wrap in JSON quotes ("...\\n...").</div>
     <div class="actions">
       <button class="btn ghost" onclick="closeDlg()">Cancel</button>
       <button class="btn" onclick="saveEnv(this)">Save</button></div>`);
 }
+function evDel(btn){
+  const row=btn.closest('.evk'),k=row.dataset.k;
+  if(EV_DEL.has(k)){EV_DEL.delete(k);row.style.opacity='';btn.textContent='✕';row.querySelector('.evv').disabled=false;}
+  else{EV_DEL.add(k);row.style.opacity='.45';btn.textContent='undo';row.querySelector('.evv').disabled=true;row.querySelector('.evv').value='';}
+}
+function parseVal(v){if(v.startsWith('"')&&v.endsWith('"')){try{return JSON.parse(v);}catch{}}return v;}
 async function saveEnv(btn){
   const name=$('#ev-title').value.trim();
   if(!name){alert('name required');return;}
   const secrets={};
-  $('#ev-secrets').value.split('\n').forEach(line=>{const i=line.indexOf('=');if(i<1)return;let v=line.slice(i+1);
-    if(v.startsWith('"')&&v.endsWith('"')){try{v=JSON.parse(v);}catch{}}secrets[line.slice(0,i).trim()]=v;});
-  // keys removed from the textarea are deleted too
-  if($('#ev-title').readOnly){try{const r=await api('GET',`api/environments/${encodeURIComponent(name)}/secrets`);for(const k of Object.keys(r.secrets||{}))if(!(k in secrets))secrets[k]='';}catch(e){}}
+  document.querySelectorAll('#ev-keys .evk').forEach(row=>{const k=row.dataset.k,v=row.querySelector('.evv').value;
+    if(EV_DEL.has(k))secrets[k]='';else if(v)secrets[k]=parseVal(v);});
+  $('#ev-add').value.split('\n').forEach(line=>{const i=line.indexOf('=');if(i<1)return;const k=line.slice(0,i).trim(),v=line.slice(i+1);
+    if(!v){alert(`"${k}": empty value (to delete an existing key use its ✕ button)`);throw new Error('empty');}secrets[k]=parseVal(v);});
+  if(!Object.keys(secrets).length&&$('#ev-title').readOnly){closeDlg();return;}
+  if(EV_DEL.size&&!confirm(`Delete ${[...EV_DEL].join(', ')} from "${name}"?`))return;
   const restore=dlgBusy(btn,'Saving…');
   try{await api('POST','api/environments',{name,secrets});closeDlg();await refresh(false);}
   catch(e){restore();alert(e.message);}

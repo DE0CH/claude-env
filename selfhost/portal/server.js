@@ -134,15 +134,8 @@ app.delete("/api/environments/:name", async (req, res) => {
   try { await store.deleteEnvironment(req.params.name); res.json({ ok: true }); }
   catch (e) { res.status(500).json({ error: e.message }); }
 });
-// reveal one environment's full secrets (values) — used by the editor on demand
-app.get("/api/environments/:name/secrets", async (req, res) => {
-  try {
-    const c = await store.get();
-    const e = c.environments[req.params.name];
-    if (!e) return res.status(404).json({ error: "not found" });
-    res.json({ secrets: e.secrets || {} });
-  } catch (e) { res.status(500).json({ error: e.message }); }
-});
+// Secret VALUES are never sent to the browser: the dashboard only sees key names
+// (in /api/state) and writes updates/deletions through POST /api/environments.
 
 // ---- repos ----------------------------------------------------------------
 app.post("/api/repos", async (req, res) => {
