@@ -118,11 +118,13 @@
   <div id="banners"></div>
   <div class="tabs">
     <button id="t-sessions" class="on" onclick="tab('sessions')">Sessions</button>
+    <button id="t-android" onclick="tab('android')">Android</button>
     <button id="t-envs" onclick="tab('envs')">Environments</button>
     <button id="t-repos" onclick="tab('repos')">Repos</button>
     <button id="t-settings" onclick="tab('settings')">Settings</button>
   </div>
   <div id="view-sessions"></div>
+  <div id="view-android" hidden></div>
   <div id="view-envs" hidden></div>
   <div id="view-repos" hidden></div>
   <div id="view-settings" hidden></div>
@@ -192,7 +194,7 @@ function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;',
 const REGION={arn:'Stockholm',fra:'Frankfurt',ams:'Amsterdam',lhr:'London',cdg:'Paris',waw:'Warsaw',mad:'Madrid',iad:'Virginia',ord:'Chicago',sjc:'San Jose',lax:'Los Angeles',sin:'Singapore',nrt:'Tokyo',hkg:'Hong Kong',syd:'Sydney'};
 function ago(iso){const s=Math.max(0,(Date.now()-new Date(iso).getTime())/1000);
   if(s<60)return 'just now';if(s<3600)return Math.floor(s/60)+' min ago';if(s<86400)return Math.floor(s/3600)+' h ago';return Math.floor(s/86400)+' d ago';}
-function tab(t){TAB=t;['sessions','envs','repos','settings'].forEach(x=>{$('#view-'+x).hidden=x!==t;$('#t-'+x).classList.toggle('on',x===t);});$('#fab').style.display=t==='sessions'?'block':'none';render();}
+function tab(t){TAB=t;['sessions','android','envs','repos','settings'].forEach(x=>{$('#view-'+x).hidden=x!==t;$('#t-'+x).classList.toggle('on',x===t);});$('#fab').style.display=t==='sessions'?'block':'none';if(t==='android'&&!ANDROID.server&&!ANDROID.loading)loadAndroid();render();}
 
 // ---- polling: 15s idle, 2s while something is settling -----------------------
 let inflight=false, fastUntil=0;
@@ -211,6 +213,8 @@ setInterval(async()=>{
   const fast=Date.now()<fastUntil;
   const tick=Math.floor(Date.now()/1000);
   if(fast||tick%15===0){await refresh(false);}
+  // while the Android tab is open, keep the box status fresh (5s, or fast while settling)
+  if(TAB==='android'&&(fast||tick%5===0))loadAndroid();
   for(let i=SETTLERS.length-1;i>=0;i--){const s=SETTLERS[i];if(s.pred(STATE)||Date.now()>s.until)SETTLERS.splice(i,1);}
   if(!SETTLERS.length)fastUntil=0;
 },2000);
@@ -224,7 +228,7 @@ function banners(){
   if(STATE.flyError)h+='<div class="banner err">Fly: '+esc(STATE.flyError)+'</div>';
   $('#banners').innerHTML=h;
 }
-function render(){banners();if(TAB==='sessions')renderSessions();if(TAB==='envs')renderEnvs();if(TAB==='repos')renderRepos();if(TAB==='settings')renderSettings();}
+function render(){banners();if(TAB==='sessions')renderSessions();if(TAB==='android')renderAndroid();if(TAB==='envs')renderEnvs();if(TAB==='repos')renderRepos();if(TAB==='settings')renderSettings();}
 
 function sessionPill(m){
   // Real state only. Fly state first; then whether claude inside has actually come up.
@@ -265,6 +269,84 @@ function renderSessions(){
     </div>
     <div class="hint">Open the Claude app to chat with this session.</div>
   </div>`}).join('');
+}
+// ---- Android (redroid box) ------------------------------------------------
+// A Hetzner VM managed via HETZNER_API. Start/Stop power it without deleting; Release
+// deletes it. Debug is READ-ONLY: a live screenshot + health pulled over SSH on demand.
+const ANDROID={loading:false,server:null,host:'',err:null,screenTs:0};
+async function loadAndroid(){
+  if(ANDROID.loading)return; ANDROID.loading=true;
+  try{const j=await api('GET','api/redroid/state');ANDROID.server=j.server;ANDROID.host=j.host||'';ANDROID.err=j.configured?null:(j.error||'not configured');}
+  catch(e){ANDROID.err=e.message;}
+  ANDROID.loading=false; if(TAB==='android')renderAndroid();
+}
+function rdPill(st){
+  if(st==='running')return '<span class="pill ok">running</span>';
+  if(st==='off')return '<span class="pill dim">off</span>';
+  if(st==='starting'||st==='stopping'||st==='initializing')return `<span class="pill wait"><span class="spinner"></span>${esc(st)}</span>`;
+  return `<span class="pill dim">${esc(st||'unknown')}</span>`;
+}
+function renderAndroid(){
+  const v=$('#view-android'),s=ANDROID.server;
+  if(!s){v.innerHTML=ANDROID.loading?'<div class="empty"><span class="spinner"></span> Loading…</div>'
+    :(ANDROID.err?`<div class="empty">Cloud Android: ${esc(ANDROID.err)}</div>`
+      :'<div class="empty">No redroid box found.<br>Provision one with <code>redroid/provision.sh</code>.</div>');return;}
+  // build the skeleton once so the screenshot <img> isn't recreated (and re-fetched) every poll
+  if(!$('#rd-card')){
+    v.innerHTML=`
+    <div class="card" id="rd-card">
+      <div class="row" style="justify-content:space-between"><h3>Cloud Android</h3><span id="rd-pill"></span></div>
+      <div class="meta" id="rd-meta"></div>
+      <div class="spacer"></div>
+      <div class="row" id="rd-actions"></div>
+      <div class="hint">Stop pauses the phone but the VM still bills — only <b>Release</b> stops the monthly cost. Release deletes the box (rebuild with <code>redroid/provision.sh</code>).</div>
+    </div>
+    <div class="card" id="rd-debug">
+      <div class="row" style="justify-content:space-between"><h3>Debug — view only</h3><span id="rd-dbtn"></span></div>
+      <div class="meta" id="rd-health">Tap “Load” for a live screenshot and health.</div>
+      <div class="spacer"></div>
+      <img id="rd-screen" alt="" onerror="this.style.display='none'" style="display:none;width:100%;max-width:360px;border:1px solid var(--border);border-radius:12px">
+    </div>`;
+  }
+  $('#rd-pill').innerHTML=rdPill(s.status);
+  $('#rd-meta').innerHTML=`${esc(s.type||'')}${s.cores?` · ${s.cores} vCPU`:''}${s.memoryGb?` · ${s.memoryGb} GB`:''}${s.datacenter?` · ${esc(s.datacenter)}`:''}<br>${s.ip?esc(s.ip):'(no IP)'}${s.created?` · created ${ago(s.created)}`:''}`;
+  const a=[];
+  if(s.status==='running'&&ANDROID.host)a.push(`<a class="btn ghost sm" href="https://${esc(ANDROID.host)}" target="_blank" rel="noopener" style="text-decoration:none">Open ↗</a>`);
+  if(s.status==='off')a.push(pbtn('rd:start','sm','rdAction("start","Starting…")','Start'));
+  if(s.status==='running')a.push(pbtn('rd:stop','ghost sm','rdAction("stop","Stopping…")','Stop'));
+  a.push(pbtn('rd:release','danger sm','rdRelease()','Release'));
+  $('#rd-actions').innerHTML=a.join('');
+  $('#rd-debug').style.display=s.status==='running'?'':'none';
+  $('#rd-dbtn').innerHTML=pbtn('rd:debug','ghost sm','rdDebug()',ANDROID.screenTs?'Refresh':'Load');
+}
+async function rdAction(kind,label){
+  pend('rd:'+kind,label);
+  try{await api('POST','api/redroid/'+kind);}catch(e){alert(e.message);}
+  pend('rd:'+kind,null);
+  fastUntil=Math.max(fastUntil,Date.now()+90000); // fast-poll until the box status settles
+  await loadAndroid();
+}
+async function rdRelease(){
+  if(!confirm('Release (DELETE) the cloud-Android box?\n\nThis permanently deletes the VM and everything on it — apps, logins, data. It stops the monthly cost. Rebuild later with redroid/provision.sh. This cannot be undone.'))return;
+  pend('rd:release','Releasing…');
+  try{await api('DELETE','api/redroid');ANDROID.server=null;ANDROID.screenTs=0;}catch(e){alert(e.message);}
+  pend('rd:release',null);
+  fastUntil=Math.max(fastUntil,Date.now()+30000);
+  await loadAndroid();
+}
+async function rdDebug(){
+  pend('rd:debug','Loading…');
+  try{
+    const d=await api('GET','api/redroid/debug');
+    const h=d.health||{};
+    const rows=[['Boot completed',h.boot==='1'?'yes':(h.boot||'?')],['Model',h.model],['Android',h.android],
+      ['redroid',h.redroid==='true'?'up':h.redroid],['ws-scrcpy',h.wsscrcpy==='true'?'up':h.wsscrcpy],
+      ['Exit IP',h.exitip],['Proxy',h.proxy],['Load',h.load],['Memory',h.mem],['Disk',h.disk],['Uptime',h.up]];
+    $('#rd-health').innerHTML=d.health?rows.filter(r=>r[1]).map(r=>`<div><b>${esc(r[0])}:</b> ${esc(r[1])}</div>`).join(''):esc(d.note||'no data');
+    ANDROID.screenTs=Date.now();
+    const img=$('#rd-screen');img.style.display='';img.src='api/redroid/screen.png?t='+ANDROID.screenTs;
+  }catch(e){$('#rd-health').textContent=e.message;}
+  pend('rd:debug',null);
 }
 function renderEnvs(){
   const e=STATE.environments||{};

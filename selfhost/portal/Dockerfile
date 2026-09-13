@@ -15,7 +15,7 @@ RUN npm ci --omit=dev
 FROM node:22-bookworm-slim
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      ca-certificates curl git openssl procps bash \
+      ca-certificates curl git openssl procps bash openssh-client \
  && rm -rf /var/lib/apt/lists/* \
  && curl -fsSL -o /usr/local/bin/sops https://github.com/getsops/sops/releases/download/v3.10.2/sops-v3.10.2.linux.amd64 \
  && chmod +x /usr/local/bin/sops \

@@ -11,6 +11,8 @@ const imagebuild = require("./lib/imagebuild");
 const archive = require("./lib/archive");
 const github = require("./lib/github");
 const oauth = require("./lib/oauth");
+const hetzner = require("./lib/hetzner");
+const redroid = require("./lib/redroid");
 
 const PORT = process.env.PORT || 8080;
 const HOST = process.env.HOST || "127.0.0.1";
@@ -429,6 +431,48 @@ app.delete("/api/sessions/:id", async (req, res) => {
       }
     }
     res.json({ ...(await fly.destroyMachine(id)), archived });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+
+// ---- redroid cloud-Android box (a Hetzner server, managed via HETZNER_API in the ----
+// default env). Start/Stop power the VM without deleting it; Release deletes it. The
+// debug view (screenshot + health) is READ-ONLY, over SSH with REDROID_SSH_KEY.
+async function hzToken() {
+  const t = await redroid.token();
+  if (!t) { const e = new Error("HETZNER_API not set in the default environment"); e.code = 400; throw e; }
+  return t;
+}
+app.get("/api/redroid/state", async (req, res) => {
+  try {
+    const token = await hzToken();
+    const server = await hetzner.find(token);
+    res.json({ configured: true, server, host: await redroid.host() });
+  } catch (e) { res.status(e.code === 400 ? 200 : 500).json({ configured: false, server: null, error: e.message }); }
+});
+app.post("/api/redroid/start", async (req, res) => {
+  try { const token = await hzToken(); const s = await hetzner.find(token); if (!s) throw new Error("box not found");
+    res.json(await hetzner.action(s.id, "poweron", token)); } catch (e) { res.status(500).json({ error: e.message }); }
+});
+app.post("/api/redroid/stop", async (req, res) => {
+  try { const token = await hzToken(); const s = await hetzner.find(token); if (!s) throw new Error("box not found");
+    res.json(await hetzner.action(s.id, "shutdown", token)); } catch (e) { res.status(500).json({ error: e.message }); }
+});
+app.delete("/api/redroid", async (req, res) => {
+  try { const token = await hzToken(); const s = await hetzner.find(token); if (!s) throw new Error("box not found");
+    res.json(await hetzner.del(s.id, token)); } catch (e) { res.status(500).json({ error: e.message }); }
+});
+app.get("/api/redroid/debug", async (req, res) => {
+  try { const token = await hzToken(); const s = await hetzner.find(token);
+    if (!s) return res.status(404).json({ error: "box not found" });
+    if (s.status !== "running") return res.json({ status: s.status, health: null, note: `box is ${s.status}` });
+    res.json({ status: s.status, health: await redroid.health(s.ip) });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+app.get("/api/redroid/screen.png", async (req, res) => {
+  try { const token = await hzToken(); const s = await hetzner.find(token);
+    if (!s || s.status !== "running") return res.status(409).end();
+    const png = await redroid.screenshot(s.ip);
+    res.set("Content-Type", "image/png").set("Cache-Control", "no-store").send(png);
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
