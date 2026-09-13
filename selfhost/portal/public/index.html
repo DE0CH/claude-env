@@ -218,8 +218,8 @@ function renderRepos(){
   const addKey=PENDING.get('repo:add');
   v.innerHTML=(cards||'<div class="empty">No repos yet.</div>')+`
     <div class="card"><label>Add repo (git URL)</label>
-      <input id="repo-url" placeholder="https://github.com/owner/name.git" ${addKey?'disabled':''}>
-      <label>Name (optional)</label><input id="repo-name" placeholder="auto from URL" ${addKey?'disabled':''}>
+      <input id="repo-url" type="url" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="https://github.com/owner/repo.git" ${addKey?'disabled':''}>
+      <label>Name (optional)</label><input id="repo-title" type="text" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="auto from URL" ${addKey?'disabled':''}>
       <div class="spacer"></div>${pbtn('repo:add','',`addRepo()`,'Add repo')}
       <div class="hint">Private repos: add a GITHUB_TOKEN key to the environment you'll use.</div></div>`;
 }
@@ -242,7 +242,7 @@ function newSession(){
     <label>Repos</label>
     ${repos.length?repos.map(r=>`<label class="choice"><input type="checkbox" name="ns-repo" value="${esc(r.name)}"><span class="t">${esc(r.name)}<small>${esc(r.url)}</small></span></label>`).join('')
       :'<div class="meta">No repos yet — add some in the Repos tab.</div>'}
-    <label>Name (optional)</label><input id="ns-label" placeholder="e.g. fix login bug">
+    <label>Name (optional)</label><input id="ns-title" type="text" autocomplete="off" autocorrect="off" autocapitalize="sentences" spellcheck="false" placeholder="e.g. refactor billing module">
     <div class="hint">This exact name shows in the Claude app too. Leave blank for an auto-generated one.</div>
     <div class="actions">
       <button class="btn ghost" onclick="closeDlg()">Cancel</button>
@@ -251,7 +251,7 @@ function newSession(){
 async function startSession(btn){
   const env=(document.querySelector('#dlg-body input[name=ns-env]:checked')||{}).value||'';
   const repos=[...document.querySelectorAll('#dlg-body input[name=ns-repo]:checked')].map(c=>c.value);
-  const label=$('#ns-label').value.trim();
+  const label=$('#ns-title').value.trim();
   const restore=dlgBusy(btn,'Starting…');
   try{
     const r=await api('POST','api/sessions',{environment:env,repos,label});
@@ -292,7 +292,7 @@ async function editEnv(name){
   if(name){try{const r=await api('GET',`api/environments/${encodeURIComponent(name)}/secrets`);secrets=r.secrets||{};}catch(e){}}
   const text=Object.entries(secrets).map(([k,v])=>`${k}=${v}`).join('\n');
   dlg(`<h3>${name?'Edit ':'New '}environment</h3>
-    <label>Name</label><input id="ev-name" value="${esc(name)}" ${name?'readonly':''} placeholder="e.g. default">
+    <label>Name</label><input id="ev-title" type="text" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" value="${esc(name)}" ${name?'readonly':''} placeholder="e.g. default">
     <label>Secrets (KEY=VALUE, one per line)</label>
     <textarea id="ev-secrets" placeholder="LOBSTER_TOKEN=...\nSERPAPI_KEY=...">${esc(text)}</textarea>
     <div class="hint">Saved encrypted. Blank value on an existing key deletes it.</div>
@@ -301,7 +301,7 @@ async function editEnv(name){
       <button class="btn" onclick="saveEnv(this)">Save</button></div>`);
 }
 async function saveEnv(btn){
-  const name=$('#ev-name').value.trim();
+  const name=$('#ev-title').value.trim();
   if(!name){alert('name required');return;}
   const secrets={};
   $('#ev-secrets').value.split('\n').forEach(line=>{const i=line.indexOf('=');if(i<1)return;secrets[line.slice(0,i).trim()]=line.slice(i+1);});
@@ -316,7 +316,7 @@ async function delEnv(n){
   pend('env:'+n,null);await refresh(false);
 }
 async function addRepo(){
-  const url=$('#repo-url').value.trim(),name=$('#repo-name').value.trim();
+  const url=$('#repo-url').value.trim(),name=$('#repo-title').value.trim();
   if(!url){alert('url required');return;}
   pend('repo:add','Adding…');
   try{await api('POST','api/repos',{url,name});}catch(e){alert(e.message);}
