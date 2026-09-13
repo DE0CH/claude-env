@@ -1,0 +1,8 @@
+# SOPS rules: every k8s Secret manifest under selfhost/k8s/secrets/ is committed encrypted
+# for the cluster's age key (Flux decrypts in-cluster with the `sops-age` secret).
+# Encrypting needs only this public recipient; decrypting needs the private key
+# (on the cluster + in Deyao's password manager).
+creation_rules:
+  - path_regex: selfhost/k8s/secrets/.*\.sops\.yaml$
+    encrypted_regex: ^(data|stringData)$
+    age: age1q94us00rr2edy94fk826lhspyndr73rhr6tn53hyk750md6gx9cqls9tr3

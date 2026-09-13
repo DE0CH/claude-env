@@ -1,19 +1,21 @@
-// Claude self-host portal — the controller's dashboard + API.
-// Manages Environments (named secret sets) and Repos, and starts/stops per-session
-// Fly Machines that each run `claude --remote-control` (visible in the Claude app).
-const fs = require("fs");
-const os = require("os");
+// Claude self-host portal — the dashboard + API, running as a Deployment in the controller
+// cluster. State lives in the cluster (Secrets/ConfigMap) with write-through to git (sops);
+// sessions are Fly Machines that each run `claude --remote-control` (visible in the Claude app).
 const path = require("path");
 const express = require("express");
 const store = require("./lib/store");
 const fly = require("./lib/fly");
+const tty = require("./lib/tty");
+const auth = require("./lib/auth");
+const imagebuild = require("./lib/imagebuild");
 
 const PORT = process.env.PORT || 8080;
+const HOST = process.env.HOST || "127.0.0.1";
 const ALLOWED_EMAIL = process.env.PORTAL_ALLOWED_EMAIL || "chendeyao000@gmail.com";
-const HOME = os.homedir();
+const VERSION = process.env.PORTAL_VERSION || require("./package.json").version;
 
 const app = express();
-app.use(express.json({ limit: "1mb" }));
+app.use(express.json({ limit: "2mb" }));
 
 // Defense in depth: if the tunnel/Access forwards the identity header, enforce it.
 app.use((req, res, next) => {
@@ -23,30 +25,13 @@ app.use((req, res, next) => {
   }
   next();
 });
+app.get("/api/health", (req, res) => res.json({ ok: true, version: VERSION }));
 
 // ---- helpers --------------------------------------------------------------
-function claudeCreds() {
-  try { return fs.readFileSync(path.join(HOME, ".claude/.credentials.json"), "utf8"); }
-  catch { return ""; }
-}
-function claudeAccount() {
-  try {
-    const d = JSON.parse(fs.readFileSync(path.join(HOME, ".claude.json"), "utf8"));
-    const out = {};
-    for (const k of ["oauthAccount", "userID"]) if (d[k] !== undefined) out[k] = d[k];
-    return JSON.stringify(out);
-  } catch { return "{}"; }
-}
 function slug(s) {
   return (s || "session").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 24) || "session";
 }
 function rand(n = 5) { return Math.random().toString(36).slice(2, 2 + n); }
-function maskEnv(env) {
-  // return key names + a masked preview only
-  const out = {};
-  for (const k of Object.keys(env || {})) out[k] = "••••••";
-  return out;
-}
 
 // ---- live session registry (inside each machine) ---------------------------
 // claude keeps ~/.claude/sessions/<pid>.json with the live display name and
@@ -85,7 +70,7 @@ async function readRegistry(machineId) {
 // ---- state ----------------------------------------------------------------
 app.get("/api/state", async (req, res) => {
   try {
-    const cfg = await store.get();
+    const [cfg, creds] = await Promise.all([store.get(), store.getClaudeCredentials()]);
     const environments = {};
     for (const [name, e] of Object.entries(cfg.environments)) {
       environments[name] = { keys: Object.keys(e.secrets || {}) };
@@ -104,6 +89,7 @@ app.get("/api/state", async (req, res) => {
           environment: m.config?.metadata?.environment || "",
           repos: m.config?.metadata?.repos || "",
           label: m.config?.metadata?.label || "",
+          permissionMode: m.config?.metadata?.permissionMode || "",
         }));
         // stable order: newest first, id as tie-break (Fly's list order is not deterministic)
         sessions.sort((a, b) => String(b.created || "").localeCompare(String(a.created || "")) || a.id.localeCompare(b.id));
@@ -115,14 +101,21 @@ app.get("/api/state", async (req, res) => {
         }));
       } catch (e) { flyError = e.message; }
     } else { flyError = "FLY_API_TOKEN not set"; }
+    let credsInfo = null;
+    try { const c = JSON.parse(creds.credentials || "{}").claudeAiOauth || {}; credsInfo = { expiresAt: c.expiresAt || null, subscriptionType: c.subscriptionType || "", scopes: c.scopes || [] }; } catch {}
+    const build = imagebuild.status();
     res.json({
+      version: VERSION,
       environments,
       repos: cfg.repos || [],
       sessions,
       sessionImage: cfg.sessionImage || null,
+      imageBuild: { running: build.running, ok: build.ok, image: build.image, startedAt: build.startedAt },
       flyApp: process.env.FLY_APP || "de0ch-claude-sessions",
       flyError,
-      hasCreds: !!claudeCreds(),
+      hasCreds: !!creds.credentials,
+      creds: credsInfo,
+      auth: auth.status(),
     });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -132,21 +125,13 @@ app.post("/api/environments", async (req, res) => {
   try {
     const { name, secrets } = req.body || {};
     if (!name) return res.status(400).json({ error: "name required" });
-    await store.mutate((c) => {
-      c.environments[name] = c.environments[name] || { secrets: {} };
-      if (secrets && typeof secrets === "object") {
-        // merge: empty-string value deletes the key; otherwise set
-        for (const [k, v] of Object.entries(secrets)) {
-          if (v === "") delete c.environments[name].secrets[k];
-          else c.environments[name].secrets[k] = String(v);
-        }
-      }
-    });
+    // merge: empty-string value deletes the key; otherwise set
+    await store.setEnvironment(name, secrets && typeof secrets === "object" ? secrets : {});
     res.json({ ok: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 app.delete("/api/environments/:name", async (req, res) => {
-  try { await store.mutate((c) => { delete c.environments[req.params.name]; }); res.json({ ok: true }); }
+  try { await store.deleteEnvironment(req.params.name); res.json({ ok: true }); }
   catch (e) { res.status(500).json({ error: e.message }); }
 });
 // reveal one environment's full secrets (values) — used by the editor on demand
@@ -165,55 +150,78 @@ app.post("/api/repos", async (req, res) => {
     const { name, url } = req.body || {};
     if (!url) return res.status(400).json({ error: "url required" });
     const nm = name || path.basename(url).replace(/\.git$/, "");
-    await store.mutate((c) => {
-      c.repos = (c.repos || []).filter((r) => r.url !== url);
-      c.repos.push({ name: nm, url });
-    });
+    const repos = ((await store.get()).repos || []).filter((r) => r.url !== url);
+    repos.push({ name: nm, url });
+    await store.setRepos(repos);
     res.json({ ok: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 app.delete("/api/repos/:name", async (req, res) => {
-  try { await store.mutate((c) => { c.repos = (c.repos || []).filter((r) => r.name !== req.params.name); }); res.json({ ok: true }); }
-  catch (e) { res.status(500).json({ error: e.message }); }
+  try {
+    const repos = ((await store.get()).repos || []).filter((r) => r.name !== req.params.name);
+    await store.setRepos(repos);
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// ---- session image ref (set by deploy-session-image.sh) -------------------
-app.post("/api/image", async (req, res) => {
-  try { const { image } = req.body || {}; await store.mutate((c) => { c.sessionImage = image; }); res.json({ ok: true }); }
+// ---- session image (built on Fly's remote builder from the repo checkout) -----
+app.post("/api/image/rebuild", async (req, res) => {
+  try { res.json(await imagebuild.start(store)); } catch (e) { res.status(500).json({ error: e.message }); }
+});
+app.get("/api/image/build", (req, res) => res.json(imagebuild.status()));
+
+// ---- Claude auth (re-login through the real CLI) ----------------------------
+app.post("/api/auth/start", async (req, res) => {
+  try { auth.seedHome(await store.getClaudeCredentials()); res.json(await auth.start()); }
   catch (e) { res.status(500).json({ error: e.message }); }
 });
+app.post("/api/auth/code", async (req, res) => {
+  try {
+    const { code } = req.body || {};
+    if (!code) return res.status(400).json({ error: "code required" });
+    res.json(await auth.submit(code, (creds, account) => store.setClaudeCredentials(creds, account)));
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+app.get("/api/auth/status", (req, res) => res.json(auth.status()));
 
 // ---- sessions -------------------------------------------------------------
 app.post("/api/sessions", async (req, res) => {
   try {
-    if (!process.env.FLY_API_TOKEN) return res.status(400).json({ error: "FLY_API_TOKEN not set on controller" });
+    if (!process.env.FLY_API_TOKEN) return res.status(400).json({ error: "FLY_API_TOKEN not set on the portal" });
     const cfg = await store.get();
-    if (!cfg.sessionImage) return res.status(400).json({ error: "no session image deployed yet (run deploy-session-image.sh)" });
-    const { environment, repos = [], label, guest } = req.body || {};
+    if (!cfg.sessionImage) return res.status(400).json({ error: "no session image yet — rebuild it from Settings" });
+    const creds = await store.getClaudeCredentials();
+    if (!creds.credentials) return res.status(400).json({ error: "no Claude credentials — re-login from Settings" });
+    const { environment, repos = [], label, guest, permissionMode } = req.body || {};
     const env = cfg.environments[environment];
     if (environment && !env) return res.status(400).json({ error: `unknown environment '${environment}'` });
 
-    const secretsEnv = env ? Object.entries(env.secrets || {}).map(([k, v]) => `${k}=${v}`).join("\n") : "";
     const repoUrls = (repos || [])
       .map((n) => (cfg.repos || []).find((r) => r.name === n || r.url === n))
       .filter(Boolean).map((r) => r.url);
 
-    // One friendly name used everywhere: dashboard card, Fly machine, AND the Remote
-    // Control session name in the Claude app (passed as `claude --remote-control <name>`).
+    // Permission mode for the remote-control host: "auto" (the default auto-approve
+    // permission mode with the classifier) or "bypass" (--dangerously-skip-permissions).
+    const permMode = permissionMode === "bypass" ? "bypass" : "auto";
+
+    // Session title. If the user typed one, pin it everywhere: dashboard card, Fly machine,
+    // AND the Remote Control session name in the Claude app (`claude --remote-control <name>`).
+    // If left blank, leave SESSION_LABEL empty so the Claude session auto-generates its own
+    // title (the dashboard then mirrors that live name once it comes up).
     const base = repoUrls.length
       ? path.basename(repoUrls[0]).replace(/\.git$/, "")
       : (environment || "session");
-    const friendly = String(label || `${base}-${rand(4)}`)
-      .replace(/["\\\r\n\t]/g, "").trim().slice(0, 60) || `session-${rand(4)}`;
+    const userLabel = String(label || "").replace(/["\\\r\n\t]/g, "").trim().slice(0, 60);
 
     const machineEnv = {
-      CLAUDE_CREDENTIALS: claudeCreds(),
-      CLAUDE_ACCOUNT: claudeAccount(),
-      SESSION_SECRETS_ENV: secretsEnv,
+      CLAUDE_CREDENTIALS: creds.credentials,
+      CLAUDE_ACCOUNT: creds.account || "{}",
+      SESSION_SECRETS_JSON: JSON.stringify(env ? env.secrets || {} : {}),
       SESSION_REPOS: repoUrls.join(","),
-      SESSION_LABEL: friendly,
+      SESSION_LABEL: userLabel, // blank => the Claude session names itself
+      SESSION_PERMISSION_MODE: permMode,
     };
-    const name = `s-${slug(friendly)}-${rand()}`;
+    const name = `s-${slug(userLabel || base)}-${rand()}`;
     const machine = await fly.createMachine({
       name,
       image: cfg.sessionImage,
@@ -223,10 +231,11 @@ app.post("/api/sessions", async (req, res) => {
         role: "claude-session",
         environment: environment || "",
         repos: repoUrls.join(" "),
-        label: friendly,
+        label: userLabel,
+        permissionMode: permMode,
       },
     });
-    res.json({ ok: true, id: machine.id, name, label: friendly, state: machine.state });
+    res.json({ ok: true, id: machine.id, name, label: userLabel, state: machine.state });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 // Pre-destroy check: uncommitted / unpushed work in each repo inside the session.
@@ -248,6 +257,16 @@ app.get("/api/sessions/:id/changes", async (req, res) => {
     res.json({ checked: true, repos, status: (reg && reg.status) || "" });
   } catch (e) { res.json({ checked: false, reason: e.message, repos: [] }); }
 });
+// live terminal (tmux mirror) — see lib/tty.js
+app.get("/api/sessions/:id/tty", (req, res) => { tty.stream(req.params.id, res); });
+app.post("/api/sessions/:id/tty/input", async (req, res) => {
+  try { await tty.input(req.params.id, req.body || {}); res.json({ ok: true }); }
+  catch (e) { res.status(500).json({ error: e.message }); }
+});
+app.post("/api/sessions/:id/tty/resize", async (req, res) => {
+  try { const { cols, rows } = req.body || {}; res.json(await tty.resize(req.params.id, cols, rows)); }
+  catch (e) { res.status(500).json({ error: e.message }); }
+});
 
 app.post("/api/sessions/:id/stop", async (req, res) => {
   try { res.json(await fly.stopMachine(req.params.id)); } catch (e) { res.status(500).json({ error: e.message }); }
@@ -261,6 +280,8 @@ app.delete("/api/sessions/:id", async (req, res) => {
 
 app.use(express.static(path.join(__dirname, "public")));
 
-store.load()
-  .then(() => app.listen(PORT, "127.0.0.1", () => console.log(`[portal] listening on 127.0.0.1:${PORT}`)))
-  .catch((e) => { console.error("[portal] failed to load config from S3:", e.message); process.exit(1); });
+app.listen(PORT, HOST, () => {
+  console.log(`[portal] v${VERSION} listening on ${HOST}:${PORT}`);
+  store.get().then((c) => console.log(`[portal] cluster ok: ${Object.keys(c.environments).length} environment(s), ${(c.repos || []).length} repo(s), image ${c.sessionImage || "none"}`))
+    .catch((e) => console.error("[portal] cluster read failed (will retry on requests):", e.message));
+});

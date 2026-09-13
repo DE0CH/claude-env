@@ -1,0 +1,31 @@
+# The portal reads/writes environments (Secrets) and its config (ConfigMap) in its own
+# namespace only — it never needs cluster-wide access.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: portal
+  namespace: claude
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: portal
+  namespace: claude
+rules:
+  - apiGroups: [""]
+    resources: [secrets, configmaps]
+    verbs: [get, list, watch, create, update, patch, delete]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: portal
+  namespace: claude
+subjects:
+  - kind: ServiceAccount
+    name: portal
+    namespace: claude
+roleRef:
+  kind: Role
+  name: portal
+  apiGroup: rbac.authorization.k8s.io

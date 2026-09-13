@@ -1,0 +1,66 @@
+# Headlamp — the k8s web UI, reached at https://tunnel.deyaochen.com/t/headlamp/
+# (via the tunnel-headlamp agent). Log in with the headlamp-admin token:
+#   kubectl -n headlamp get secret headlamp-admin-token -o jsonpath='{.data.token}' | base64 -d
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: headlamp
+  namespace: headlamp
+spec:
+  interval: 1h
+  url: https://kubernetes-sigs.github.io/headlamp/
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: headlamp
+  namespace: headlamp
+spec:
+  interval: 10m
+  chart:
+    spec:
+      chart: headlamp
+      version: "*"
+      sourceRef:
+        kind: HelmRepository
+        name: headlamp
+  values:
+    config:
+      baseURL: /t/headlamp
+    service:
+      type: ClusterIP
+      port: 80
+    resources:
+      requests:
+        cpu: 20m
+        memory: 64Mi
+      limits:
+        memory: 256Mi
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: headlamp-admin
+  namespace: headlamp
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: headlamp-admin
+subjects:
+  - kind: ServiceAccount
+    name: headlamp-admin
+    namespace: headlamp
+roleRef:
+  kind: ClusterRole
+  name: cluster-admin
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: headlamp-admin-token
+  namespace: headlamp
+  annotations:
+    kubernetes.io/service-account.name: headlamp-admin
+type: kubernetes.io/service-account-token

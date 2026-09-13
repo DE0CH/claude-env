@@ -551,35 +551,38 @@ push. This is the standard recovery whenever remote `main` has moved ahead of yo
 ## Self-hosted Claude cloud (`selfhost/`)
 
 A DIY replica of Claude cloud code, built to escape the 443-only network + permission
-classifier. See `selfhost/README.md`. Architecture: a tiny **stateless Hetzner controller**
-(cx23) runs a mobile **dashboard** at `https://tunnel.deyaochen.com/t/portal/` (Cloudflare
-Access, my email only) + a cf-tunnel agent, both under systemd. Each **session** is a
+classifier. See `selfhost/README.md` (v2, 2026-09-13). Architecture: one Hetzner box (cx23)
+running a **single-node k3s cluster** that reconciles itself from this repo with **Flux**
+(`selfhost/k8s/`): the mobile **dashboard** at `https://tunnel.deyaochen.com/t/portal/`,
+**Headlamp** (k8s UI) at `/t/headlamp/`, two cf-tunnel agents, and **SOPS-encrypted Secrets**
+(`selfhost/k8s/secrets/*.sops.yaml`, age key in `flux-system/sops-age`). Each **session** is a
 **Fly.io Machine** (app `de0ch-claude-sessions`) booting a prebuilt image that injects an
-environment's secrets + repos and runs `claude --remote-control` — so it shows up in the
-Claude phone app. Isolated microVM per session (install tools freely). Portal state
-(environments = named secret sets, repos, session image ref) is a **plain file on the
-controller**, `~/.selfhost/config.json` (mode 600, unencrypted — Deyao's choice); together with
-`~/.secrets` it is all the controller's state, and `selfhost/controller/create.sh` bundles both
-from the machine it runs on when rebuilding.
+environment's secrets + repos and runs `claude --remote-control` (default model
+`claude-opus-4-8`, permission mode Auto or dangerously-skip chosen per session) — so it shows
+up in the Claude phone app. Isolated microVM per session (install tools freely).
 
-- Commands (run where `~/.secrets` + `~/.claude` creds live): `selfhost/controller/create.sh`
-  / `destroy.sh`; `selfhost/deploy-session-image.sh` to (re)build the session image on Fly.
-- **Secrets home = the controller's disk.** `FLY_API_TOKEN` (Fly org token) and `GITHUB_TOKEN`
-  live in plain `~/.secrets` (mode 600) on the controller (Deyao's decision, 2026-09-13 — do NOT
-  nag him to persist them in the env config); both are also in the `default` environment so
-  sessions can push. `PORTAL_ENC_KEY` is obsolete (store is unencrypted). To rebuild the
-  controller from another box, copy its `~/.secrets` + `~/.selfhost/config.json` there first.
-  Fly login: `flyctl auth login --email/--password`.
-- Cost: controller ~€6.59/mo fixed; Fly sessions ~1–2¢/session-hour. Destroy sessions from
-  the dashboard when done (no idle auto-destroy yet). Dashboard rules Deyao set: name chosen
-  once at creation and then mirrored from the Claude app; only Destroy (no Start/Stop) with a
-  pre-destroy uncommitted/unpushed check; two-phase UI (instant ack, change only on confirmed
-  state — never optimistic); 250ms cooldown on destructive buttons after a list shifts.
-- Deploying a dashboard/portal change: commit+push (`GITHUB_TOKEN` in `~/.secrets`), then on
-  the controller `git fetch && git reset --hard origin/main` (+ `systemctl restart
-  claude-portal` if `server.js`/`lib/` changed). Session-image changes need
-  `selfhost/deploy-session-image.sh` (rebuild on Fly, ~5 min).
-- Known v1 limit: sessions share the Claude OAuth refresh token (fine for a few concurrent).
+- **Deploying = `git push` to main.** Portal/cf-tunnel changes: GitHub Actions builds
+  `ghcr.io/de0ch/claude-portal` and pins the tag in `selfhost/k8s/kustomization.yaml`; Flux
+  rolls it out within ~1 min. Manifest/secret changes: Flux applies them directly. Nothing to
+  SSH into, no CI secrets, CI never touches the cluster or Hetzner.
+- **Driving the control plane from a session pod:** the portal API through the tunnel with
+  the CF Access service token (`CF-Access-Client-Id/Secret` headers from env; e.g.
+  `https://tunnel.deyaochen.com/t/portal/api/state`), or `kubectl` (installed in sessions;
+  kubeconfig auto-written from `KUBE_SERVER`/`KUBE_TOKEN`/`KUBE_CA` in the `default` env).
+- **Secrets:** git is the source of truth (sops). Dashboard edits are committed encrypted then
+  applied. To add/rotate by hand: edit the Secret manifest, `sops --encrypt --in-place`, push.
+  The age private key + k8s admin token live in Deyao's password manager (never in CI).
+  Session image rebuild: dashboard → Settings → Rebuild (flyctl inside the portal pod).
+- **Box lifecycle is manual:** `selfhost/cluster/create.sh` (needs `AGE_KEY_FILE`,
+  `K8S_ADMIN_TOKEN_FILE`, `HETZNER_API`, `HETZNER_S3_*`) / `destroy.sh`. Rebuild = destroy +
+  create; everything returns from git. First time only: make the GHCR package public (no API).
+- Cost: box ~€6.59/mo fixed; Fly sessions ~1–2¢/session-hour. Destroy sessions from the
+  dashboard when done (no idle auto-destroy yet). Dashboard rules Deyao set: name optional
+  (blank → the Claude session names itself, dashboard mirrors it); only Destroy (no
+  Start/Stop) with a pre-destroy uncommitted/unpushed check; two-phase UI (instant ack, change
+  only on confirmed state — never optimistic); 250ms cooldown on destructive buttons after a
+  list shifts; Terminal panel = tmux mirror via Fly exec; Re-login = real `claude auth login`.
+- Known limit: sessions share the Claude OAuth refresh token (fine for a few concurrent).
 
 ## Other files
 

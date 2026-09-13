@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Claude sessions</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/xterm/5.5.0/xterm.min.css">
 <style>
   :root{--bg:#f4f5f7;--card:#fff;--text:#1a1d21;--muted:#6b7280;--accent:#7c3aed;--accent2:#5b21b6;--ok:#16a34a;--warn:#d97706;--err:#dc2626;--border:#e5e7eb;--input:#fbfbfc}
   @media (prefers-color-scheme:dark){:root{--bg:#0d0f13;--card:#171b21;--text:#eceef1;--muted:#9aa1ab;--accent:#a78bfa;--accent2:#7c3aed;--ok:#34d399;--warn:#fbbf24;--err:#f87171;--border:#2a2f37;--input:#12151a}}
@@ -15,7 +16,7 @@
   header .grow{flex:1}
   .wrap{max-width:820px;margin:0 auto;padding:1rem}
   .tabs{display:flex;gap:.4rem;margin-bottom:1rem}
-  .tabs button{flex:1;padding:.6rem;border:1px solid var(--border);background:var(--card);color:var(--muted);border-radius:10px;font-weight:600;font-size:.9rem}
+  .tabs button{flex:1;padding:.6rem .2rem;border:1px solid var(--border);background:var(--card);color:var(--muted);border-radius:10px;font-weight:600;font-size:.85rem}
   .tabs button.on{color:#fff;background:linear-gradient(135deg,var(--accent),var(--accent2));border-color:transparent}
   .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:1rem;margin-bottom:.8rem;transition:opacity .2s}
   .card.pending{opacity:.75}
@@ -49,6 +50,8 @@
   .empty{color:var(--muted);text-align:center;padding:2rem 1rem}
   .hint{font-size:.78rem;color:var(--muted);margin-top:.3rem}
   .spacer{height:.6rem}
+  pre.log{background:var(--input);border:1px solid var(--border);border-radius:10px;padding:.6rem;font-size:.75rem;max-height:14rem;overflow:auto;white-space:pre-wrap;word-break:break-all;margin-top:.5rem}
+  a.link{color:var(--accent);word-break:break-all}
   /* Mobile-first bottom sheet (iOS Safari pins default <dialog> to the top). */
   dialog{position:fixed;left:0;right:0;bottom:0;top:auto;margin:0;width:100%;max-width:100%;
     max-height:88dvh;overflow:auto;border:none;border-radius:20px 20px 0 0;
@@ -70,6 +73,18 @@
     width:min(92vw,480px);border-radius:16px;max-height:85vh;padding:1.3rem}.grab{display:none}.wrap{padding:1.5rem}}
   .fab{position:fixed;right:max(1rem,env(safe-area-inset-right));bottom:max(1rem,env(safe-area-inset-bottom));z-index:6}
   .fab button{font-size:1rem;font-weight:700;color:#fff;background:linear-gradient(135deg,var(--accent),var(--accent2));border:none;border-radius:999px;padding:.9rem 1.3rem;box-shadow:0 6px 20px rgba(124,58,237,.4)}
+  /* terminal: full screen, dark always */
+  dialog.term{top:0;bottom:0;left:0;right:0;transform:none;width:100%;max-width:100%;max-height:100dvh;height:100dvh;border-radius:0;padding:0;background:#0b0d11;color:#eee;display:flex;flex-direction:column}
+  .term .bar{display:flex;align-items:center;gap:.5rem;padding:.5rem .7rem;padding-top:max(.5rem,env(safe-area-inset-top));border-bottom:1px solid #222;font-size:.85rem;background:#11141a}
+  .term .bar .title{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+  .term .bar button,.term .keys button{font-size:.8rem;font-weight:700;color:#eee;background:#1f2430;border:1px solid #2c3242;border-radius:8px;padding:.4rem .6rem;-webkit-tap-highlight-color:transparent}
+  .term .bar button:active,.term .keys button:active{background:#2c3242}
+  .term .screen{flex:1;min-height:0;padding:.4rem;overflow:hidden}
+  .term .screen .xterm{height:100%}
+  .term .keys{display:flex;flex-wrap:wrap;gap:.35rem;padding:.4rem .6rem;border-top:1px solid #222;background:#11141a}
+  .term .inrow{display:flex;gap:.4rem;padding:.4rem .6rem calc(.5rem + env(safe-area-inset-bottom));background:#11141a}
+  .term .inrow input{flex:1;background:#0b0d11;border-color:#2c3242;color:#eee;font-family:ui-monospace,Menlo,monospace;font-size:.95rem;padding:.55rem .7rem}
+  .term .status{font-size:.75rem;color:#9aa1ab;padding:0 .7rem}
 </style>
 </head>
 <body>
@@ -83,17 +98,32 @@
     <button id="t-sessions" class="on" onclick="tab('sessions')">Sessions</button>
     <button id="t-envs" onclick="tab('envs')">Environments</button>
     <button id="t-repos" onclick="tab('repos')">Repos</button>
+    <button id="t-settings" onclick="tab('settings')">Settings</button>
   </div>
   <div id="view-sessions"></div>
   <div id="view-envs" hidden></div>
   <div id="view-repos" hidden></div>
+  <div id="view-settings" hidden></div>
 </div>
 <div class="fab" id="fab"><button onclick="newSession()">+ New session</button></div>
 <dialog id="dlg"><div id="dlg-body"></div></dialog>
+<dialog id="termdlg" class="term">
+  <div class="bar"><button onclick="closeTerm()">✕</button><div class="title" id="term-title"></div><button onclick="termFit()" title="Resize the session's terminal to this screen">Fit</button></div>
+  <div class="screen"><div id="term"></div></div>
+  <div class="status" id="term-status"></div>
+  <div class="keys">
+    <button onclick="tkey('Enter')">Enter</button><button onclick="tkey('Escape')">Esc</button><button onclick="tkey('Tab')">Tab</button>
+    <button onclick="tkey('Up')">↑</button><button onclick="tkey('Down')">↓</button><button onclick="tkey('Left')">←</button><button onclick="tkey('Right')">→</button>
+    <button onclick="tkey('BSpace')">⌫</button><button onclick="tkey('C-c')">Ctrl-C</button><button onclick="tkey('S-Tab')">⇧Tab</button>
+  </div>
+  <div class="inrow"><input id="term-in" type="text" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" placeholder="type, then Send (adds Enter)"><button onclick="tsend()">Send</button></div>
+</dialog>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xterm/5.5.0/xterm.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xterm-addon-fit/0.8.0/xterm-addon-fit.min.js"></script>
 <script>
 const $=s=>document.querySelector(s);
-let STATE={environments:{},repos:[],sessions:[],sessionImage:null,flyError:null,hasCreds:true};
+let STATE={environments:{},repos:[],sessions:[],sessionImage:null,flyError:null,hasCreds:true,imageBuild:{},auth:{}};
 let TAB='sessions';
 // ---- pending actions: UI acks immediately, real state arrives via polling --------
 // key -> label while an action is in flight. Renders consult this so a re-render
@@ -128,7 +158,7 @@ function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;',
 const REGION={arn:'Stockholm',fra:'Frankfurt',ams:'Amsterdam',lhr:'London',cdg:'Paris',waw:'Warsaw',mad:'Madrid',iad:'Virginia',ord:'Chicago',sjc:'San Jose',lax:'Los Angeles',sin:'Singapore',nrt:'Tokyo',hkg:'Hong Kong',syd:'Sydney'};
 function ago(iso){const s=Math.max(0,(Date.now()-new Date(iso).getTime())/1000);
   if(s<60)return 'just now';if(s<3600)return Math.floor(s/60)+' min ago';if(s<86400)return Math.floor(s/3600)+' h ago';return Math.floor(s/86400)+' d ago';}
-function tab(t){TAB=t;['sessions','envs','repos'].forEach(x=>{$('#view-'+x).hidden=x!==t;$('#t-'+x).classList.toggle('on',x===t);});$('#fab').style.display=t==='sessions'?'block':'none';render();}
+function tab(t){TAB=t;['sessions','envs','repos','settings'].forEach(x=>{$('#view-'+x).hidden=x!==t;$('#t-'+x).classList.toggle('on',x===t);});$('#fab').style.display=t==='sessions'?'block':'none';render();}
 
 // ---- polling: 15s idle, 2s while something is settling -----------------------
 let inflight=false, fastUntil=0;
@@ -154,12 +184,12 @@ setInterval(async()=>{
 // ---- render ---------------------------------------------------------------
 function banners(){
   let h='';
-  if(STATE.hasCreds===false)h+='<div class="banner err">Controller has no Claude credentials — sessions can\'t authenticate.</div>';
-  if(!STATE.sessionImage)h+='<div class="banner warn">No session image deployed yet. Run deploy-session-image.sh.</div>';
+  if(STATE.hasCreds===false)h+='<div class="banner err">No Claude credentials — sessions can\'t authenticate. Re-login from Settings.</div>';
+  if(!STATE.sessionImage)h+='<div class="banner warn">No session image yet. Build one from Settings.</div>';
   if(STATE.flyError)h+='<div class="banner err">Fly: '+esc(STATE.flyError)+'</div>';
   $('#banners').innerHTML=h;
 }
-function render(){banners();if(TAB==='sessions')renderSessions();if(TAB==='envs')renderEnvs();if(TAB==='repos')renderRepos();}
+function render(){banners();if(TAB==='sessions')renderSessions();if(TAB==='envs')renderEnvs();if(TAB==='repos')renderRepos();if(TAB==='settings')renderSettings();}
 
 function sessionPill(m){
   // Real state only. Fly state first; then whether claude inside has actually come up.
@@ -180,15 +210,17 @@ function renderSessions(){
   v.innerHTML=s.map(m=>{
     // name: whatever claude inside reports (mirrors renames made in the Claude app);
     // until it has booted, the creation name.
-    const title=(m.liveName&&m.nameSource&&m.nameSource!=='derived')?m.liveName:(m.label||m.name);
+    const title=(m.liveName&&m.nameSource&&m.nameSource!=='derived')?m.liveName:(m.label||m.liveName||m.name);
     const busy=PENDING.has('destroy:'+m.id);
     const repos=m.repos?m.repos.split(' ').map(u=>u.split('/').pop().replace(/\.git$/,'')).join(', '):'';
+    const perm=m.permissionMode==='bypass'?' · <span class="pill bad" style="text-transform:none">skip perms</span>':(m.permissionMode?' · auto':'');
     return `<div class="card${busy?' pending':''}">
     <div class="row" style="justify-content:space-between"><h3>${esc(title)}</h3>${sessionPill(m)}</div>
-    <div class="meta">${m.environment?('env: '+esc(m.environment)):''}${repos?(' · '+esc(repos)):''}</div>
+    <div class="meta">${m.environment?('env: '+esc(m.environment)):''}${repos?(' · '+esc(repos)):''}${perm}</div>
     <div class="meta">${esc(REGION[m.region]||m.region||'')}${m.created?' · created '+ago(m.created):''}</div>
     <div class="spacer"></div>
     <div class="row">
+      ${m.state==='started'?`<button class="btn ghost sm" onclick="openTerm('${m.id}','${esc(title)}')">Terminal</button>`:''}
       ${pbtn('destroy:'+m.id,'danger sm',`destroy('${m.id}')`,'Destroy',cool)}
     </div>
     <div class="hint">Open the Claude app to chat with this session.</div>
@@ -223,6 +255,33 @@ function renderRepos(){
       <div class="spacer"></div>${pbtn('repo:add','',`addRepo()`,'Add repo')}
       <div class="hint">Private repos: add a GITHUB_TOKEN key to the environment you'll use.</div></div>`;
 }
+function renderSettings(){
+  const v=$('#view-settings');
+  const c=STATE.creds||{};
+  const exp=c.expiresAt?new Date(c.expiresAt):null;
+  const b=STATE.imageBuild||{};
+  const authBusy=PENDING.get('auth');
+  v.innerHTML=`
+    <div class="card"><h3>Claude account</h3>
+      <div class="meta">${STATE.hasCreds?`Signed in${c.subscriptionType?' · '+esc(c.subscriptionType):''}${exp?' · access token '+(exp>new Date()?'expires':'expired')+' '+ago(exp.toISOString()).replace(' ago','')+(exp>new Date()?' from now':' ago'):''}`:'Not signed in'}</div>
+      <div class="hint">Runs the real <code>claude auth login</code> on the controller: you open the link, sign in, and paste the code back here. New sessions use the refreshed credentials; running ones keep their copy.</div>
+      <div class="spacer"></div>
+      ${pbtn('auth','sm','relogin()','Re-login')}
+    </div>
+    <div class="card"><h3>Session image</h3>
+      <div class="meta">${STATE.sessionImage?esc(STATE.sessionImage):'none yet'}</div>
+      ${b.running?`<div class="meta"><span class="spinner"></span> building on Fly (started ${ago(new Date(b.startedAt).toISOString())})…</div>`:(b.startedAt?`<div class="meta">last build: ${b.ok?'✓ '+esc(b.image):'✗ failed'}</div>`:'')}
+      <div class="hint">Rebuilds selfhost/session-image from the current main on Fly's remote builder (~5 min) and records the new ref.</div>
+      <div class="spacer"></div>
+      <div class="row">${pbtn('image','sm','rebuildImage()',b.running?'Building…':'Rebuild image')}<button class="btn ghost sm" onclick="showBuildLog()">Build log</button></div>
+      <pre class="log" id="build-log" hidden></pre>
+    </div>
+    <div class="card"><h3>Controller</h3>
+      <div class="meta">portal v${esc(STATE.version||'?')} · Fly app ${esc(STATE.flyApp||'')}</div>
+      <div class="hint">Everything here is reconciled by Flux from the claude-env repo (selfhost/k8s). Edits made in this dashboard are committed back to git (secrets encrypted with sops) and applied immediately. k8s UI: <a class="link" href="/t/headlamp/" target="_blank">Headlamp</a>.</div>
+    </div>`;
+  if(b.running)settle(st=>!(st.imageBuild||{}).running,900000);
+}
 
 // ---- dialogs --------------------------------------------------------------
 function dlg(html){$('#dlg-body').innerHTML='<div class="grab"></div>'+html;$('#dlg').showModal();}
@@ -242,8 +301,11 @@ function newSession(){
     <label>Repos</label>
     ${repos.length?repos.map(r=>`<label class="choice"><input type="checkbox" name="ns-repo" value="${esc(r.name)}"><span class="t">${esc(r.name)}<small>${esc(r.url)}</small></span></label>`).join('')
       :'<div class="meta">No repos yet — add some in the Repos tab.</div>'}
+    <label>Permission mode</label>
+    <label class="choice"><input type="radio" name="ns-perm" value="auto" checked><span class="t">Auto<small>Auto-approve safe actions; the permission classifier gates the rest.</small></span></label>
+    <label class="choice"><input type="radio" name="ns-perm" value="bypass"><span class="t">Dangerously skip permissions<small>No prompts at all (--dangerously-skip-permissions).</small></span></label>
     <label>Session title (optional)</label><input id="ns-title" type="text" name="session-topic" autocomplete="off" autocorrect="off" autocapitalize="sentences" spellcheck="false" placeholder="e.g. refactor billing module">
-    <div class="hint">Shows as the session title in the Claude app too. Leave blank for an auto-generated one.</div>
+    <div class="hint">Shows as the session title in the Claude app too. Leave blank and the Claude session names itself.</div>
     <div class="actions">
       <button class="btn ghost" onclick="closeDlg()">Cancel</button>
       <button class="btn" id="ns-start" onclick="startSession(this)">Start</button></div>`);
@@ -252,9 +314,10 @@ async function startSession(btn){
   const env=(document.querySelector('#dlg-body input[name=ns-env]:checked')||{}).value||'';
   const repos=[...document.querySelectorAll('#dlg-body input[name=ns-repo]:checked')].map(c=>c.value);
   const label=$('#ns-title').value.trim();
+  const permissionMode=(document.querySelector('#dlg-body input[name=ns-perm]:checked')||{}).value||'auto';
   const restore=dlgBusy(btn,'Starting…');
   try{
-    const r=await api('POST','api/sessions',{environment:env,repos,label});
+    const r=await api('POST','api/sessions',{environment:env,repos,label,permissionMode});
     closeDlg();
     await refresh(false);                                 // card appears in its REAL state (creating…)
     settle(st=>{const m=(st.sessions||[]).find(x=>x.id===r.id);return !!(m&&m.state==='started'&&m.status);}); // fast-poll until claude is actually up
@@ -290,12 +353,12 @@ async function destroy(id){
 async function editEnv(name){
   let secrets={};
   if(name){try{const r=await api('GET',`api/environments/${encodeURIComponent(name)}/secrets`);secrets=r.secrets||{};}catch(e){}}
-  const text=Object.entries(secrets).map(([k,v])=>`${k}=${v}`).join('\n');
+  const text=Object.entries(secrets).map(([k,v])=>`${k}=${/[\n\r]/.test(v)?JSON.stringify(v):v}`).join('\n');
   dlg(`<h3>${name?'Edit ':'New '}environment</h3>
-    <label>Environment id</label><input id="ev-title" type="text" name="env-id" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" value="${esc(name)}" ${name?'readonly':''} placeholder="e.g. default">
+    <label>Environment id</label><input id="ev-title" type="text" name="env-id" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" value="${esc(name)}" ${name?'readonly':''} placeholder="e.g. default (lowercase, dashes)">
     <label>Secrets (KEY=VALUE, one per line)</label>
     <textarea id="ev-secrets" placeholder="LOBSTER_TOKEN=...\nSERPAPI_KEY=...">${esc(text)}</textarea>
-    <div class="hint">Saved on the controller. Blank value on an existing key deletes it.</div>
+    <div class="hint">Committed to git encrypted (sops) and applied to the cluster. Blank value on an existing key deletes it. Multi-line values: wrap in JSON quotes ("...\\n...").</div>
     <div class="actions">
       <button class="btn ghost" onclick="closeDlg()">Cancel</button>
       <button class="btn" onclick="saveEnv(this)">Save</button></div>`);
@@ -304,13 +367,16 @@ async function saveEnv(btn){
   const name=$('#ev-title').value.trim();
   if(!name){alert('name required');return;}
   const secrets={};
-  $('#ev-secrets').value.split('\n').forEach(line=>{const i=line.indexOf('=');if(i<1)return;secrets[line.slice(0,i).trim()]=line.slice(i+1);});
+  $('#ev-secrets').value.split('\n').forEach(line=>{const i=line.indexOf('=');if(i<1)return;let v=line.slice(i+1);
+    if(v.startsWith('"')&&v.endsWith('"')){try{v=JSON.parse(v);}catch{}}secrets[line.slice(0,i).trim()]=v;});
+  // keys removed from the textarea are deleted too
+  if($('#ev-title').readOnly){try{const r=await api('GET',`api/environments/${encodeURIComponent(name)}/secrets`);for(const k of Object.keys(r.secrets||{}))if(!(k in secrets))secrets[k]='';}catch(e){}}
   const restore=dlgBusy(btn,'Saving…');
   try{await api('POST','api/environments',{name,secrets});closeDlg();await refresh(false);}
   catch(e){restore();alert(e.message);}
 }
 async function delEnv(n){
-  if(!confirm(`Delete environment "${n}" and its saved secret values?\n\nOnly this dashboard's copy is removed — nothing outside it is affected.`))return;
+  if(!confirm(`Delete environment "${n}" and its saved secret values?\n\nRemoved from the cluster and from git — nothing outside is affected.`))return;
   pend('env:'+n,'Deleting…');
   try{await api('DELETE','api/environments/'+encodeURIComponent(n));}catch(e){alert(e.message);}
   pend('env:'+n,null);await refresh(false);
@@ -327,6 +393,77 @@ async function delRepo(n){
   pend('repo:'+n,'Removing…');
   try{await api('DELETE','api/repos/'+encodeURIComponent(n));}catch(e){alert(e.message);}
   pend('repo:'+n,null);await refresh(false);
+}
+
+// ---- settings: re-login + image rebuild ----------------------------------
+async function relogin(){
+  pend('auth','Starting…');
+  let url;
+  try{url=(await api('POST','api/auth/start')).url;}catch(e){pend('auth',null);alert('Could not start login: '+e.message);return;}
+  pend('auth',null);
+  dlg(`<h3>Re-login to Claude</h3>
+    <div class="meta">1. Open the link and sign in (it shows a code at the end).</div>
+    <div class="spacer"></div><a class="btn" href="${esc(url)}" target="_blank" rel="noopener" style="text-decoration:none">Open sign-in page ↗</a>
+    <div class="hint" style="margin-top:.5rem">${esc(url)}</div>
+    <label>2. Paste the code</label><input id="auth-code" type="text" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" placeholder="code#state">
+    <div id="auth-msg" class="hint"></div>
+    <div class="actions">
+      <button class="btn ghost" onclick="closeDlg()">Cancel</button>
+      <button class="btn" onclick="submitCode(this)">Finish</button></div>`);
+}
+async function submitCode(btn){
+  const code=$('#auth-code').value.trim();
+  if(!code){alert('paste the code first');return;}
+  const restore=dlgBusy(btn,'Signing in…');
+  try{const r=await api('POST','api/auth/code',{code});closeDlg();await refresh(false);alert('Signed in. New sessions will use the refreshed credentials.');}
+  catch(e){restore();$('#auth-msg').textContent=e.message;}
+}
+async function rebuildImage(){
+  if(!confirm('Rebuild the session image on Fly from the current main? (~5 min)'))return;
+  pend('image','Starting…');
+  try{await api('POST','api/image/rebuild');}catch(e){alert(e.message);}
+  pend('image',null);await refresh(false);
+}
+async function showBuildLog(){
+  const el=$('#build-log');el.hidden=false;
+  try{const s=await api('GET','api/image/build');el.textContent=(s.log||'(no build yet)');el.scrollTop=el.scrollHeight;}catch(e){el.textContent=e.message;}
+}
+
+// ---- terminal (tmux mirror of the session, via SSE + send-keys) --------------
+let TERM=null,TERMFIT=null,TERMSSE=null,TERMID=null;
+function openTerm(id,title){
+  TERMID=id;$('#term-title').textContent=title;$('#term-status').textContent='connecting…';
+  const d=$('#termdlg');d.showModal();
+  if(!TERM){
+    TERM=new Terminal({cursorBlink:true,fontSize:12,convertEol:false,scrollback:0,theme:{background:'#0b0d11'},allowProposedApi:true});
+    TERMFIT=new FitAddon.FitAddon();TERM.loadAddon(TERMFIT);TERM.open($('#term'));
+    // desktop keyboard: translate xterm input into tmux keys
+    TERM.onData(data=>{
+      const map={'\r':'Enter','\x7f':'BSpace','\x1b':'Escape','\x03':'C-c','\t':'Tab','\x1b[A':'Up','\x1b[B':'Down','\x1b[C':'Right','\x1b[D':'Left','\x1b[Z':'S-Tab','\x04':'C-d','\x0c':'C-l','\x15':'C-u'};
+      if(map[data])tinput({keys:[map[data]]});else if(!data.startsWith('\x1b'))tinput({text:data});
+    });
+  }
+  TERM.reset();
+  if(TERMSSE)TERMSSE.close();
+  TERMSSE=new EventSource(`api/sessions/${id}/tty`);
+  TERMSSE.addEventListener('frame',e=>{
+    const f=JSON.parse(e.data);
+    if(TERM.cols!==f.cols||TERM.rows!==f.rows)TERM.resize(f.cols,f.rows);
+    TERM.write('\x1b[H\x1b[2J'+f.screen.replace(/\n/g,'\r\n')+`\x1b[${(f.y|0)+1};${(f.x|0)+1}H`);
+    $('#term-status').textContent=`live · ${f.cols}×${f.rows}`;
+  });
+  TERMSSE.addEventListener('error',e=>{try{$('#term-status').textContent=JSON.parse(e.data).error;}catch{$('#term-status').textContent='reconnecting…';}});
+}
+function closeTerm(){if(TERMSSE){TERMSSE.close();TERMSSE=null;}$('#termdlg').close();}
+async function tinput(body){if(!TERMID)return;try{await api('POST',`api/sessions/${TERMID}/tty/input`,body);}catch(e){$('#term-status').textContent=e.message;}}
+function tkey(k){tinput({keys:[k]});}
+function tsend(){const i=$('#term-in');const t=i.value;i.value='';if(t)tinput({text:t,keys:['Enter']});else tinput({keys:['Enter']});}
+$('#term-in').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();tsend();}});
+async function termFit(){
+  // size the session's tmux window to what fits on this screen (xterm fit computes cols/rows)
+  TERMFIT.fit();
+  try{const r=await api('POST',`api/sessions/${TERMID}/tty/resize`,{cols:TERM.cols,rows:TERM.rows});$('#term-status').textContent=`resized to ${r.cols}×${r.rows}`;}
+  catch(e){$('#term-status').textContent=e.message;}
 }
 
 tab('sessions');refresh(true);

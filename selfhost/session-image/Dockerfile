@@ -10,6 +10,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Node.js 22 (for the repo's JS tooling)
 RUN curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
  && apt-get install -y nodejs && rm -rf /var/lib/apt/lists/*
+# kubectl: sessions drive the controller cluster (kubeconfig written by entrypoint.sh)
+RUN curl -fsSL -o /usr/local/bin/kubectl "https://dl.k8s.io/release/v1.33.4/bin/linux/amd64/kubectl" \
+ && chmod +x /usr/local/bin/kubectl
 # Non-root user with passwordless sudo. claude refuses --dangerously-skip-permissions
 # as root, and per-session tool installs want sudo.
 RUN useradd -m -s /bin/bash claude \
