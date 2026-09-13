@@ -159,8 +159,9 @@ function renderRepos(){
   const v=$('#view-repos');
   const cards=r.map(x=>`<div class="card">
     <div class="row" style="justify-content:space-between"><h3>${esc(x.name)}</h3>
-      <button class="btn danger sm" onclick="delRepo('${esc(x.name)}')">Delete</button></div>
-    <div class="meta">${esc(x.url)}</div></div>`).join('');
+      <button class="btn ghost sm" onclick="delRepo('${esc(x.name)}')">Remove from list</button></div>
+    <div class="meta">${esc(x.url)}</div>
+    <div class="hint">Removing only forgets it here — the repository on GitHub is never touched.</div></div>`).join('');
   v.innerHTML=(cards||'<div class="empty">No repos yet.</div>')+`
     <div class="card"><label>Add repo (git URL)</label>
       <input id="repo-url" placeholder="https://github.com/owner/name.git">
@@ -204,7 +205,10 @@ async function renameSession(id,current){
   try{await api('POST',`api/sessions/${id}/rename`,{name});setTimeout(refresh,1500);refresh();}catch(e){alert('Rename failed: '+e.message);}
 }
 async function act(id,what){try{await api('POST',`api/sessions/${id}/${what}`);setTimeout(refresh,1200);}catch(e){alert(e.message);}}
-async function destroy(id){if(!confirm('Destroy this session?'))return;try{await api('DELETE','api/sessions/'+id);refresh();}catch(e){alert(e.message);}}
+async function destroy(id){
+  if(!confirm('Destroy this session\'s container?\n\nAnything inside it that was not pushed is lost. Your repos on GitHub are not affected.'))return;
+  try{await api('DELETE','api/sessions/'+id);refresh();}catch(e){alert(e.message);}
+}
 
 async function editEnv(name){
   let secrets={};
@@ -229,13 +233,19 @@ async function saveEnv(){
   });
   try{await api('POST','api/environments',{name,secrets});closeDlg();refresh();}catch(e){alert(e.message);}
 }
-async function delEnv(n){if(!confirm('Delete environment '+n+'?'))return;try{await api('DELETE','api/environments/'+encodeURIComponent(n));refresh();}catch(e){alert(e.message);}}
+async function delEnv(n){
+  if(!confirm(`Delete environment "${n}" and its saved secret values?\n\nOnly this dashboard's copy is removed — nothing outside it is affected.`))return;
+  try{await api('DELETE','api/environments/'+encodeURIComponent(n));refresh();}catch(e){alert(e.message);}
+}
 async function addRepo(){
   const url=$('#repo-url').value.trim(),name=$('#repo-name').value.trim();
   if(!url){alert('url required');return;}
   try{await api('POST','api/repos',{url,name});refresh();}catch(e){alert(e.message);}
 }
-async function delRepo(n){try{await api('DELETE','api/repos/'+encodeURIComponent(n));refresh();}catch(e){alert(e.message);}}
+async function delRepo(n){
+  if(!confirm(`Remove "${n}" from this list?\n\nThis only forgets the entry on the dashboard — nothing on GitHub is deleted or changed.`))return;
+  try{await api('DELETE','api/repos/'+encodeURIComponent(n));refresh();}catch(e){alert(e.message);}
+}
 
 tab('sessions');refresh();
 setInterval(()=>{if(TAB==='sessions')refresh();},15000);
