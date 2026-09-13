@@ -6,7 +6,7 @@
     "namespace": "claude"
   },
   "data": {
-    "repos.json": "[{\"name\":\"claude-env\",\"url\":\"https://github.com/de0ch/claude-env.git\"},{\"name\":\"china-train\",\"url\":\"https://github.com/de0ch/china-train\"}]",
+    "repos.json": "[{\"name\":\"claude-env\",\"url\":\"https://github.com/de0ch/claude-env.git\"}]",
     "sessionImage": "registry.fly.io/de0ch-claude-sessions:deployment-01M2D5HW5ZWPE9GMRT4JE2NCY6"
   }
 }
