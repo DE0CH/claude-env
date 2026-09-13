@@ -54,8 +54,11 @@ or add a new skill, install its dependencies the proper way (brew/apt/pip) and n
 installs a tool — apt/pip/npm package, a binary, a config that had to be set by hand —
 that might be useful again, add it to `selfhost/session-image/Dockerfile` in the same
 task and push. The session microVM is ephemeral; the image is what persists, so a
-per-session install that isn't in the build script is lost. It takes effect at the next
-image rebuild (dashboard → Settings → Rebuild).
+per-session install that isn't in the build script is lost. Then **trigger the rebuild
+yourself** — `POST https://tunnel.deyaochen.com/t/portal/api/image/rebuild` with the CF
+Access service-token headers, poll `GET …/api/image/build` from a background watcher — and
+don't ask me first: it's a cheap build and the previous `sessionImage` ref stays in git, so
+a bad image is a one-line revert.
 
 If claude-in-chrome is avaliable and it's running on mac, use it and normal tools.
 

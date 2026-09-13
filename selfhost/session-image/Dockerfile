@@ -21,7 +21,8 @@ RUN curl -fsSL -o /usr/local/bin/sops "https://github.com/getsops/sops/releases/
 RUN curl -fsSL -o /usr/local/bin/yt-dlp "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp" \
  && chmod +x /usr/local/bin/yt-dlp
 # flyctl: drive Fly (manage the sessions app / rebuild the session image)
-RUN FLYCTL_INSTALL=/usr/local curl -fsSL https://fly.io/install.sh | sh
+RUN curl -fsSL https://fly.io/install.sh | FLYCTL_INSTALL=/usr/local sh \
+ && test -x /usr/local/bin/flyctl
 # vercel CLI: deploy HTML reports/demos for Deyao (vercel skill — never Claude Artifacts)
 RUN npm install -g vercel
 # Common Python libs used across scripts/skills (Ubuntu 24.04 pip is externally-managed).
@@ -37,12 +38,12 @@ RUN pip3 install --no-cache-dir --break-system-packages \
 # revision-numbered dirs, and the build FAILS if either binary isn't where we expect.
 ENV PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers NODE_PATH=/usr/lib/node_modules
 RUN npm install -g playwright@1.62.0 ws \
- && playwright install --with-deps chromium \
+ && playwright install --with-deps chromium chromium-headless-shell \
  && pip3 install --no-cache-dir --break-system-packages playwright==1.62.0 edge-tts \
  && apt-get update && apt-get install -y --no-install-recommends fonts-noto-cjk fonts-noto-color-emoji \
  && rm -rf /var/lib/apt/lists/* \
  && ln -s "$(find /opt/pw-browsers -path '*/chromium-*' -type f -name chrome | head -1)" /opt/pw-browsers/chromium \
- && ln -s "$(find /opt/pw-browsers -path '*/chromium_headless_shell-*' -type f -name headless_shell | head -1)" /opt/pw-browsers/headless_shell \
+ && ln -s "$(find /opt/pw-browsers -path '*/chromium_headless_shell-*' -type f \( -name headless_shell -o -name chrome-headless-shell \) | head -1)" /opt/pw-browsers/headless_shell \
  && test -x /opt/pw-browsers/chromium && test -x /opt/pw-browsers/headless_shell \
  && ln -s /opt/pw-browsers/chromium /usr/local/bin/chromium \
  && chmod -R a+rX /opt/pw-browsers
