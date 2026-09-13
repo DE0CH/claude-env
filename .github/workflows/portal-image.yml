@@ -23,6 +23,8 @@ jobs:
       IMAGE: ghcr.io/de0ch/claude-portal
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # the tunnel-pin step diffs the pushed range
       - uses: docker/setup-buildx-action@v3
       - uses: docker/login-action@v3
         with:
@@ -49,6 +51,17 @@ jobs:
           # direct release tarball: the install_kustomize.sh helper calls the GitHub API unauthenticated and 401s
           curl -fsSL "https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv5.6.0/kustomize_v5.6.0_linux_amd64.tar.gz" | sudo tar -xz -C /usr/local/bin kustomize
           cd selfhost/k8s && kustomize edit set image "$IMAGE=$IMAGE:${{ steps.meta.outputs.tag }}"
+          # tunnel agent: same image, separate pin — bump only if cf-tunnel/** changed in this push
+          # (a portal-only build must not restart the tunnel pod, or the tunnel goes down)
+          BEFORE="${{ github.event.before }}"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] || [ -z "$BEFORE" ] || ! git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
+            CHANGED=$(git diff --name-only HEAD~1 HEAD -- cf-tunnel/ || true)
+          else
+            CHANGED=$(git diff --name-only "$BEFORE" HEAD -- cf-tunnel/ || true)
+          fi
+          if [ -n "$CHANGED" ]; then
+            echo "cf-tunnel changed; bumping tunnel-agent pin"; kustomize edit set image "claude-tunnel-agent=$IMAGE:${{ steps.meta.outputs.tag }}"
+          fi
           cd "$GITHUB_WORKSPACE"
           git config user.name "portal-image bot"; git config user.email "actions@users.noreply.github.com"
           git add selfhost/k8s/kustomization.yaml

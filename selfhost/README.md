@@ -34,7 +34,9 @@ phone ─ Claude app (chat)            dashboard  https://tunnel.deyaochen.com/t
   it's usable immediately. Git stays the source of truth — a rebuilt box comes back identical.
 - **CI builds, Flux deploys.** `.github/workflows/portal-image.yml` builds
   `ghcr.io/de0ch/claude-portal` on every portal/cf-tunnel change and pins the tag into
-  `selfhost/k8s/kustomization.yaml`; Flux rolls it out. CI never touches the cluster or Hetzner
+  `selfhost/k8s/kustomization.yaml`; Flux rolls it out with zero downtime (portal = RollingUpdate
+  behind its Service; the tunnel agent has its own image pin, bumped only when `cf-tunnel/**`
+  changes, so it is never restarted by a portal build). CI never touches the cluster or Hetzner
   and holds no secrets (only the built-in `GITHUB_TOKEN`).
 - **The box's lifecycle is manual** (`cluster/create.sh` / `destroy.sh`), not CI-managed. Its
   only stateful inputs are the age private key and the static k8s admin token, both baked in

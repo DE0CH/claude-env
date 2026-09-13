@@ -1,5 +1,7 @@
 # Root of everything Flux reconciles onto the controller cluster (see flux/sync.yaml).
-# The portal image tag below is bumped by .github/workflows/portal-image.yml on each build.
+# The portal image tag below is bumped by .github/workflows/portal-image.yml on each build;
+# the tunnel-agent pin (same image, placeholder name) only when cf-tunnel/** changed, so portal
+# builds don't restart the tunnel agent.
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
@@ -10,5 +12,8 @@ resources:
 - tunnel
 images:
 - name: ghcr.io/de0ch/claude-portal
+  newName: ghcr.io/de0ch/claude-portal
+  newTag: sha-f1905b16980e
+- name: claude-tunnel-agent
   newName: ghcr.io/de0ch/claude-portal
   newTag: sha-f1905b16980e

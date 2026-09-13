@@ -1,6 +1,9 @@
 # cf-tunnel agent (cf-tunnel/agent.js, shipped inside the portal image) exposing
-#   https://tunnel.deyaochen.com/t/portal/  -> portal
+#   https://tunnel.deyaochen.com/t/portal/  -> the `portal` Service (load balancer over portal pods)
 # behind Cloudflare Access (Deyao's email, or the service token sessions carry).
+# The image is the placeholder `claude-tunnel-agent`, mapped to a portal-image tag in
+# selfhost/k8s/kustomization.yaml that CI bumps ONLY when cf-tunnel/** changes — so a portal
+# build never restarts this pod and the tunnel stays up across portal rollouts.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -8,8 +11,13 @@ metadata:
   namespace: claude
 spec:
   replicas: 1
+  # the Worker keeps one agent socket per tunnel id and lets a new connection take over, so
+  # a surge pod replaces the old one with only the socket-swap gap
   strategy:
-    type: Recreate
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
   selector:
     matchLabels:
       app: tunnel-portal
@@ -20,7 +28,7 @@ spec:
     spec:
       containers:
         - name: agent
-          image: ghcr.io/de0ch/claude-portal
+          image: claude-tunnel-agent
           command: ["node", "/app/cf-tunnel/agent.js"]
           env:
             - name: TUNNEL_ID
