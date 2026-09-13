@@ -11,6 +11,7 @@ body{margin:0;padding-bottom:3rem}
 .tablist{overflow-x:auto;scrollbar-width:none;margin-left:-16px;margin-right:-16px;padding:0 16px}
 .tablist::-webkit-scrollbar{display:none}
 .topbar{position:sticky;top:0;z-index:5;background:var(--color-background);border-bottom:1px solid var(--gray-a5);padding-top:env(safe-area-inset-top)}
+.topbar .wrap{padding-left:20px;padding-right:20px}
 /* action menu rows */
 .menu .mi{display:block;width:100%;background:none;border:none;padding:12px 8px;text-align:left;border-radius:var(--radius-3);font:inherit;color:inherit;cursor:pointer}
 .menu .mi:active{background:var(--gray-a3)}
@@ -30,7 +31,7 @@ body{margin:0;padding-bottom:3rem}
 .handle-wrap{display:flex;justify-content:center;padding:10px 0 8px;cursor:grab;touch-action:none}
 .handle-wrap .react-modal-sheet-drag-indicator-container{height:auto}
 .react-modal-sheet-drag-indicator{background-color:var(--gray-8) !important} /* colour only (opaque: the lib's two tilting segments overlap at the join) */
-.sheet .head{display:flex;align-items:center;gap:8px;padding:0 16px 10px;border-bottom:1px solid var(--gray-a5)}
+.sheet .head{display:flex;align-items:center;gap:8px;padding:6px 20px 14px;border-bottom:1px solid var(--gray-a5)}
 .sheet .head .ttl{flex:1;text-align:center;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin:0}
 .sheet .head .side{flex:none;min-width:5rem;display:flex}
 .sheet .head .side.r{justify-content:flex-end}

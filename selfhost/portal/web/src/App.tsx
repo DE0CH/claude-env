@@ -49,7 +49,7 @@ export function App() {
     <Theme {...THEME} ref={setRoot}>
       <PortalCtx.Provider value={root}>
         <div className="topbar">
-          <Flex className="wrap" align="center" justify="between" py="3">
+          <Flex className="wrap" align="center" justify="between" py="4" gap="3">
             <Heading size="5">Claude sessions</Heading>
             <Flex gap="2">
               <IconButton variant="soft" color="gray" id="refreshBtn" onClick={() => refresh(true)} aria-label="Refresh" loading={refreshing}>↻</IconButton>
