@@ -33,9 +33,11 @@ keeps the traps and non-obvious facts a future session must still know.
   appears elsewhere in the same command line. Kill by PID or in a separate tool call.
 - **GitHub refuses workflow-file pushes** from a PAT without the `workflow` scope; editing
   the existing classic token's scopes keeps its value, so a running session can retry.
-- **GHCR packages start private** even for a public repo and there is no API to change it —
-  the owner clicks Package settings → Change visibility. Until then pods sit in
-  `ImagePullBackOff` while Flux reports Ready (`wait: false`).
+- **GHCR packages may start private** (claude-portal did; claude-sessions came out public on
+  first push, 2026-09-13 — depends on the account's package defaults) and there is no API to
+  change visibility — the owner clicks Package settings → Change visibility. Check with
+  `gh api /users/DE0CH/packages/container/<name> --jq .visibility`. A private one leaves pods
+  in `ImagePullBackOff` while Flux reports Ready (`wait: false`).
 - **Reading a GHCR package via API needs `read:packages`** on the PAT (403 otherwise).
 - **Anything long-running inside the portal process dies on a rollout.** The in-pod session
   image build (a flyctl child + in-memory job record) was lost when Flux replaced the pod

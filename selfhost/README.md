@@ -92,9 +92,11 @@ Encrypt by hand: put a Secret manifest at `selfhost/k8s/secrets/<x>.sops.yaml`, 
 AGE_KEY_FILE=age.agekey K8S_ADMIN_TOKEN_FILE=k8s_admin_token selfhost/cluster/create.sh
 #    -> cloud-init: k3s (--tls-san <ip>, static token auth) → flux install → sops-age secret
 #       → applies selfhost/k8s/flux/sync.yaml → Flux brings up everything from main
-# 2. first time only: make the ghcr.io/de0ch/claude-portal AND ghcr.io/de0ch/claude-sessions
-#    packages PUBLIC (GitHub UI, package settings → Change visibility) — GHCR packages start
-#    private and there is no API. The session-image workflow refuses to pin a private image.
+# 2. first time only: check ghcr.io/de0ch/claude-portal and ghcr.io/de0ch/claude-sessions are
+#    PUBLIC (`gh api /users/DE0CH/packages/container/<name> --jq .visibility`; fix in the GitHub
+#    UI, package settings → Change visibility — no API). New packages have come out public on
+#    this account (claude-sessions, 2026-09-13) but may start private; the session-image
+#    workflow refuses to pin a private image and says so.
 # 3. add KUBE_SERVER=https://<ip>:6443 + KUBE_CA to the default environment (Settings → env)
 kubectl --server https://<ip>:6443 --token "$(cat k8s_admin_token)" --insecure-skip-tls-verify get pods -A
 ```
