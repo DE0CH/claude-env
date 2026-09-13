@@ -44,17 +44,21 @@ start() {
     bypass) export SESSION_PERM_FLAG="--dangerously-skip-permissions" ;;
     *)      export SESSION_PERM_FLAG="" ;;
   esac
+  # Resume: entrypoint.sh has already placed the transcript in ~/.claude/projects (it unsets
+  # SESSION_RESUME_ID if that failed). A uuid, so the unquoted expansion below is safe.
+  export SESSION_RESUME_FLAG=""
+  [ -n "${SESSION_RESUME_ID:-}" ] && export SESSION_RESUME_FLAG="--resume $SESSION_RESUME_ID"
   if [ -n "$SESSION_LABEL" ]; then
     # --remote-control <name> names it in the Claude app; --name sets the local display
     # name (the session registry the dashboard reads), so both start identical.
-    CMD='claude --remote-control "$SESSION_LABEL" --name "$SESSION_LABEL" --model "$SESSION_MODEL" $SESSION_PERM_FLAG'
+    CMD='claude --remote-control "$SESSION_LABEL" --name "$SESSION_LABEL" --model "$SESSION_MODEL" $SESSION_PERM_FLAG $SESSION_RESUME_FLAG'
   else
     # No label => let the Claude session auto-generate (and later refine) its own title.
-    CMD='claude --remote-control --model "$SESSION_MODEL" $SESSION_PERM_FLAG'
+    CMD='claude --remote-control --model "$SESSION_MODEL" $SESSION_PERM_FLAG $SESSION_RESUME_FLAG'
   fi
   # fixed 120x40 window: the dashboard's terminal panel mirrors this pane (tmux capture-pane)
   tmux new-session -d -s "$SESSION" -x 120 -y 40 -c "$WD" "$CMD"
-  echo "[supervisor] started remote-control host in $WD (name: ${SESSION_LABEL:-auto}, model: $SESSION_MODEL, perm: ${SESSION_PERMISSION_MODE:-auto})"
+  echo "[supervisor] started remote-control host in $WD (name: ${SESSION_LABEL:-auto}, model: $SESSION_MODEL, perm: ${SESSION_PERMISSION_MODE:-auto}, resume: ${SESSION_RESUME_ID:-none})"
 }
 
 start

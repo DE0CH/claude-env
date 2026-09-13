@@ -8,6 +8,9 @@
 #   SESSION_LABEL           session title; blank => the Claude session names itself
 #   SESSION_PERMISSION_MODE auto | bypass
 #   SESSION_MODEL           model id (default claude-opus-4-8, see session-supervisor.sh)
+#   SESSION_RESUME_ID       [optional] resume this Claude session id instead of starting fresh;
+#   SESSION_RESUME_PATH     its transcript .jsonl, as a WebDAV path on the Storage Box
+#                           (fetched with STORAGEBOX_* from the environment; see below)
 # If the environment carries KUBE_SERVER + KUBE_TOKEN (+ KUBE_CA), a kubeconfig is written so
 # the session can drive the controller cluster with kubectl.
 set -uo pipefail
@@ -97,5 +100,21 @@ fi
 WD="$HOME/workspace"
 mapfile -t DIRS < <(find "$HOME/workspace" -mindepth 1 -maxdepth 1 -type d 2>/dev/null)
 [ "${#DIRS[@]}" = "1" ] && WD="${DIRS[0]}"
+
+# --- resume a previous session (move a session to a new machine) -------------
+# Drops the transcript where claude looks for it (~/.claude/projects/<cwd slug>/<id>.jsonl)
+# so session-supervisor.sh can start `claude --resume $SESSION_RESUME_ID`. On any failure
+# the id is unset and the machine starts a fresh session instead.
+if [ -n "${SESSION_RESUME_ID:-}" ] && [ -n "${SESSION_RESUME_PATH:-}" ]; then
+  PDIR="$HOME/.claude/projects/$(printf '%s' "$WD" | sed 's#[^A-Za-z0-9]#-#g')"
+  mkdir -p "$PDIR"
+  if curl -fsSL -u "${STORAGEBOX_USER:-}:${STORAGEBOX_PASSWORD:-}" \
+       "https://${STORAGEBOX_HOST:-}/${SESSION_RESUME_PATH#/}" -o "$PDIR/$SESSION_RESUME_ID.jsonl"; then
+    echo "[entrypoint] resume transcript for $SESSION_RESUME_ID: $(wc -c < "$PDIR/$SESSION_RESUME_ID.jsonl") bytes"
+  else
+    echo "[entrypoint] WARN resume transcript download failed; starting fresh"
+    unset SESSION_RESUME_ID
+  fi
+fi
 
 exec /usr/local/bin/session-supervisor.sh "$WD"
