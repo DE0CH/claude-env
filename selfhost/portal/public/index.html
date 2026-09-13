@@ -444,17 +444,23 @@ function openTerm(id,title){
     });
   }
   TERM.reset();
-  if(TERMSSE)TERMSSE.close();
-  TERMSSE=new EventSource(`api/sessions/${id}/tty`);
-  TERMSSE.addEventListener('frame',e=>{
-    const f=JSON.parse(e.data);
-    if(TERM.cols!==f.cols||TERM.rows!==f.rows)TERM.resize(f.cols,f.rows);
-    TERM.write('\x1b[H\x1b[2J'+f.screen.replace(/\n/g,'\r\n')+`\x1b[${(f.y|0)+1};${(f.x|0)+1}H`);
-    $('#term-status').textContent=`live · ${f.cols}×${f.rows}`;
-  });
-  TERMSSE.addEventListener('error',e=>{try{$('#term-status').textContent=JSON.parse(e.data).error;}catch{$('#term-status').textContent='reconnecting…';}});
+  // poll one snapshot per second (only repaint when it changed); SSE doesn't survive the tunnel relay
+  let last='';
+  if(TERMSSE)clearInterval(TERMSSE);
+  const tick=async()=>{
+    if(TERMID!==id)return;
+    try{
+      const f=await api('GET',`api/sessions/${id}/tty/frame`);
+      const key=f.screen+'|'+f.x+','+f.y+','+f.cols+','+f.rows;
+      if(key===last)return; last=key;
+      if(TERM.cols!==f.cols||TERM.rows!==f.rows)TERM.resize(f.cols,f.rows);
+      TERM.write('\x1b[H\x1b[2J'+f.screen.replace(/\n/g,'\r\n')+`\x1b[${(f.y|0)+1};${(f.x|0)+1}H`);
+      $('#term-status').textContent=`live · ${f.cols}×${f.rows}`;
+    }catch(e){$('#term-status').textContent=e.message;}
+  };
+  tick();TERMSSE=setInterval(tick,1000);
 }
-function closeTerm(){if(TERMSSE){TERMSSE.close();TERMSSE=null;}$('#termdlg').close();}
+function closeTerm(){if(TERMSSE){clearInterval(TERMSSE);TERMSSE=null;}TERMID=null;$('#termdlg').close();}
 async function tinput(body){if(!TERMID)return;try{await api('POST',`api/sessions/${TERMID}/tty/input`,body);}catch(e){$('#term-status').textContent=e.message;}}
 function tkey(k){tinput({keys:[k]});}
 function tsend(){const i=$('#term-in');const t=i.value;i.value='';if(t)tinput({text:t,keys:['Enter']});else tinput({keys:['Enter']});}

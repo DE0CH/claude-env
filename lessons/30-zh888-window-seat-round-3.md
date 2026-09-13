@@ -8,7 +8,8 @@ The whole battle with seat maps was unnecessary.
   already assigned**: app → 选座值机 → 已选座位 tab (or run the manual query and read the
   "该行程已完成选座值机" dialog). Business tickets often come pre-seated.
 - **Global-site (global.shenzhenair.com) web check-in CAN be driven end-to-end** with a
-  human doing the sliders via Browserbase live view: homepage 选座值机 widget → fill →
+  human doing the sliders (relay them to Deyao's phone with
+  `scripts/realtime-captcha-relay.js`): homepage 选座值机 widget → fill →
   `seatCheckin('seatCheckIn')` → login modal (prefill password; human enters phone +
   drags jigsaw) → submit slider (human drags) → lands on
   `/zhair/ibe/checkout/airAncillaries.do` with the FULL seat map. Enter via
@@ -18,9 +19,8 @@ The whole battle with seat maps was unnecessary.
   not-book click returned 运营保障，该座位不可选 — for THIS flight even non-window seats;
   probably because online assignment was closed/held, while the pre-assigned 01A showed
   as already-book. Don't burn hours on 运营保障 without checking existing assignment.
-- **Browserbase silently IGNORES external proxies** (`type:external`, IPRoyal + Evomi
-  both, `proxyBytes:0`, exit = AWS) and silently no-ops `browserbase`-type geolocation
-  CN/HK on this plan. Don't plan CN-exit browsing via Browserbase.
+- CN-exit BROWSING = a mobilerun cloud phone with the IPRoyal CN mobile SOCKS5 attached
+  (CLAUDE.md "Proxies"); there is no other browser route into the mainland site.
 - **ScrapingBee premium CN (`country_code=cn`) DOES reach www.shenzhenair.com** (the
   mainland site, unreachable from everywhere else we tried) — but exits are flaky
   (~30% success, ERR_TUNNEL/ERR_CONNECTION_CLOSED otherwise) and EVEN error pages

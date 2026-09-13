@@ -15,10 +15,15 @@ Write and treat the docs as if it's already available for you (the next agent wi
 
 ## Runner Environment
 
-Expect to find yourself being run in two places: 1. My own mac. 2. A github workspaces pod.
+Expect to find yourself being run in three places: 1. My own mac. 2. A Claude-on-the-web
+(github workspaces) pod. 3. A self-hosted session (a Fly Machine started from the selfhost
+dashboard — see the `selfhost/` section; hostname `s-…`, user `claude` with sudo).
 For 1. This is my personal mac and I need you not to break it, and be conservative with making
 persistent config changes. They probabaly need explicit explanation and approval from me.
-For 2. you are modify the environment however you want because the pod is ephemeral.  
+For 2. and 3. modify the environment however you want because the pod is ephemeral.
+Network differs: 2. has 443-only egress through a gateway (and the permission classifier);
+3. has open egress (any port, e.g. k8s `:6443`, proxies) and no classifier — rules below
+that say "443-only" or "gateway-blocked" apply to 2. only.
 
 ## Tools
 
@@ -30,38 +35,42 @@ billing issue — no credit left, free-plan usage exhausted, a payment failing, 
 me to recharge instead of working around it. **Exception — ScrapingBee (Deyao,
 2026-08-26): do NOT ping about its quota/billing.** He will not recharge it (too
 expensive, no pay-as-you-go); when its monthly quota is out, silently use the
-alternatives (Browserbase for fetches/screenshots, exa for content) and only
+alternatives (exa for content, a direct fetch, or a mobilerun phone's Chrome) and only
 mention ScrapingBee if a task truly cannot be done without it. If a workaround is reqruied, you should
 always ask me for permission first because using the workaround.
 
 **Incorrect configuration → discord me, never work around.** If the environment is
 misconfigured — an expected environment variable doesn't exist, an API key is
 missing/empty/invalid, a credential doesn't work — STOP and discord me to fix the
-misconfiguration instead of substituting a workaround. Example: if the Browserbase
-API key can't be found, do NOT fall back to the container's built-in Chrome — ping
-me to fix the env var. Same rule as billing issues: the fix is on my side; your job
+misconfiguration instead of substituting a workaround. Example: if the ScrapingBee
+key can't be found, do NOT quietly fall back to a direct fetch — ping me to fix the
+env var. Same rule as billing issues: the fix is on my side; your job
 is to surface it, and only use a workaround if I explicitly approve one.
 
 When a new tool is required, for example by me asking you to add a new tool, edit claude.md,
 or add a new skill, install its dependencies the proper way (brew/apt/pip) and notify me.
 
-If claude-in-chrome is avaliable and it's running on mac, use it and normal tools 
-(ignore the directive about Browserbase below), Browserbase is still avaliable when needed.
+If claude-in-chrome is avaliable and it's running on mac, use it and normal tools.
+
+**Browserbase is gone (Deyao, 2026-09-13: no credits, not renewing) — never use it.** For
+page/content fetches use ScrapingBee (JS rendering, premium proxies, screenshots) or `exa
+contents`; for interactive browsing use claude-in-chrome on the Mac, or a mobilerun cloud
+phone's Chrome driven over CDP (see the mobilerun section). Direct connections from a pod
+(curl, yt-dlp, Playwright with the container's Chromium) are an acceptable fallback when
+ScrapingBee can't do it — datacenter IPs may get bot-blocked, so try ScrapingBee's premium
+proxy first.
 
 **Web search: use the `serpapi` skill by default** (SerpApi — real Google SERP data
 as JSON: organic results, answer box, knowledge graph, news/images/maps/scholar
 engines; key in env var `SERPAPI_KEY`, free plan = 250 searches/month so budget
 credits). SerpApi returns links/snippets, not page content — fetch the winning URLs
 with `exa contents` / ScrapingBee when you need the text. Fall back to the `exa`
-skill (direct Exa API — content-with-search, find-similar; needs `EXA_API`, ask
-Deyao to persist it; cached at `scratchpad/exa_key` on 2026-08-18) when SerpApi's
+skill (direct Exa API — content-with-search, find-similar; key `EXA_API`) when SerpApi's
 quota is out or the task needs semantic search over page content, then to the
-`exa-search` skill (Exa via OpenRouter, no key needed, search-only). Do NOT use
-Browserbase's Search API as the default anymore — it's slow and just types into Google.
-Browserbase Search is a last-resort fallback only.
+`exa-search` skill (Exa via OpenRouter, no key needed, search-only).
 
 **When fetching web pages, always fetch the raw HTML — never markdown conversions**
-(e.g. ScrapingBee's `return_page_markdown`, Browserbase Fetch's markdown output).
+(e.g. ScrapingBee's `return_page_markdown`).
 I (Claude) understand HTML just as well or better, and markdown conversion loses
 structure (tables, attributes, embedded JSON/scripts). Fetch HTML and read that.
 
@@ -72,42 +81,18 @@ it returns platform JSON directly (video/note search, profiles, comments). Use
 SerpApi Google (with `hl=zh-CN`/`gl=cn`) for the general Chinese web and prefer
 Chinese primary sources (gov `.gov.cn`, official WeChat 公众号 via mp.weixin.qq.com).
 
-If claude-in-chrome is not avaliable, then use Browserbase for ANY content from websites 
-— not just interactive browsing: media/file downloads, YouTube videos/audio/subtitles, 
-APIs. It covers three modes:
-the `browse` CLI for interactive browser sessions, the Fetch API for plain page/content
-retrieval, and the Search API for web search (fallback only — prefer `exa-search`).
-There is no longer a persistent logged-in browser context — assume nothing is signed
-in and create a fresh context per task if you need one. See @browserbase.md.
-
-Always create Browserbase sessions with `--timeout 3600` (1 hour). The default timeout
-is ~5 minutes and kills the session mid-task whenever you're waiting on something slow
-(e.g. Deyao replying with an OTP), losing all page state.
-
-Use a browser session without a proxy first. If a website flow then fails for no clear
-reason (instant rejections, failed payments/verifications, captchas, auto-bounces),
-consider that it may be IP reputation: retry the same flow in a Browserbase session
-created with a residential proxy (`--proxies`) before giving up.
-
-When Deyao is watching a Browserbase session via the live view (debugger URL): those URLs
-are pinned to a specific page/tab, so whenever the session is recreated, a new tab is
-opened, or the page the link points at otherwise changes, immediately send him the fresh
-`debuggerFullscreenUrl` (from `browse cloud sessions debug <session-id>`) without being
-asked. Also explicitly say when a session is intentionally stopped or has died, so a blank
-live view isn't mistaken for a bug.
-
-Avoid using direct connection to the internet if possible. Do not fall back to direct
-connections (yt-dlp, curl/wget against the target site, etc.) without trying Browserbase
-first — datacenter IPs get bot-blocked anyway.
+If a website flow fails for no clear reason (instant rejections, failed
+payments/verifications, captchas, auto-bounces), consider that it may be IP reputation:
+retry through a residential/mobile IP (ScrapingBee premium proxy for fetches; a mobilerun
+cloud phone with an IPRoyal mobile SOCKS5 for interactive flows) before giving up.
 
 **If a source is unavailable when fetched** (dead link, 404/410, domain gone, page
-deleted, paywall, or a wall you can't get past), don't give up on the content: run
-`NODE_PATH=$(npm root -g) node scripts/archive-dump.js <url>` (see the `archive-today`
-skill) to pull the archive.today copy — it fetches the newest snapshot, or submits the
-page for archiving first if none exists.
+deleted, paywall, or a wall you can't get past), don't give up on the content: fetch the
+archive.today copy (`https://archive.ph/newest/<url>`) through ScrapingBee with a premium
+proxy; if none exists, submit the page at `https://archive.ph/` first.
 
-For YouTube videos, try to get the transcript/subtitles first (through Browserbase). Only
-if no transcript exists, download the audio (through Browserbase) and transcribe it.
+For YouTube videos, try to get the transcript/subtitles first (ScrapingBee — see
+lessons/14). Only if no transcript exists, download the audio (loader.to) and transcribe it.
 
 If audio transcription is required, use OpenAI Whisper through Openrouter.
 
@@ -121,12 +106,12 @@ and never use it as a task/service email unless I explicitly say so for that tas
 ## Card payments & payment-page sessions
 
 Standing rule (Deyao, 2026-08-26): when a task reaches a card-payment step, do NOT
-collect card details through a drop form — hand Deyao the Browserbase live view
-(`debuggerFullscreenUrl`) and let him type the card details directly into the payment
-page himself. Also: run any browser session that will touch a payment flow on a
-**residential IP** (e.g. Browserbase `proxies:[{type:"browserbase",geolocation:
-{country:"GB",city:"LONDON"}}]`) from the start — payment fraud checks flag
-datacenter IPs, and a session's proxy can't be changed after creation.
+collect card details through a drop form — get the payment page in front of Deyao (his
+own browser via a link, claude-in-chrome on the Mac, or a cloud phone's live view) and let
+him type the card details directly into the payment page himself. Also: run any browser
+session that will touch a payment flow on a **residential/mobile IP** from the start —
+payment fraud checks flag datacenter IPs, and a device's proxy should be set before the
+first page load.
 
 ## Security questions = passwords
 
@@ -158,6 +143,16 @@ one exists. A skills file should always be generated after doing research, so th
 session starts from the distilled knowledge instead of re-deriving it. (When the tool
 also needs installing, install it and notify me, per the Tools policy above.)
 
+## Repo docs describe the PRESENT, not the past
+
+Standing rule (Deyao, 2026-09-13): CLAUDE.md, `lessons/`, and skills must always reflect the
+**current** facts — what tools exist, how things work now. History lives in git commit
+history, not in the docs. When something changes (a tool is dropped, a flow is replaced),
+rewrite or delete the affected text; don't leave "this used to be…" narratives or "historical"
+banners. The only past facts worth keeping are **pitfalls and quirks** a future session must
+still avoid. Also: this pod is ephemeral — the local `~/.claude/.../memory/` dir does not
+survive, so anything worth remembering goes in the repo.
+
 ## Prompts for the next agent
 
 When I ask you to write a prompt for the next agent (a follow-up session), keep it short
@@ -169,7 +164,7 @@ the skills files / lessons.md for distilled knowledge).
 
 I lived in China and have a Chinese phone number. Whenever a task involves a Chinese
 service (telecom, banking, shopping, government, etc.), assume their website is
-usually broken — try the mobile app first (e.g. via MobileNext cloud devices or my
+usually broken — try the mobile app first (a mobilerun cloud phone, MobileNext, or my
 iPhone) and only fall back to the website if the app path fails.
 
 ## iPhone control
@@ -205,8 +200,7 @@ MobileNext stays a fallback when a specific device/region is only available ther
 ### IPRoyal — use conservatively
 Residential proxy = Tier 2 (skill: `iproyal`; ~2 GB balance). Route **only tiny probes**
 through it (e.g. `ipv4.icanhazip.com`), never bulk traffic. Check an exit IP's reputation on
-ping0.cc via a SEPARATE Browserbase session (Browserbase's own IP), **never through the proxy
-under test**.
+ping0.cc via ScrapingBee (its own IP), **never through the proxy under test**.
 
 **Prefer IPRoyal MOBILE over residential (Deyao, 2026-09-09).** Deyao keeps ~2 GB on the
 **mobile** product and near-zero on residential — so mobile is the one with balance. When
@@ -221,8 +215,7 @@ directly (Deyao env, 2026-09-09).** Connections to IPRoyal ports (mobile `:7001`
 `:12321`/`:32325`) time out from the pod. So a **local** Chromium/curl in the container cannot
 use IPRoyal. To get a China-exit BROWSER, run it where egress is open: a **mobilerun cloud
 phone** with the IPRoyal mobile SOCKS5 attached as the device proxy (`POST
-/v1/devices/{id}/proxy`), then drive the phone's Chrome/app. Browserbase silently ignores
-external proxies (lesson 30), so it can't do CN-exit either.
+/v1/devices/{id}/proxy`), then drive the phone's Chrome/app.
 
 ## Installing apps on phones — on-device only
 
@@ -292,8 +285,7 @@ execute-JS-in-Chrome (CDP), terminate.
   2026-08-18). PAYG $0.45/GB, SOCKS5, product `sdc` (Shared Datacenter). Get a ready proxy string
   from the Public API: `GET https://api.evomi.com/public/generate?product=sdc&protocol=socks5&countries=US`
   with `apikey=$EVOMI_API` (or header `x-apikey`). SOCKS5 endpoint **`dcp.evomi.com:2002`**; creds
-  come back as `user:pass_country-XX_session-…`. **`EVOMI_API` is not yet a session env var** — ask
-  Deyao to add it for next session; this session it's cached at `scratchpad/evomi_key`.
+  come back as `user:pass_country-XX_session-…`. Key: env var `EVOMI_API`.
 - **Tier 2 — residential/mobile only when we really need it: IPRoyal** (skill: `iproyal`). Mint a
   fresh sub-user each time (see skill); residential SOCKS5 `geo.iproyal.com:32325`.
 
@@ -331,7 +323,7 @@ map (or main visual) on the left with the cards/text in a scrolling column on th
 right; for text pages, a comfortable max-width column, not a full-bleed line. Never
 ship a "wide but short" map strip on desktop. Verify BOTH viewports before sending
 the link: screenshot the deployed page at a phone size (~390 px) AND a desktop size
-(~1600 px) through Browserbase (see lessons/33 for the screenshot mechanics).
+(~1600 px) with ScrapingBee's screenshot API (`screenshot=true`, `window_width=…`).
 
 ## Cloudflare tunnel + local HTML content / private data drops
 
@@ -390,8 +382,9 @@ expires before you react). Instead put a **button** on the tunnel page: I click 
 and the server performs the action **just before** the capture (regenerate the QR /
 refresh) then returns the fresh image, all in that one request. You are NOT in the
 loop between button-click → action → capture → display. Reusable server:
-`scripts/tunnel-live-capture.js --session <bb_session.json> --port 8900` — holds a
-persistent Playwright/CDP connection to a Browserbase session, serves a buttons page
+`scripts/tunnel-live-capture.js --session <cdp_session.json> --port 8900` — holds a
+persistent Playwright/CDP connection to a browser (any CDP endpoint, e.g. a mobilerun cloud
+phone's Chrome), serves a buttons page
 (`New QR` = reload+re-activate the QR tab then screenshot the QR; `Refresh view` =
 screenshot current state), and clips to the QR via `#qrlogin_img` (for QQ). Point the
 tunnel at it with `TUNNEL_TARGET=http://127.0.0.1:8900 node cf-tunnel/agent.js`. Adapt
@@ -399,15 +392,14 @@ the action/clip per site for other latency-sensitive captures.
 
 **Interactive INSTANT-REPLAY relay for captchas/drags I solve by hand (Deyao,
 2026-09-09, refined 2026-09-10).** Standing rule: whenever a captcha/interaction has to
-be solved by ME (a slider/drag like Tencent TCaptcha `drag_ele`, which Browserbase's
-solver and 2captcha can't do), don't auto-solve and don't hand me the Browserbase live
-view (it doesn't render on a phone). Relay it to my phone with **real-time instant
+be solved by ME (a slider/drag like Tencent TCaptcha `drag_ele`, which 2captcha can't
+do), don't auto-solve. Relay it to my phone with **real-time instant
 replay** — a **button** raises the captcha (the triggering action = a button), the
 captcha region streams to my phone, and as I **drag with my finger** each move is
 dispatched to the browser IMMEDIATELY (CDP `Input.dispatchMouseEvent` down/move…/up)
 while frames stream back so I watch the puzzle piece move and align it live. Replaying my
 REAL finger movement in real time is what both passes Tencent's bot-detection AND lets me
-aim. Reusable server: `scripts/realtime-captcha-relay.js --session <bb.json> --port <p>
+aim. Reusable server: `scripts/realtime-captcha-relay.js --session <cdp.json> --port <p>
 --phone <num>` (SSE frames = self-scheduling CDP `Page.captureScreenshot` clipped to the
 captcha box; `/input` dispatches each move; `/trigger`+`/box` raise+locate it; `/pass`
 checks for the code field). The older batched `scripts/captcha-relay-server.js` (replays
@@ -418,7 +410,7 @@ blind fail; use the real-time one.
 
 Never wait inside a long foreground Bash loop — you get no turn until it exits and
 cannot react mid-wait. Instead run `scripts/watch-dom.sh` (background DOM watcher
-for `browse` sessions: exits the moment its probe changes, waking you with a turn)
+for a CDP browser session: exits the moment its probe changes, waking you with a turn)
 via `run_in_background`, and ALWAYS arm a `send_later` deadman alarm (~10 min)
 alongside it in case the watcher itself hangs. Details and war stories: lessons.md.
 
@@ -450,9 +442,9 @@ there are several copyable values, send each in its own bare message.
 
 When I ask for a **summary** and/or **transcript** of a YouTube video, this is what I mean:
 
-- **Getting the content:** captions/subtitles first (through Browserbase / ScrapingBee —
-  see lessons.md); only if the video genuinely has none, download the audio and
-  transcribe it (loader.to + audio models via OpenRouter worked before, see lessons.md).
+- **Getting the content:** captions/subtitles first (ScrapingBee — see lessons/14); only
+  if the video genuinely has none, download the audio and transcribe it (loader.to +
+  audio models via OpenRouter worked before, see lessons.md).
 - **Summary** means a structured summary of the video's actual argument and key numbers,
   in fluent prose — and the summary itself gets sent to me on Discord, not just a
   "done" ping.
@@ -471,9 +463,8 @@ this is what I mean:
 
 - **Get frames at the highest resolution the video actually has** (check the watch page's
   format list — never settle for 720p without checking). Downloading the file via loader.to
-  tops out below 4K; for true 4K, screenshot the YouTube player itself at 2160p through the
-  logged-in Browserbase session (seek → pause → element screenshot). Mechanics and pitfalls
-  for both paths are in lessons.md.
+  tops out below 4K; true 4K needs a real logged-in browser (claude-in-chrome on the Mac:
+  seek → pause → element screenshot at 2160p). Mechanics and pitfalls are in lessons.md.
 - **Coarse pass:** extract frames at **1-second intervals** across the content (skip
   intros/sponsor segments — use the captions' timestamps to find segment boundaries), and
   review them as tiled contact sheets to locate the interesting moments.
@@ -515,9 +506,9 @@ Upload into that directory:
    **NEVER use base64 (`base64Content` or the `base64` CLI) on transcripts or
    artefacts — the permission classifier ALWAYS blocks base64-encoding as
    exfiltration-shaped. Don't retry it.**
-2. **Any artefacts generated by tool use**: Browserbase session recordings,
+2. **Any artefacts generated by tool use**: browser/phone session recordings,
    screenshots, downloaded/generated files, reports. If an artefact can't be
-   fetched/uploaded, list its location/URL (e.g. the Browserbase
+   fetched/uploaded, list its location/URL (e.g. the mobilerun device /
    session/recording ID) in the record file.
 3. **A structured, human-readable record of the task** (markdown or text file):
    a chronicle of the actions taken (what was done, in order, with outcomes),
@@ -587,7 +578,6 @@ up in the Claude phone app. Isolated microVM per session (install tools freely).
 ## Other files
 
 @lobster.md
-@browserbase.md
 @lessons.md
 
 ## Customer service chats — humans only

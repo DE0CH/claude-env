@@ -31,7 +31,7 @@ apt-get update -y
 apt-get install -y --no-install-recommends \
   ca-certificates curl git tmux openssl unzip jq ripgrep ffmpeg \
   python3 python3-pip python3-venv build-essential
-# Node.js (for the repo's JS tooling: cf-tunnel, archive-dump, browserbase CLI, etc.)
+# Node.js (for the repo's JS tooling: cf-tunnel, Playwright/CDP scripts, etc.)
 curl -fsSL https://deb.nodesource.com/setup_22.x | bash - || true
 apt-get install -y nodejs || true
 python3 -m pip install --break-system-packages --quiet boto3 requests || \

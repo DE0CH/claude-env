@@ -19,5 +19,5 @@
   `/2fa` (`#_auth_code`), fronted by a "Heray" proof-of-work check that can eat the
   first 2FA submit (bounces back to /2fa with no error) — resubmitting the same
   code worked. Console SSO (console.hetzner.com) follows from the accounts login.
-  (There is no longer a shared logged-in Browserbase context — expect to log in
-  fresh via the accounts.hetzner.com email-OTP flow above each time.)
+  (There is no shared logged-in browser context — expect to log in fresh via the
+  accounts.hetzner.com email-OTP flow above each time.)

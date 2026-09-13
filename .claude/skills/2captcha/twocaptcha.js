@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // Raw 2Captcha API v2 client (createTask / getTaskResult / getBalance).
 // Tool-agnostic: no browser dependency. Used directly for "I already have the
-// sitekey" solves, and imported by bb-solve.js for the Browserbase flow.
+// sitekey" solves, and imported by Playwright/CDP driver scripts that inject the
+// token into a live page (pattern in SKILL.md).
 //
 // Auth: env var TWOCAPTCHA_API (the 2Captcha API key). Endpoints are the JSON
 // v2 API at api.2captcha.com — NOT the legacy in.php/res.php.
@@ -116,7 +117,7 @@ async function solve(task, opts = {}) {
 
 // Cloudflare Turnstile. For a standalone widget pass only url+sitekey. For a
 // Cloudflare *Challenge* page, also pass action/data/pagedata/userAgent grabbed
-// by intercepting turnstile.render (see bb-solve.js). Add a `proxy` object
+// by intercepting turnstile.render (see SKILL.md). Add a `proxy` object
 // { type, address, port, login, password } to use TurnstileTask (proxied).
 function turnstileTask({ url, sitekey, action, data, pagedata, userAgent, proxy }) {
   const task = { type: 'TurnstileTaskProxyless', websiteURL: url, websiteKey: sitekey };

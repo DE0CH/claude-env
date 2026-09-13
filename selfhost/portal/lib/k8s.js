@@ -56,6 +56,10 @@ module.exports = {
     return call("PATCH", nsPath(resource, manifest.metadata.name) + "?fieldManager=portal&force=true",
       manifest, { contentType: "application/apply-patch+yaml" });
   },
+  // JSON merge-patch: needed to REMOVE keys (null) that another field manager (Flux) still
+  // owns — a server-side apply that merely omits them leaves them in place until Flux syncs.
+  mergePatch: (resource, name, patch) =>
+    call("PATCH", nsPath(resource, name), patch, { contentType: "application/merge-patch+json" }),
   delete: (resource, name) => call("DELETE", nsPath(resource, name), null, { allow404: true }),
   // convenience: Secret .data (base64 on the wire) -> plain strings
   decodeData: (data) => Object.fromEntries(Object.entries(data || {}).map(([k, v]) => [k, Buffer.from(v, "base64").toString("utf8")])),

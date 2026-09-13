@@ -5,7 +5,8 @@
  * WHY: when Deyao needs a latency-sensitive screenshot (a QR code that expires,
  * a live page state), Claude driving the screenshot by hand is too slow — the QR
  * expires before the round-trip completes. Instead, this server holds a persistent
- * Playwright/CDP connection to a Browserbase session and exposes an HTML page with
+ * Playwright/CDP connection to a browser (any CDP endpoint, e.g. a mobilerun cloud
+ * phone's Chrome, or claude-in-chrome on the Mac) and exposes an HTML page with
  * BUTTONS. Deyao clicks a button; the server performs the action (e.g. regenerate
  * the QR) and returns a fresh PNG in the same request. Claude is NOT in the loop
  * between click -> action -> capture -> display.
@@ -13,7 +14,7 @@
  * Point the cf-tunnel at this server's port (TUNNEL_TARGET=http://127.0.0.1:<port>).
  *
  * Env / args:
- *   --session <path>   JSON file with a Browserbase session {connectUrl,...} (required)
+ *   --session <path>   JSON file {connectUrl: "<CDP websocket URL>", ...} (required)
  *   --port <n>         listen port (default 8900)
  *
  * Endpoints:
@@ -32,7 +33,7 @@ function arg(name, def) {
   const i = process.argv.indexOf(name);
   return i >= 0 ? process.argv[i + 1] : def;
 }
-const SESSION_PATH = arg("--session", "/tmp/claude-0/bb_session.json");
+const SESSION_PATH = arg("--session", "/tmp/claude-0/cdp_session.json");
 const PORT = parseInt(arg("--port", "8900"), 10);
 
 let browser = null, page = null, connecting = null;

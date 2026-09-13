@@ -13,7 +13,7 @@ allowed-tools: Bash
 
 # Exa search via OpenRouter
 
-**This is the default web-search tool.** Prefer it over Browserbase/ScrapingBee
+**This is the default web-search tool.** Prefer it over ScrapingBee
 "type into Google" flows — those are slow and only return SERP links. Exa returns
 semantically-ranked results *with the extracted page content inline*, so one call
 gives you both the URLs and the text to read.
@@ -56,7 +56,7 @@ Examples:
 
 Pick a specific result and read its `.content` field — it's already clean text,
 no scraping needed. If you need the *full* page (content is truncated) fetch that
-one URL with Browserbase/ScrapingBee.
+one URL with `exa contents` or ScrapingBee.
 
 ## Raw curl (search-only)
 
@@ -107,4 +107,3 @@ curl -s https://openrouter.ai/api/v1/chat/completions \
 - **Direct Exa API** (`api.exa.ai/search`) if we ever get a native Exa key — richer
   params (autoprompt, category filters, date ranges, `/contents`, `/answer`).
 - **ScrapingBee Google Search API** (`scrapingbee` skill) — real SERP links.
-- **Browserbase Search API** — slowest; last resort.

@@ -4,11 +4,13 @@
  *
  * Deyao taps a button to TRIGGER the captcha (the action that raises it), the slider
  * is screenshotted to his phone, he DRAGS it with his finger, and his exact drag
- * trajectory is replayed onto the Browserbase page over CDP mouse events — with no
+ * trajectory is replayed onto the live browser page over CDP mouse events — with no
  * LLM turn in the loop. Replaying his real human trajectory is what beats Tencent's
- * bot-detection. Reached via a cf-tunnel agent pointed at this port.
+ * bot-detection. Reached via a cf-tunnel agent pointed at this port. The browser is
+ * any CDP endpoint (e.g. a mobilerun cloud phone's Chrome, or claude-in-chrome on
+ * the Mac); the session JSON just needs {connectUrl: "<CDP websocket URL>"}.
  *
- *   node scripts/captcha-relay-server.js --session <bb_session.json> --port 8901
+ *   node scripts/captcha-relay-server.js --session <cdp_session.json> --port 8901
  */
 const { execSync } = require("node:child_process");
 module.paths.push(execSync("npm root -g").toString().trim());
@@ -160,7 +162,7 @@ async function trigger(re){
  }catch(e){ $('m').textContent='出错: '+e.message; }
  tb.disabled=rb.disabled=false;
 }
-function toPage(ev){ // touch/mouse point on the image -> page coords on the browserbase viewport
+function toPage(ev){ // touch/mouse point on the image -> page coords on the remote browser viewport
  const im=wrap.querySelector('img'); const r=im.getBoundingClientRect();
  const cx=(ev.touches?ev.touches[0].clientX:ev.clientX)-r.left;
  const cy=(ev.touches?ev.touches[0].clientY:ev.clientY)-r.top;

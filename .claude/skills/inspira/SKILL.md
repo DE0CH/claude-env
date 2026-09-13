@@ -1,7 +1,7 @@
 ---
 name: inspira
-description: "Drive the UN Inspira recruitment portal (inspira.un.org, PeopleSoft) with Playwright over a Browserbase session — log in, open/resume a job application draft, walk the 7-step application wizard, fill fields/modals (work experience, references, education with institution lookup, languages), and read every page's fields. Use whenever a task involves inspira.un.org, UN job/internship applications, or careers.un.org postings."
-compatibility: "Needs Browserbase (browse CLI + playwright via NODE_PATH=$(npm root -g)). Login requires the user's Inspira User ID + password (collect via cf-tunnel drop)."
+description: "Drive the UN Inspira recruitment portal (inspira.un.org, PeopleSoft) with Playwright over CDP (any CDP endpoint — a mobilerun cloud phone's Chrome, or claude-in-chrome on the Mac) — log in, open/resume a job application draft, walk the 7-step application wizard, fill fields/modals (work experience, references, education with institution lookup, languages), and read every page's fields. Use whenever a task involves inspira.un.org, UN job/internship applications, or careers.un.org postings."
+compatibility: "Needs a CDP-reachable Chrome (mobilerun cloud phone or claude-in-chrome) + playwright via NODE_PATH=$(npm root -g). Login requires the user's Inspira User ID + password (collect via cf-tunnel drop)."
 ---
 
 # UN Inspira (PeopleSoft) automation

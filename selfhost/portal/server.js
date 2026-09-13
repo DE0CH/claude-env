@@ -257,8 +257,12 @@ app.get("/api/sessions/:id/changes", async (req, res) => {
     res.json({ checked: true, repos, status: (reg && reg.status) || "" });
   } catch (e) { res.json({ checked: false, reason: e.message, repos: [] }); }
 });
-// live terminal (tmux mirror) — see lib/tty.js
+// live terminal (tmux mirror) — see lib/tty.js. The dashboard polls /frame (SSE doesn't
+// survive the cf-tunnel's WS relay); the SSE stream stays for direct/in-cluster clients.
 app.get("/api/sessions/:id/tty", (req, res) => { tty.stream(req.params.id, res); });
+app.get("/api/sessions/:id/tty/frame", async (req, res) => {
+  try { res.json(await tty.snapshot(req.params.id)); } catch (e) { res.status(500).json({ error: e.message }); }
+});
 app.post("/api/sessions/:id/tty/input", async (req, res) => {
   try { await tty.input(req.params.id, req.body || {}); res.json({ ok: true }); }
   catch (e) { res.status(500).json({ error: e.message }); }

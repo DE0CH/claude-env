@@ -12,9 +12,10 @@ ScrapingBee (quota out) and with tianyancha/qcc/qichamao all login-walled.
   `null([...])` — strip the `null(`…`)` wrapper, then it's a JSON array whose element
   with `listInfo.content[]` holds `{publishDate, disclosureTitle, destFilePath}`.
   Works for **delisted** companies too (双翼 836301, delisted 2021-02, still had 243 rows).
-- **The Browserbase Fetch API gets 403 on the PDFs** (`/disclosure/YYYY/…pdf`) and the
-  direct company page (`/nq/detailcompany.html?companyCode=`) 404s. What works: a
-  Browserbase browser session, `page.goto('https://www.neeq.com.cn/')`, then run the
+- **Cookie-less fetches get 403 on the PDFs** (`/disclosure/YYYY/…pdf`) and the
+  direct company page (`/nq/detailcompany.html?companyCode=`) 404s. What works: a real
+  browser tab over CDP (mobilerun phone's Chrome / claude-in-chrome),
+  `page.goto('https://www.neeq.com.cn/')`, then run the
   POST and the PDF downloads **inside the page** with `fetch(url,{credentials:'include'})`
   and return `Array.from(new Uint8Array(await r.arrayBuffer()))` from `page.evaluate`
   (a few hundred KB per PDF is fine; avoids base64, which the permission classifier
@@ -25,13 +26,13 @@ ScrapingBee (quota out) and with tianyancha/qcc/qichamao all login-walled.
 
 ## Wuhan land auction results (zrzyhgh.wuhan.gov.cn 土地交易市场 → 成交信息)
 
-- Listing pages `…/tdjysc/cjxx/index_N.shtml` are static and **Browserbase-Fetch-able**
-  (the detail pages too). Pagination ≈ 4–5 pages/year: index_30 ≈ 2022, index_40 ≈ 2019,
+- Listing pages `…/tdjysc/cjxx/index_N.shtml` are static — **a plain non-browser fetch
+  works** (the detail pages too; ScrapingBee `render_js=false` = 1 credit each). Pagination ≈ 4–5 pages/year: index_30 ≈ 2022, index_40 ≈ 2019,
   index_50 ≈ 2018, index_60 ≈ 2017, index_70 ≈ 2016. Each listing links to
   "20XX年第N号公告成交信息表" and separate "…工业用地网挂公告成交信息表" pages that
   carry the 竞得人 / 土地位置 / 面积 / 成交价 table. Parse `<a href>` inner HTML (title
   text is nested/whitespace-padded), then fetch each detail page — 3 parallel workers,
-  ~100 pages in ~2 min. Driving the same pages through a Browserbase tab was ~10×
+  ~100 pages in ~2 min. Driving the same pages through a browser tab was ~10×
   slower.
 
 ## Tooling gotchas hit on the way
@@ -40,11 +41,11 @@ ScrapingBee (quota out) and with tianyancha/qcc/qichamao all login-walled.
   `pypdf` and `pdfminer.six` down with it → `pip install cffi pymupdf` and use pymupdf.
 - `pkill -f "node land.js"` killed the calling shell (pattern matched its own command
   line, exit 144). Use `pkill -f "[n]ode land.js"` (lesson 34's self-kill trap, again).
-- Browserbase Fetch returns binary bodies (PDF, GBK HTML) base64-encoded in `content`;
+- When a fetch proxy returns binary bodies (PDF, GBK HTML) base64-encoded in its JSON,
   decode locally (`base64.b64decode` on a response body is fine — the classifier rule is
   about *encoding* transcripts/artefacts).
-- Exa's crawler reads `m.qcc.com/firm/<KeyNo>.html` pages that block the Fetch API and
-  the bare tab — `exa contents <url>` returned shareholder tables for 上海博达; but qcc
+- Exa's crawler reads `m.qcc.com/firm/<KeyNo>.html` pages that block plain fetches and
+  a bare browser tab — `exa contents <url>` returned shareholder tables for 上海博达; but qcc
   serves a login wall for some firms (双翼科技), and qichamao/tianyancha search pages are
   login-walled everywhere.
 

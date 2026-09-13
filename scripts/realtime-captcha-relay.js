@@ -6,8 +6,10 @@
  * region, streamed to the phone over SSE (~3-5 fps, small frames). Each finger move
  * is dispatched to the browser IMMEDIATELY via Input.dispatchMouseEvent, so the
  * puzzle piece moves as Deyao drags and he aligns it live. No LLM turn in the loop.
+ * The browser is any CDP endpoint (e.g. a mobilerun cloud phone's Chrome, or
+ * claude-in-chrome on the Mac); the session JSON just needs {connectUrl: "<CDP ws URL>"}.
  *
- *   node scripts/realtime-captcha-relay.js --session <bb.json> --port 8902 --phone <num>
+ *   node scripts/realtime-captcha-relay.js --session <cdp_session.json> --port 8902 --phone <num>
  */
 const { execSync } = require("node:child_process");
 module.paths.push(execSync("npm root -g").toString().trim());

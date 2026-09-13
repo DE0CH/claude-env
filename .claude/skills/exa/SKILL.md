@@ -8,7 +8,7 @@ description: >
   extracted page content WITH the search (research/RAG over many pages), semantic
   matching / find-similar, /contents on known URLs, or when the SerpApi quota is
   exhausted. Richer than the OpenRouter route (autoprompt, filters, /answer,
-  /contents, /findSimilar). Prefer over Browserbase/ScrapingBee "type into Google"
+  /contents, /findSimilar). Prefer over ScrapingBee "type into Google"
   flows.
 allowed-tools: Bash
 ---

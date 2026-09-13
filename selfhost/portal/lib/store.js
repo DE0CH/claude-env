@@ -40,14 +40,19 @@ async function setEnvironment(rawName, merge) {
   const name = envName(rawName);
   const cur = (await get()).environments[name];
   const secrets = { ...((cur && cur.secrets) || {}) };
+  const removed = [];
   for (const [k, v] of Object.entries(merge || {})) {
     if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(k)) throw new Error(`bad key '${k}'`);
-    if (v === "") delete secrets[k]; else secrets[k] = String(v);
+    if (v === "") { if (k in secrets) removed.push(k); delete secrets[k]; } else secrets[k] = String(v);
   }
   const m = envManifest(name, secrets);
   await git.transaction(`portal: environment ${name}`, () =>
     git.writeEncryptedSecret(`${git.SECRETS_DIR}/env-${name}.sops.yaml`, m));
   await k8s.apply(m);
+  // Flux co-owns the live Secret's fields, so dropped keys must be removed explicitly
+  if (removed.length && cur) {
+    await k8s.mergePatch("secrets", `env-${name}`, { data: Object.fromEntries(removed.map((k) => [k, null])) });
+  }
 }
 async function deleteEnvironment(rawName) {
   const name = envName(rawName);

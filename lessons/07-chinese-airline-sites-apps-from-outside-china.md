@@ -2,8 +2,9 @@
 
 - **Mainland ZH domains are unreachable from every non-China vantage point tried**:
   `www.shenzhenair.com` and the `res.shenzhenair.com` CDN time out from the container,
-  from Browserbase (datacenter AND GB residential proxy), and from a US MobileNext
-  device alike. Only `global.shenzhenair.com` (intl site) is reachable.
+  from US datacenter AND GB residential exits, and from a US MobileNext
+  device alike. Only `global.shenzhenair.com` (intl site) is reachable (ScrapingBee's
+  premium CN exit is the one non-China route that reaches the mainland site — lesson 30).
 - The intl site's guest "Seat selection check-in" form always pops a **member login
   modal** on submit (6-digit password). Its "Forget your password" flow is
   **security-question based** (step 1 = mobile/doc + DOB + image captcha) — there is
@@ -20,11 +21,12 @@
   developer-signed APK comes from `imtt.dd.qq.com` (official Tencent store CDN; the
   page shows an 官方 badge and the developer name to sanity-check). The same CDN
   **connection-resets curl from the container**, but the device downloads it fine.
-- **Agent-side APK fetching (curl or the Browserbase downloads API) gets blocked by
+- **Agent-side APK fetching (curl or any remote-browser download API) gets blocked by
   the permission classifier** even after user approval in chat. The right move (per
   Deyao) is to "click through the phone": drive the device's own browser/store UI to
   download and install, so no binary ever touches the agent host.
 - `sj.qq.com` (应用宝 web) is reachable from the container for app metadata, but its
   desktop pages only offer QR codes — `a.app.qq.com/o/simple.jsp?pkgname=` is the
-  direct mobile page. Clicking its download button with `browse network on` captures
-  the real `imtt.dd.qq.com` URL from the beacon params if it's ever needed.
+  direct mobile page. Clicking its download button with network capture on (CDP
+  `Network` domain / Playwright request events) captures the real `imtt.dd.qq.com` URL
+  from the beacon params if it's ever needed.

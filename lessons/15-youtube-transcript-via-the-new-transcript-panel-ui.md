@@ -1,7 +1,7 @@
 ## YouTube transcript via the NEW transcript panel UI (2026-08-28, `WtlGB-YVLOg`)
 
-The logged-in Browserbase watch-page route still works, but two sub-paths died and the
-DOM changed:
+The logged-in watch-page route (lesson 14: a YouTube-signed-in browser driven over CDP)
+still works, but two sub-paths died and the DOM changed:
 
 - **Timedtext `baseUrl` fetches now return 0 bytes** even from inside the logged-in page
   (POT-token wall extends to the web client's own caption URLs), and a hand-rolled

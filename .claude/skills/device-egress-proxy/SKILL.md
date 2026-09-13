@@ -1,6 +1,6 @@
 ---
 name: device-egress-proxy
-description: Route a remote mobile device's traffic through a proxy (Evomi datacenter Tier-1 or IPRoyal residential Tier-2) and verify/rate the egress IP. Use when a task needs a phone (Android/iOS) to browse from a proxied IP, or asks to check a proxy exit IP's reputation. Covers mobilerun (preferred — whole-device SOCKS5 with auth, no whitelisting), MobileNext (fallback, IP-whitelisting), and ping0.cc reputation lookup via Browserbase.
+description: Route a remote mobile device's traffic through a proxy (Evomi datacenter Tier-1 or IPRoyal residential Tier-2) and verify/rate the egress IP. Use when a task needs a phone (Android/iOS) to browse from a proxied IP, or asks to check a proxy exit IP's reputation. Covers mobilerun (preferred — whole-device SOCKS5 with auth, no whitelisting), MobileNext (fallback, IP-whitelisting), and ping0.cc reputation lookup via ScrapingBee.
 ---
 
 # Device egress proxy (mobile → residential IP → reputation)
@@ -74,14 +74,17 @@ curl -s -X DELETE "https://resi-api.iproyal.com/v1/residential-users/$HASH/white
   (`POST /v1/residential-subusers {username,password,traffic:0.1}`; password ≤16 chars), enter
   them in iOS Wi-Fi proxy Username/Password, delete the sub-user after.
 
-## Reputation check — ping0.cc via Browserbase (NOT IPRoyal)
-Check the exit IP's reputation on its own, off IPRoyal (conserve data). ping0.cc is JS-rendered
-+ bot-protected, so the Fetch API returns empty — use a remote browser session:
+## Reputation check — ping0.cc via ScrapingBee (NOT IPRoyal)
+Check the exit IP's reputation on its own, off IPRoyal (conserve data) — never through the
+proxy under test. ping0.cc is JS-rendered + bot-protected, so a plain fetch returns empty —
+use ScrapingBee with JS rendering and its screenshot API (`scrapingbee` skill; escalate to
+`premium_proxy=true` if the page comes back blank):
 ```bash
-browse open "https://ping0.cc/ip/<exit-ip>" --remote
-browse wait load networkidle --timeout 45000
-browse screenshot --path ping0.png     # read the rows from the screenshot (it's a Chinese page)
-browse stop
+curl -s --get 'https://app.scrapingbee.com/api/v1/' \
+  --header "Authorization: Bearer $SCRAPINGBEE_TOKEN" \
+  --data-urlencode "url=https://ping0.cc/ip/<exit-ip>" \
+  -d render_js=true -d wait=5000 -d screenshot=true -o ping0.png
+# read the rows from the screenshot (it's a Chinese page); or drop screenshot=true to get the HTML
 ```
 Key rows: 位置 (location), ASN/所有者, **IP 类型** (家庭宽带=residential / IDC=datacenter),
 **风控值** (risk %; 极度纯净 = very clean), **原生 IP** (native vs secondary), **共享人数**

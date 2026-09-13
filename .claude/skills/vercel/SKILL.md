@@ -73,13 +73,14 @@ username `de0ch`.
 
 Login is email-OTP and fully self-serviceable:
 
-1. Browserbase session with `--persist` (there is no longer a shared logged-in
-   context — assume you are logged out and log in fresh via email-OTP below).
+1. Open a browser you can drive over CDP — claude-in-chrome on the Mac, or a
+   mobilerun cloud phone's Chrome (there is no shared logged-in context —
+   assume you are logged out and log in fresh via email-OTP below).
 2. vercel.com/login → enter `chendeyao000@gmail.com` → "Continue with Email".
 3. The 6-digit code lands in Gmail (the Gmail MCP connector IS this account):
    `search_threads` query `from:system@vercel.com subject:code newer_than:1d`.
-   Match the email's stated login location to your egress (e.g. "Boardman, United
-   States" = AWS us-west-2 / Browserbase) and take the newest.
+   Match the email's stated login location to your browser's egress IP (the
+   proxy country on a mobilerun device, or the Mac's location) and take the newest.
 4. Code goes in a single plain input (not per-digit boxes).
 5. Tokens page: `vercel.com/account/settings/tokens` — inline form (name, scope
    combobox: "de0ch's projects" or "Full Account", expiration select). The token
@@ -89,13 +90,7 @@ Login is email-OTP and fully self-serviceable:
 
 ## Pitfalls (2026-08-18)
 
-- **Don't drive long login flows through the `browse` daemon's auto-created
-  sessions**: bare `browse open --remote` (and `--session <id>` — that names a
-  LOCAL daemon session, it does NOT attach to an existing Browserbase session id)
-  auto-creates a Browserbase session with the ~5-min default timeout and no
-  context. It times out mid-flow and loses login + any shown-once dialog.
-  Create the session explicitly (`browse cloud sessions create --context-id … --persist
-  --keep-alive --timeout 3600`+) and drive it with Playwright over its `connectUrl`.
-- The classifier blocked `browse cloud sessions update <id>` for release; the
-  plain REST call works: `POST /v1/sessions/<id>` with
-  `{"projectId":…,"status":"REQUEST_RELEASE"}`.
+- **Don't drive the login flow through a short-lived browser**: the OTP
+  round-trip and the shown-once "Token Created" dialog need one persistent page.
+  Keep a single long-lived CDP connection (Playwright `connectOverCDP` to the
+  device/Mac Chrome) for the whole flow, and extract the token in that same page.

@@ -9,8 +9,9 @@ allowed-tools: Bash
 
 **Quota policy (Deyao, 2026-08-26):** free plan, 1000 calls/month, and he will NOT
 recharge/upgrade (no pay-as-you-go). If you get `{"message":"Monthly API calls limit
-reached"}`, do NOT ping him about it — fall back silently (Browserbase for
-fetches/screenshots, exa for page content) and mention ScrapingBee only if a task
+reached"}`, do NOT ping him about it — fall back silently (`exa contents` for page
+content; a CDP browser — claude-in-chrome on the Mac or a mobilerun cloud phone's
+Chrome — for screenshots) and mention ScrapingBee only if a task
 genuinely has no alternative. Quota was exhausted on 2026-08-26; it resets monthly.
 
 ScrapingBee is an HTTP API for fetching web pages — it handles headless browsers, proxies, and anti-bot measures server-side. Everything is a single `curl` call; no SDK or browser install needed.

@@ -26,8 +26,8 @@ worked fine for us but `*.vercel.app` is GFW-blocked for her. Ended up on
 - `pip install oss2` fails to build (crcmod) on the pods; use the ossutil binary instead.
 
 ## Supabase gotchas
-- The dashboard login is behind an **hCaptcha the Browserbase solver can't clear** — sign-in
-  hangs on "Signing in…" forever. Don't fight it: ask for a **Personal Access Token** and use
+- The dashboard login is behind an **hCaptcha that automated solving did not get past** —
+  sign-in hangs on "Signing in…" forever. Don't fight it: ask for a **Personal Access Token** and use
   the Management API (create project, `database/query` for DDL, `config/auth` for redirect
   URLs, `api-keys` for anon/service_role).
 - **The Management API 403s Python urllib's default User-Agent** (curl works). Set a curl-like

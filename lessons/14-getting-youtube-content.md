@@ -4,10 +4,11 @@ Goal was: transcript if it exists, otherwise audio → Whisper. What actually wo
 
 ### What worked
 
-- **Watch page via Browserbase:** the persistent context is logged into YouTube — a
-  context-backed session gets `playabilityStatus: OK` on videos that bot-wall anonymous
-  sessions, and caption tracks/timedtext can be fetched from inside the page. Try this
-  first (see browserbase.md). Caveat: this covers page data and transcripts only —
+- **Watch page in a logged-in browser:** a browser signed in to YouTube (claude-in-chrome
+  on the Mac, or a mobilerun cloud phone's Chrome after logging in, driven over CDP) gets
+  `playabilityStatus: OK` on videos that bot-wall anonymous sessions, and the transcript
+  panel can be read from inside the page (lesson 15). Try this first. Caveat: this covers
+  page data and transcripts only —
   `streamingData` is still SABR-only (no `url`, no `signatureCipher` on any format), and
   non-web InnerTube clients (IOS, ANDROID_VR, TVHTML5, MWEB, *_EMBEDDED_PLAYER) still
   return `LOGIN_REQUIRED`/`ERROR` even from the logged-in session, so audio/video files
@@ -37,20 +38,8 @@ Goal was: transcript if it exists, otherwise audio → Whisper. What actually wo
 
 ### What didn't work (don't retry these first)
 
-- **Browserbase `--verified`** is paid/Enterprise-gated on the current plan.
-  **Browserbase HAS built-in captcha solving — use it FIRST** (Deyao, 2026-08-19):
-  create the session with `browserSettings: {solveCaptchas: true}` and wait on the
-  solver's own signal — it logs `browserbase-solving-started` /
-  `browserbase-solving-finished` to the page console (Playwright `page.on('console')`);
-  keep a page-text poll as fallback. Verified working on archive.today's "One more step"
-  interstitial (a session without it hit the wall; with it, sailed straight through).
-  Reach for residential proxies only after the built-in solver fails. Known limit:
-  it did **not** solve Cloudflare Turnstile on cobalt.tools (tested 2026-08).
-  **Proxies now work** (2026-08-15): geolocated proxy sessions
-  (e.g. GB/London, residential exit IP) create fine via the `proxies` array in
-  the session body — see browserbase.md for the working invocation.
 - **Non-web InnerTube clients** (IOS, ANDROID_VR, TVHTML5, MWEB, embedded players):
-  `LOGIN_REQUIRED`/`ERROR` from every vantage point tried — Browserbase logged-in session,
+  `LOGIN_REQUIRED`/`ERROR` from every vantage point tried — logged-in browser session,
   ScrapingBee residential IP (js_scenario evaluate), with or without visitorData. YouTube
   wants PO-token/attestation for non-web clients. The web client is SABR-only everywhere:
   no `url`, no `signatureCipher` in any format.
@@ -69,7 +58,7 @@ Goal was: transcript if it exists, otherwise audio → Whisper. What actually wo
   `evaluate_results`) is a workable way to run arbitrary JS (incl. same-origin `fetch`
   POSTs) on a page from a residential IP — the YouTube failure above was YouTube-specific,
   not a technique failure.
-- Browserbase Fetch API returns markdown (not raw HTML) for HTML pages — useless for
-  script-embedded JSON like `ytInitialPlayerResponse`; use ScrapingBee for raw HTML.
+- Never use a fetcher's markdown conversion for HTML pages — it drops script-embedded
+  JSON like `ytInitialPlayerResponse`; fetch raw HTML (ScrapingBee) instead.
 - Discord API returns 403 for python `urllib` requests (user-agent filtering); the
   documented `curl` invocation in lobster.md works — don't switch it to urllib.

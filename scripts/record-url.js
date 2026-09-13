@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Self-hosted "session recorder": point a headless Chromium at a live monitoring
 // URL (e.g. a mobilerun / MobileNext device live view) and record whatever the
-// page shows to a .webm video file, so we get a Browserbase-style run recording
+// page shows to a .webm video file, so we get a run recording of the session
 // without depending on the device vendor's opt-in recording API.
 //
 // Aspect ratio: by default it probes the page for the device's media element

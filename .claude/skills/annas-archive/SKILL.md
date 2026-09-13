@@ -75,8 +75,9 @@ and it matches the egress-gateway notes in `lessons.md`.
 
 - **Where it works:** any environment without a TLS-MITM gateway — in particular Deyao's Mac (the
   proven setup; the dissertation repo runs the same code there).
-- **In a pod:** if a download is genuinely needed, fall back to fetching through **Browserbase**
-  (repo policy for blocked web content) rather than fighting the gateway. Do not disable TLS
+- **In a pod:** if a download is genuinely needed, fall back to fetching through **ScrapingBee**
+  (`scrapingbee` skill, `render_js=false` for file downloads — capped at 2 MB) rather than
+  fighting the gateway. Do not disable TLS
   verification to get around it.
 
 ## Dependencies

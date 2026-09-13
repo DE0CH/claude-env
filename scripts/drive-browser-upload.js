@@ -1,5 +1,7 @@
-// Upload local files to a Google Drive folder through a Browserbase session (CDP).
-// Usage: CONNECT_URL=wss://... node drive-browser-upload.js <folderId> <file> [file...]
+// Upload local files to a Google Drive folder through a browser driven over CDP —
+// any CDP endpoint (e.g. a mobilerun cloud phone's Chrome, or claude-in-chrome on
+// the Mac) that is signed in to the target Google account.
+// Usage: CONNECT_URL=ws://... node drive-browser-upload.js <folderId> <file> [file...]
 const { chromium } = require('playwright');
 
 const [folderId, ...files] = process.argv.slice(2);

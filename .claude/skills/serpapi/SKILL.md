@@ -21,7 +21,7 @@ knowledge graph, AI overview, related questions — with no browser, no captchas
 
 What it does NOT return: extracted page content. Results are titles/links/snippets.
 When you need the page text, fetch the winning URLs afterwards (exa `contents`,
-ScrapingBee, or Browserbase).
+or ScrapingBee).
 
 ## Auth & quota
 
@@ -99,7 +99,7 @@ each engine has its own page; the JSON keys differ per engine (e.g. `news_result
    over many pages), semantic/neural matching, find-similar, or when the SerpApi
    quota is exhausted. Also `exa contents` to turn SerpApi's winning URLs into text.
 3. **exa-search** (OpenRouter) — if both keys above are unavailable.
-4. Browserbase/ScrapingBee Google flows — last resort only.
+4. ScrapingBee Google Search API — last resort only.
 
 ## Notes / gotchas
 

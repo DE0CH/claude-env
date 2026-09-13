@@ -22,8 +22,9 @@
   `cat` the segments in playlist order, then `-c copy -bsf:a aac_adtstoasc`.
 - **xvideos video downloads**: the player page's `setVideoUrlHigh` mp4 tops out at
   360p; the real max lives in the HLS master (`setVideoHLS`). The tokenized
-  hls-cdn77 URLs from a Browserbase page load work from the container IP too
-  (no IP binding observed), so grab the URL via Browserbase, then curl directly.
+  hls-cdn77 URLs from a browser page load work from the container IP too
+  (no IP binding observed), so grab the URL from the page (a CDP browser, or
+  ScrapingBee with `render_js=true`), then curl directly.
 - **`pkill -f`/`pgrep -f` self-kill trap**: the pattern matches the calling shell's
   own -c command line (exit 144 with no other symptom). Use a bracketed regex
   (`pgrep -f "agent[.]js"`) AND keep the restart (which contains the literal

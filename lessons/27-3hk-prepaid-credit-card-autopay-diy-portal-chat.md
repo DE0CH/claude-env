@@ -10,9 +10,10 @@
   human: whether CS can override, and whether debit cards are accepted.)
 - **The My3 app is the same web app**: spoofing UA `MoAppAndroid` changes nothing about
   the disabled switch — don't burn time on a cloud phone for portal-locked features.
-- **DIY portal "Remember me" login survives in the Browserbase persistent context**: a
-  NEW session on the regular context lands on the dashboard already logged in, NO OTP.
-  Huge for follow-up sessions — just open the dashboard URL and check for "Welcome back".
+- **DIY portal "Remember me" login survives in a persistent browser profile**: reopening
+  the dashboard in the same profile (e.g. claude-in-chrome on the Mac) lands already logged
+  in, NO OTP (cookie lasts ~24h — lesson 29). Huge for follow-up work — just open the
+  dashboard URL and check for "Welcome back".
 - **DIY portal human chat**: the floating anime-girl avatar (`.ichat` draggable, bottom
   right) → "Online Chat" button → `3chatbot.three.com.hk` iframe, input `#chatbox`.
   3iChat (3ichat.three.com.hk) DEFLECTS prepaid customers to FAQ pages — the in-portal

@@ -49,7 +49,8 @@ s3.put_object(Bucket=os.environ['HETZNER_S3_BUCKET'], Key='k', Body=b'...')
 
 ## Creating a bucket / credentials in the Console (browser)
 
-No shared logged-in Browserbase context exists — log in fresh each time
+No shared logged-in browser context exists — log in fresh each time (claude-in-chrome
+on the Mac, or a mobilerun cloud phone's Chrome via CDP)
 (`accounts.hetzner.com`, email-OTP; the "Heray" proof-of-work often eats the first
 username/password AND the first 2FA submit — just resubmit the same values/code; see
 `lessons/18`). Drive with Playwright over CDP (connect to the keep-alive session's

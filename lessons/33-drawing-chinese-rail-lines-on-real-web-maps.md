@@ -22,8 +22,7 @@
   list: T4枢纽/机场东/黄麻布/石岩中心/龙胜/民治北/五和/白坭坑/大运/坪山/聚龙, gov source
   szlhq.gov.cn), and 大鹏支线's 坪山站 wraps the 深大 mainline there.
 - **Verifying a deployed page from a pod**: local Playwright gets ERR_CONNECTION_RESET
-  through the egress gateway even for vercel.app — screenshot through a Browserbase
-  session instead (REST `X-BB-API-Key` + Playwright `connectOverCDP`; the `browse` CLI
-  is NOT installed in web pods, plain REST works; global playwright lives at
-  /opt/node22/lib/node_modules). ScrapingBee screenshots were unavailable: **monthly
-  quota exhausted 2026-08-26 ("Monthly API calls limit reached: 1000")** — Deyao pinged.
+  through the egress gateway even for vercel.app — screenshot it with ScrapingBee's
+  screenshot API instead (`screenshot=true`, `scrapingbee` skill), or via a mobilerun cloud phone's
+  Chrome over CDP when the ScrapingBee quota is out (global playwright lives at
+  /opt/node22/lib/node_modules).

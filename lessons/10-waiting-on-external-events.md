@@ -8,6 +8,7 @@
 - **Always arm a timed deadman alarm alongside any background wait** (`send_later`,
   ~10 min) in case the background task itself hangs; on firing, check the task
   output, the watched resource, and re-arm both if still waiting.
-- Watch DOM text (`browse eval` on the chat iframe's `innerText` length), not
+- Watch DOM text (`scripts/watch-dom.sh` — a JS probe via Playwright `page.evaluate`
+  over the browser's CDP `CONNECT_URL`, e.g. the chat iframe's `innerText` length), not
   accessibility snapshots — snapshot re-renders shuffle refs and produce false
   diffs.

@@ -1,13 +1,14 @@
 ## Uploading files to Google Drive from a container (2026-08)
 
 Working path for /Claude Records transcript+artefact uploads (`scripts/drive-browser-upload.js`):
-drive.google.com in a regular-context Browserbase session, driven over CDP with Playwright.
+drive.google.com in a browser driven over CDP with Playwright (claude-in-chrome on the Mac,
+or a mobilerun cloud phone's Chrome), signed in to a Google account with access to the folder.
 
-- The regular Browserbase context's Google login is **chendeyao.uk@gmail.com**, NOT the
-  chendeyao000@gmail.com account that owns the Drive the MCP connector sees. The Claude
-  Records folder is shared to the .uk account (Editor, granted 2026-08-17) — that's what
-  makes the browser path work. If a Drive page shows "You need access", check which
-  account is signed in before debugging anything else.
+- Check WHICH Google account the browser is signed in as before debugging anything else.
+  The Drive the MCP connector sees belongs to chendeyao000@gmail.com; the Claude Records
+  folder is additionally shared to **chendeyao.uk@gmail.com** (Editor, granted 2026-08-17),
+  so a browser signed in as either account works. If a Drive page shows "You need access",
+  it's the wrong account.
 - Drive web UI upload mechanics: click the New button (`[guidedhelpid="new_menu_button"]`),
   then the menu item — it's `li[role="menuitem"]:has-text("File upload")` (an `li`, and the
   inner span intercepts nothing; clicking the span times out because the `li` intercepts
@@ -17,5 +18,5 @@ drive.google.com in a regular-context Browserbase session, driven over CDP with 
   subfolder's parentId).
 - Playwright's `setFiles` on a CDP-connected remote browser transfers the local file
   content itself — this is the byte-faithful any-size no-base64 upload channel.
-- Don't retype `connectUrl` signing keys by hand (a dropped character = 401): fetch with
-  `browse cloud sessions get <id>` and extract programmatically.
+- Don't retype CDP `connectUrl`s / signing tokens by hand (a dropped character = 401):
+  extract them programmatically from the API response.

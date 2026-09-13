@@ -112,7 +112,7 @@ curl -sS -G -H "Authorization: Bearer $TIKHUB_API" --data-urlencode "note_id=<no
 
 Parsing tip: responses nest differently per platform — walk the JSON recursively for dicts carrying the
 text field (`caption.text` / `text_raw` / `desc`) instead of hard-coding paths. LIHKG is not on TikHub and
-blocks ScrapingBee, Browserbase Fetch and Exa (Cloudflare 403) — use Google-indexed titles/snippets via SerpApi.
+blocks ScrapingBee and Exa (Cloudflare 403) — use Google-indexed titles/snippets via SerpApi.
 
 ## Gotchas
 

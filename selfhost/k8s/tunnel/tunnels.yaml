@@ -62,8 +62,10 @@ spec:
           env:
             - name: TUNNEL_ID
               value: headlamp
+            # the worker strips /t/headlamp before forwarding; Headlamp serves under that
+            # base path (Helm value config.baseURL), so put it back on the target
             - name: TUNNEL_TARGET
-              value: http://headlamp.headlamp.svc.cluster.local:80
+              value: http://headlamp.headlamp.svc.cluster.local:80/t/headlamp
           envFrom:
             - secretRef:
                 name: portal-secrets
