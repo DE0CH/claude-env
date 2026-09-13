@@ -563,9 +563,12 @@ rebuilds it identically.
 
 - Commands (run where `~/.secrets` + `~/.claude` creds live): `selfhost/controller/create.sh`
   / `destroy.sh`; `selfhost/deploy-session-image.sh` to (re)build the session image on Fly.
-- **New env vars this needs (persist in the environment config):** `FLY_API_TOKEN` (Fly org
-  token, mints/kills session machines) and `PORTAL_ENC_KEY` (64-hex; encrypts the S3 config —
-  **if lost, all saved environments are unreadable**). Fly login: `flyctl auth login --email/--password`.
+- **Secrets home = the controller's disk.** `FLY_API_TOKEN` (Fly org token), `PORTAL_ENC_KEY`
+  (64-hex, encrypts the S3 config) and `GITHUB_TOKEN` live in plain `~/.secrets` (mode 600) on
+  the controller (Deyao's decision, 2026-09-13 — do NOT nag him to persist them in the env
+  config). `FLY_API_TOKEN` + `PORTAL_ENC_KEY` are also stored in the `default` environment.
+  To rebuild the controller from another box, copy the controller's `~/.secrets` there first
+  (`create.sh` bundles the runner's `~/.secrets`). Fly login: `flyctl auth login --email/--password`.
 - Cost: controller ~€6.59/mo fixed; Fly sessions ~1–2¢/session-hour. Destroy sessions from
   the dashboard when done (no idle auto-destroy yet). Dashboard rules Deyao set: name chosen
   once at creation and then mirrored from the Claude app; only Destroy (no Start/Stop) with a

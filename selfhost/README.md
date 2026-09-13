@@ -37,7 +37,13 @@ phone ─ Claude app (chat)          ─ dashboard  https://tunnel.deyaochen.com
 | `CF_ACCESS_CLIENT_ID/SECRET` | cf-tunnel agent (already present) |
 | `FLY_API_TOKEN` | create/destroy session machines + build the image |
 | `PORTAL_ENC_KEY` | 64-hex key encrypting the S3 config (generate once) |
+| `GITHUB_TOKEN` | pushing this repo; private-repo clones in sessions |
 | Claude OAuth | `~/.claude/.credentials.json` (bundled at provision) |
+
+These live as a plain `~/.secrets` (mode 600) on the controller — that file is their home.
+`FLY_API_TOKEN` and `PORTAL_ENC_KEY` are additionally kept in the `default` environment. When
+rebuilding the controller from a different machine, copy the controller's `~/.secrets` over
+first, since `create.sh` bundles the `~/.secrets` of the machine it runs on.
 
 ## Bring-up
 
