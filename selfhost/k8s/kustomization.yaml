@@ -16,12 +16,12 @@ resources:
 # (`kustomize edit set image` sorts these entries, so no entry's `name` may equal another's
 # `newName` — a chained rewrite would re-tag the tunnel agent on every portal build).
 images:
+- name: claude-auth-broker
+  newName: ghcr.io/de0ch/claude-portal
+  newTag: sha-af6f28e2056d
 - name: claude-portal
   newName: ghcr.io/de0ch/claude-portal
-  newTag: sha-7cbacc7f5806
+  newTag: sha-af6f28e2056d
 - name: claude-tunnel-agent
   newName: ghcr.io/de0ch/claude-portal
   newTag: sha-3f6e62f88e8d
-- name: claude-auth-broker
-  newName: ghcr.io/de0ch/claude-portal
-  newTag: sha-7cbacc7f5806
