@@ -7,8 +7,9 @@ primary_region = "arn"   # Stockholm — close to the Helsinki controller
 [build]
   dockerfile = "Dockerfile"
 
-# Default guest for on-demand session machines (the portal can override per session).
+# Session machines are sized by the portal per session (SIZES in server.js; default medium =
+# 4 shared vCPU / 4 GB). This block only matters for `fly deploy` itself, which we never run.
 [[vm]]
   cpu_kind = "shared"
-  cpus = 1
-  memory = "1024mb"
+  cpus = 4
+  memory = "4096mb"

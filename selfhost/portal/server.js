@@ -101,6 +101,8 @@ app.get("/api/state", async (req, res) => {
           repos: m.config?.metadata?.repos || "",
           label: m.config?.metadata?.label || "",
           permissionMode: m.config?.metadata?.permissionMode || "",
+          size: m.config?.metadata?.size || "",
+          guest: m.config?.guest ? `${m.config.guest.cpus}×${m.config.guest.cpu_kind} · ${Math.round((m.config.guest.memory_mb || 0) / 1024)} GB` : "",
         }));
         // stable order: newest first, id as tie-break (Fly's list order is not deterministic)
         sessions.sort((a, b) => String(b.created || "").localeCompare(String(a.created || "")) || a.id.localeCompare(b.id));
@@ -189,6 +191,18 @@ app.post("/api/auth/code", async (req, res) => {
 app.get("/api/auth/status", (req, res) => res.json(auth.status()));
 
 // ---- sessions -------------------------------------------------------------
+// Machine size presets (Fly on-demand prices, 2026-09): the dashboard offers these; anything
+// else in `guest` is rejected so a typo can't provision a 128 GB machine.
+const SIZES = {
+  small:  { cpu_kind: "shared",      cpus: 2, memory_mb: 2048,  label: "2 shared vCPU · 2 GB · ~$0.016/h" },
+  medium: { cpu_kind: "shared",      cpus: 4, memory_mb: 4096,  label: "4 shared vCPU · 4 GB · ~$0.033/h" },
+  large:  { cpu_kind: "shared",      cpus: 8, memory_mb: 8192,  label: "8 shared vCPU · 8 GB · ~$0.066/h" },
+  xlarge: { cpu_kind: "shared",      cpus: 8, memory_mb: 16384, label: "8 shared vCPU · 16 GB · ~$0.12/h" },
+  perf:   { cpu_kind: "performance", cpus: 2, memory_mb: 4096,  label: "2 dedicated vCPU · 4 GB · ~$0.09/h" },
+};
+const DEFAULT_SIZE = "medium";
+app.get("/api/sizes", (req, res) => res.json({ sizes: SIZES, default: DEFAULT_SIZE }));
+
 app.post("/api/sessions", async (req, res) => {
   try {
     if (!process.env.FLY_API_TOKEN) return res.status(400).json({ error: "FLY_API_TOKEN not set on the portal" });
@@ -196,9 +210,11 @@ app.post("/api/sessions", async (req, res) => {
     if (!cfg.sessionImage) return res.status(400).json({ error: "no session image yet — rebuild it from Settings" });
     const creds = await store.getClaudeCredentials();
     if (!creds.credentials) return res.status(400).json({ error: "no Claude credentials — re-login from Settings" });
-    const { environment, repos = [], label, guest, permissionMode } = req.body || {};
+    const { environment, repos = [], label, permissionMode, size } = req.body || {};
     const env = cfg.environments[environment];
     if (environment && !env) return res.status(400).json({ error: `unknown environment '${environment}'` });
+    const sizeKey = size && SIZES[size] ? size : DEFAULT_SIZE;
+    const { label: _sizeLabel, ...guest } = SIZES[sizeKey];
 
     const repoUrls = (repos || [])
       .map((n) => (cfg.repos || []).find((r) => r.name === n || r.url === n))
@@ -230,16 +246,17 @@ app.post("/api/sessions", async (req, res) => {
       name,
       image: cfg.sessionImage,
       env: machineEnv,
-      guest: guest || undefined,
+      guest,
       metadata: {
         role: "claude-session",
         environment: environment || "",
         repos: repoUrls.join(" "),
         label: userLabel,
         permissionMode: permMode,
+        size: sizeKey,
       },
     });
-    res.json({ ok: true, id: machine.id, name, label: userLabel, state: machine.state });
+    res.json({ ok: true, id: machine.id, name, label: userLabel, state: machine.state, size: sizeKey });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 // Pre-destroy check: uncommitted / unpushed work in each repo inside the session.

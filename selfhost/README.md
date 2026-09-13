@@ -94,6 +94,9 @@ Destroy: `selfhost/cluster/destroy.sh` (Fly sessions are separate — destroy th
   dashboard shows the app's AI-generated conversation title (read from the session transcript's
   `ai-title` records) — so both always match. No renaming from the dashboard.
 - **Permission mode** per session: Auto (default) or Dangerously skip permissions.
+- **Machine size** per session: Small (2 shared vCPU / 2 GB, ~$0.016/h), **Medium (4/4 GB, default, ~$0.033/h)**, Large
+  (8/8 GB), XLarge (8/16 GB), Perf (2 dedicated / 4 GB). Presets live in `server.js` (`SIZES`); anything
+  else is rejected. 1 GB was too small: `claude` alone is ~400 MB and Chromium got OOM-killed.
 - **Secret values are write-only**: the dashboard lists key names and lets you set a new value, delete
   a key, or add keys; values are never sent to the browser (there is no reveal endpoint).
 - **Terminal**: mirrors the session's tmux pane (1 Hz `capture-pane` over the Fly exec API,

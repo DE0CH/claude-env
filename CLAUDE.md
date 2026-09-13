@@ -570,7 +570,8 @@ a cf-tunnel agent, and **SOPS-encrypted Secrets**
 (`selfhost/k8s/secrets/*.sops.yaml`, age key in `flux-system/sops-age`). Each **session** is a
 **Fly.io Machine** (app `de0ch-claude-sessions`) booting a prebuilt image that injects an
 environment's secrets + repos and runs `claude --remote-control` (default model
-`claude-opus-4-8`, permission mode Auto or dangerously-skip chosen per session) — so it shows
+`claude-opus-4-8`, permission mode Auto or dangerously-skip and machine size — default 4 shared
+vCPU / 4 GB — chosen per session) — so it shows
 up in the Claude phone app. Isolated microVM per session (install tools freely).
 
 - **Deploying = `git push` to main.** Portal/cf-tunnel changes: GitHub Actions builds

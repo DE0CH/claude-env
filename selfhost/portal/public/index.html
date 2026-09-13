@@ -135,6 +135,7 @@
 const $=s=>document.querySelector(s);
 let STATE={environments:{},repos:[],sessions:[],sessionImage:null,flyError:null,hasCreds:true,imageBuild:{},auth:{}};
 window.getState=()=>STATE; // read hook for test/dashboard.test.js
+let SIZES={sizes:{},default:'medium'}; fetch('api/sizes').then(r=>r.json()).then(j=>{SIZES=j;}).catch(()=>{});
 let TAB='sessions';
 // ---- pending actions: UI acks immediately, real state arrives via polling --------
 // key -> label while an action is in flight. Renders consult this so a re-render
@@ -232,7 +233,7 @@ function renderSessions(){
     return `<div class="card${busy?' pending':''}">
     <div class="row" style="justify-content:space-between"><h3>${esc(title)}</h3>${sessionPill(m)}</div>
     <div class="meta">${m.environment?('env: '+esc(m.environment)):''}${repos?(' · '+esc(repos)):''}${perm}</div>
-    <div class="meta">${esc(REGION[m.region]||m.region||'')}${m.created?' · created '+ago(m.created):''}</div>
+    <div class="meta">${esc(REGION[m.region]||m.region||'')}${m.guest?' · '+esc(m.guest):''}${m.created?' · created '+ago(m.created):''}</div>
     <div class="spacer"></div>
     <div class="row">
       ${m.state==='started'?`<button class="btn ghost sm" onclick="openTerm('${m.id}','${esc(title)}')">Terminal</button>`:''}
@@ -319,6 +320,8 @@ function newSession(){
     <label>Permission mode</label>
     <label class="choice"><input type="radio" name="ns-perm" value="auto" checked><span class="t">Auto<small>Auto-approve safe actions; the permission classifier gates the rest.</small></span></label>
     <label class="choice"><input type="radio" name="ns-perm" value="bypass"><span class="t">Dangerously skip permissions<small>No prompts at all (--dangerously-skip-permissions).</small></span></label>
+    <label>Machine size</label>
+    ${Object.entries(SIZES.sizes||{}).map(([k,v])=>`<label class="choice"><input type="radio" name="ns-size" value="${esc(k)}" ${k===SIZES.default?'checked':''}><span class="t">${esc(k[0].toUpperCase()+k.slice(1))}<small>${esc(v.label)}</small></span></label>`).join('')}
     <label>Session title (optional)</label><input id="ns-title" type="text" name="session-topic" autocomplete="off" autocorrect="off" autocapitalize="sentences" spellcheck="false" placeholder="e.g. refactor billing module">
     <div class="hint">Shows as the session title in the Claude app too. Leave blank and the Claude session names itself.</div>
     <div class="actions">
@@ -330,9 +333,10 @@ async function startSession(btn){
   const repos=[...document.querySelectorAll('#dlg-body input[name=ns-repo]:checked')].map(c=>c.value);
   const label=$('#ns-title').value.trim();
   const permissionMode=(document.querySelector('#dlg-body input[name=ns-perm]:checked')||{}).value||'auto';
+  const size=(document.querySelector('#dlg-body input[name=ns-size]:checked')||{}).value||SIZES.default;
   const restore=dlgBusy(btn,'Starting…');
   try{
-    const r=await api('POST','api/sessions',{environment:env,repos,label,permissionMode});
+    const r=await api('POST','api/sessions',{environment:env,repos,label,permissionMode,size});
     closeDlg();
     await refresh(false);                                 // card appears in its REAL state (creating…)
     settle(st=>{const m=(st.sessions||[]).find(x=>x.id===r.id);return !!(m&&m.state==='started'&&m.status);}); // fast-poll until claude is actually up
