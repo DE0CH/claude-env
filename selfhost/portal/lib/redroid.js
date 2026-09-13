@@ -13,7 +13,6 @@ async function defaults() {
   return (cfg.environments && cfg.environments.default && cfg.environments.default.secrets) || {};
 }
 async function token() { return (await defaults()).HETZNER_API; }
-async function host() { return (await defaults()).REDROID_HOST || "android.deyaochen.com"; }
 
 // Write the private key to a 0600 temp file (rewrite only when it changes).
 let keyPath = null;
@@ -47,7 +46,6 @@ const HEALTH_CMD = [
   'echo model=$(adb -s localhost:5555 shell getprop ro.product.model 2>/dev/null | tr -d "\\r")',
   'echo android=$(adb -s localhost:5555 shell getprop ro.build.version.release 2>/dev/null | tr -d "\\r")',
   'echo redroid=$(docker inspect -f "{{.State.Running}}" redroid 2>/dev/null)',
-  'echo wsscrcpy=$(docker inspect -f "{{.State.Running}}" ws-scrcpy 2>/dev/null)',
   'echo proxy=$(/usr/local/bin/redroid-proxy status 2>/dev/null | tr "\\n" " ")',
   'echo exitip=$(/usr/local/bin/redroid-ip 2>/dev/null)',
   'echo load=$(cut -d" " -f1-3 /proc/loadavg)',
@@ -71,4 +69,4 @@ async function screenshot(ip) {
   return run(ip, "adb -s localhost:5555 exec-out screencap -p", { binary: true, timeout: 20000 });
 }
 
-module.exports = { token, host, health, screenshot };
+module.exports = { token, health, screenshot };

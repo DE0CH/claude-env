@@ -273,10 +273,10 @@ function renderSessions(){
 // ---- Android (redroid box) ------------------------------------------------
 // A Hetzner VM managed via HETZNER_API. Start/Stop power it without deleting; Release
 // deletes it. Debug is READ-ONLY: a live screenshot + health pulled over SSH on demand.
-const ANDROID={loading:false,server:null,host:'',err:null,screenTs:0};
+const ANDROID={loading:false,server:null,err:null,screenTs:0};
 async function loadAndroid(){
   if(ANDROID.loading)return; ANDROID.loading=true;
-  try{const j=await api('GET','api/redroid/state');ANDROID.server=j.server;ANDROID.host=j.host||'';ANDROID.err=j.configured?null:(j.error||'not configured');}
+  try{const j=await api('GET','api/redroid/state');ANDROID.server=j.server;ANDROID.err=j.configured?null:(j.error||'not configured');}
   catch(e){ANDROID.err=e.message;}
   ANDROID.loading=false; if(TAB==='android')renderAndroid();
 }
@@ -311,9 +311,8 @@ function renderAndroid(){
   $('#rd-pill').innerHTML=rdPill(s.status);
   $('#rd-meta').innerHTML=`${esc(s.type||'')}${s.cores?` · ${s.cores} vCPU`:''}${s.memoryGb?` · ${s.memoryGb} GB`:''}${s.datacenter?` · ${esc(s.datacenter)}`:''}<br>${s.ip?esc(s.ip):'(no IP)'}${s.created?` · created ${ago(s.created)}`:''}`;
   const a=[];
-  if(s.status==='running'&&ANDROID.host)a.push(`<a class="btn ghost sm" href="https://${esc(ANDROID.host)}" target="_blank" rel="noopener" style="text-decoration:none">Open ↗</a>`);
-  if(s.status==='off')a.push(pbtn('rd:start','sm','rdAction("start","Starting…")','Start'));
-  if(s.status==='running')a.push(pbtn('rd:stop','ghost sm','rdAction("stop","Stopping…")','Stop'));
+  if(s.status==='off')a.push(pbtn('rd:start','sm',"rdAction('start','Starting…')",'Start'));
+  if(s.status==='running')a.push(pbtn('rd:stop','ghost sm',"rdAction('stop','Stopping…')",'Stop'));
   a.push(pbtn('rd:release','danger sm','rdRelease()','Release'));
   $('#rd-actions').innerHTML=a.join('');
   $('#rd-debug').style.display=s.status==='running'?'':'none';
@@ -340,7 +339,7 @@ async function rdDebug(){
     const d=await api('GET','api/redroid/debug');
     const h=d.health||{};
     const rows=[['Boot completed',h.boot==='1'?'yes':(h.boot||'?')],['Model',h.model],['Android',h.android],
-      ['redroid',h.redroid==='true'?'up':h.redroid],['ws-scrcpy',h.wsscrcpy==='true'?'up':h.wsscrcpy],
+      ['redroid',h.redroid==='true'?'up':h.redroid],
       ['Exit IP',h.exitip],['Proxy',h.proxy],['Load',h.load],['Memory',h.mem],['Disk',h.disk],['Uptime',h.up]];
     $('#rd-health').innerHTML=d.health?rows.filter(r=>r[1]).map(r=>`<div><b>${esc(r[0])}:</b> ${esc(r[1])}</div>`).join(''):esc(d.note||'no data');
     ANDROID.screenTs=Date.now();

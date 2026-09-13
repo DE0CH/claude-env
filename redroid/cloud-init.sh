@@ -1,15 +1,16 @@
 #!/bin/bash
 # Full reproducible provisioner for the self-hosted cloud-Android box (redroid).
 # Runs as cloud-init user_data on a fresh Ubuntu 24.04 x86 Hetzner Cloud server.
-# Result: redroid (Android 14, ARM-translation included) + ws-scrcpy browser control
-# behind Caddy (auto HTTPS + basic auth), with an on-demand SOCKS5 egress proxy toggle.
+# Result: redroid (Android 14, ARM-translation included) driven over SSH + adb, with an
+# on-demand SOCKS5 egress proxy toggle. No web UI: the portal's Android tab shows a
+# view-only screenshot, and sessions drive the device with adb over SSH.
 set -x
 exec > /var/log/redroid-setup.log 2>&1
 export DEBIAN_FRONTEND=noninteractive
 
 apt-get update
-apt-get install -y ca-certificates curl gnupg git android-tools-adb redsocks \
-  debian-keyring debian-archive-keyring apt-transport-https "linux-modules-extra-$(uname -r)"
+apt-get install -y ca-certificates curl gnupg android-tools-adb redsocks \
+  "linux-modules-extra-$(uname -r)"
 
 # ---- Docker ----
 install -m0755 -d /etc/apt/keyrings
@@ -34,39 +35,6 @@ docker run -itd --restart unless-stopped --privileged --name redroid \
   androidboot.use_memfd=1 \
   androidboot.redroid_width=720 androidboot.redroid_height=1280 androidboot.redroid_dpi=320 \
   androidboot.redroid_gpu_mode=guest
-
-# ---- ws-scrcpy (browser screen + control), built from source ----
-mkdir -p /root/ws-scrcpy-build
-cat > /root/ws-scrcpy-build/Dockerfile <<'DOCKER'
-FROM node:18-bookworm
-RUN apt-get update && apt-get install -y android-tools-adb git python3 build-essential && rm -rf /var/lib/apt/lists/*
-WORKDIR /app
-RUN git clone --depth 1 https://github.com/NetrisTV/ws-scrcpy.git .
-RUN npm install && npm run dist
-WORKDIR /app/dist
-EXPOSE 8000
-CMD ["node","index.js"]
-DOCKER
-docker build -t ws-scrcpy /root/ws-scrcpy-build
-docker run -d --restart unless-stopped --name ws-scrcpy --network host ws-scrcpy
-
-# ---- Caddy: auto HTTPS + basic auth in front of ws-scrcpy (:8000) ----
-curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/gpg.key' | gpg --dearmor -o /usr/share/keyrings/caddy-stable-archive-keyring.gpg
-curl -1sLf 'https://dl.cloudsmith.io/public/caddy/stable/debian.deb.txt' > /etc/apt/sources.list.d/caddy-stable.list
-apt-get update && apt-get install -y caddy
-# password: generated on first boot, plaintext kept in /root/ws-auth.txt (never in git)
-python3 -c "import secrets,string;print(''.join(secrets.choice(string.ascii_letters+string.digits) for _ in range(24)))" > /root/ws-auth.txt
-HASH=$(caddy hash-password --plaintext "$(cat /root/ws-auth.txt)")
-DOMAIN="${REDROID_DOMAIN:-android.deyaochen.com}"
-cat > /etc/caddy/Caddyfile <<CADDY
-${DOMAIN} {
-    basic_auth {
-        deyao ${HASH}
-    }
-    reverse_proxy localhost:8000
-}
-CADDY
-systemctl restart caddy
 
 # ---- on-box helper scripts ----
 install -m0755 /dev/stdin /usr/local/bin/redroid-proxy <<'PROXY'
@@ -116,23 +84,5 @@ RIP
 for i in $(seq 1 40); do [ "$(adb connect localhost:5555 >/dev/null 2>&1; adb -s localhost:5555 shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = "1" ] && break; sleep 3; done
 curl -sL https://github.com/moparisthebest/static-curl/releases/latest/download/curl-amd64 -o /root/curl-and
 adb -s localhost:5555 push /root/curl-and /data/local/tmp/curl && adb -s localhost:5555 shell chmod 755 /data/local/tmp/curl
-docker exec ws-scrcpy adb connect localhost:5555
-
-# reconnect device to ws-scrcpy after every reboot
-cat > /etc/systemd/system/redroid-connect.service <<'UNIT'
-[Unit]
-Description=Connect redroid device to ws-scrcpy adb after boot
-After=docker.service
-Requires=docker.service
-[Service]
-Type=oneshot
-RemainAfterExit=yes
-ExecStartPre=/bin/sleep 25
-ExecStart=/usr/bin/docker exec ws-scrcpy adb connect localhost:5555
-[Install]
-WantedBy=multi-user.target
-UNIT
-systemctl daemon-reload && systemctl enable redroid-connect.service
-
 touch /root/redroid-setup-done
 echo "SETUP DONE"

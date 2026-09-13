@@ -446,7 +446,7 @@ app.get("/api/redroid/state", async (req, res) => {
   try {
     const token = await hzToken();
     const server = await hetzner.find(token);
-    res.json({ configured: true, server, host: await redroid.host() });
+    res.json({ configured: true, server });
   } catch (e) { res.status(e.code === 400 ? 200 : 500).json({ configured: false, server: null, error: e.message }); }
 });
 app.post("/api/redroid/start", async (req, res) => {
