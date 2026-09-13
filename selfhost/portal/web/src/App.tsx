@@ -50,7 +50,7 @@ export function App() {
       <PortalCtx.Provider value={root}>
         <div className="topbar">
           <Flex className="wrap" align="center" justify="between" py="4" gap="3">
-            <Heading size="5">Claude sessions</Heading>
+            <Heading size="4" truncate style={{ minWidth: 0 }}>Claude sessions</Heading>
             <Flex gap="2">
               <IconButton variant="soft" color="gray" id="refreshBtn" onClick={() => refresh(true)} aria-label="Refresh" loading={refreshing}>↻</IconButton>
               {tab === "sessions" && <Button id="newBtn" onClick={() => show({ kind: "new" })}>+ New session</Button>}
