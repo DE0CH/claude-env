@@ -55,6 +55,19 @@
   .spacer{height:.6rem}
   pre.log{background:var(--input);border:1px solid var(--border);border-radius:10px;padding:.6rem;font-size:.75rem;max-height:14rem;overflow:auto;white-space:pre-wrap;word-break:break-all;margin-top:.5rem}
   a.link{color:var(--accent);word-break:break-all}
+  /* repo picker: search box + dropdown of your GitHub repos */
+  .combo{position:relative}
+  .combo .dd{position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:4;background:var(--card);border:1.5px solid var(--border);border-radius:12px;
+    box-shadow:0 10px 30px rgba(0,0,0,.18);max-height:min(48vh,22rem);overflow:auto;-webkit-overflow-scrolling:touch}
+  .combo .dd .it{display:block;width:100%;text-align:left;background:none;border:none;border-bottom:1px solid var(--border);padding:.65rem .8rem;color:var(--text);font:inherit;cursor:pointer;-webkit-tap-highlight-color:transparent}
+  .combo .dd .it:last-child{border-bottom:none}
+  .combo .dd .it:hover,.combo .dd .it.hi{background:rgba(124,58,237,.08)}
+  .combo .dd .it:disabled{opacity:.5;cursor:default}
+  .combo .dd .it .n{font-weight:600;word-break:break-all}
+  .combo .dd .it small{display:block;color:var(--muted);font-size:.76rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .combo .dd .it .tag{font-size:.66rem;font-weight:700;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);border:1px solid var(--border);border-radius:6px;padding:0 .3rem;margin-left:.4rem;vertical-align:middle}
+  .combo .dd .note{padding:.7rem .8rem;color:var(--muted);font-size:.85rem}
+  .combo .dd .note a{color:var(--accent)}
   /* Mobile-first bottom sheet (iOS Safari pins default <dialog> to the top). */
   dialog{position:fixed;left:0;right:0;bottom:0;top:auto;margin:0;width:100%;max-width:100%;
     max-height:88dvh;overflow:auto;border:none;border-radius:20px 20px 0 0;
@@ -263,13 +276,74 @@ function renderRepos(){
     <div class="row" style="justify-content:space-between"><h3>${esc(x.name)}</h3>
       ${pbtn('repo:'+x.name,'ghost sm',`delRepo('${esc(x.name)}')`,'Remove from list',cool)}</div>
     <div class="meta">${esc(x.url)}</div></div>`).join('');
-  const addKey=PENDING.get('repo:add');
-  v.innerHTML=(cards||'<div class="empty">No repos yet.</div>')+`
-    <div class="card"><label>Add repo (git URL)</label>
-      <input id="repo-url" type="url" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="https://github.com/owner/repo.git" ${addKey?'disabled':''}>
-      <label>Alias (optional)</label><input id="repo-title" type="text" name="repo-alias" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="auto from URL" ${addKey?'disabled':''}>
-      <div class="spacer"></div>${pbtn('repo:add','',`addRepo()`,'Add repo')}
-      <div class="hint">Private repos: add a GITHUB_TOKEN key to the environment you'll use.</div></div>`;
+  // The list re-renders on every poll; the add card is built once so typed text and an
+  // open picker survive a refresh. Only its button swaps between idle/pending.
+  if(!$('#repo-list')){
+    v.innerHTML=`<div id="repo-list"></div>
+    <div class="card" id="repo-add">
+      <label>Add repo — pick one of yours</label>
+      <div class="combo">
+        <input id="repo-search" type="text" autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="Search your GitHub repos…"
+          oninput="ghFilter()" onfocus="ghOpen()" onkeydown="ghKey(event)">
+        <div id="repo-dd" class="dd" hidden></div>
+      </div>
+      <label>Git URL (any host)</label>
+      <input id="repo-url" type="url" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="https://github.com/owner/repo.git" oninput="$('#repo-search').value=''">
+      <label>Alias (optional)</label><input id="repo-title" type="text" name="repo-alias" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="auto from URL">
+      <div class="spacer"></div><span id="repo-add-btn"></span>
+      <div class="hint">The picker lists every repo the portal's GitHub token can see. Private repos also need a GITHUB_TOKEN key in the environment you'll use.</div></div>`;
+    document.addEventListener('pointerdown',e=>{if(!e.target.closest('#repo-add .combo'))ghClose();});
+  }
+  $('#repo-list').innerHTML=cards||'<div class="empty">No repos yet.</div>';
+  $('#repo-add-btn').innerHTML=pbtn('repo:add','',`addRepo()`,'Add repo');
+  ['repo-search','repo-url','repo-title'].forEach(id=>{$('#'+id).disabled=PENDING.has('repo:add');});
+}
+// ---- GitHub repo picker --------------------------------------------------------
+const GH={repos:null,loading:false,error:null,hi:-1,shown:[]};
+async function ghLoad(refresh){
+  if(GH.loading)return; GH.loading=true;GH.error=null;ghFilter();
+  try{const j=await api('GET','api/github/repos'+(refresh?'?refresh=1':''));GH.repos=j.repos||[];}
+  catch(e){GH.error=e.message;}
+  GH.loading=false;ghFilter();
+}
+function ghOpen(){if(!GH.repos&&!GH.loading)ghLoad(false);ghFilter();$('#repo-dd').hidden=false;}
+function ghClose(){const d=$('#repo-dd');if(d)d.hidden=true;}
+function ghFilter(){
+  const d=$('#repo-dd');if(!d)return;
+  const q=$('#repo-search').value.trim().toLowerCase();
+  d.hidden=false;
+  if(GH.loading){d.innerHTML='<div class="note"><span class="spinner"></span> Loading your repos…</div>';return;}
+  if(GH.error){d.innerHTML=`<div class="note">Couldn\'t list repos: ${esc(GH.error)} <a href="#" onclick="ghLoad(true);return false">retry</a></div>`;return;}
+  const all=GH.repos||[];
+  const added=new Set((STATE.repos||[]).map(r=>String(r.url).toLowerCase().replace(/\.git$/,'')));
+  const words=q.split(/\s+/).filter(Boolean);
+  const hit=r=>words.every(w=>r.fullName.toLowerCase().includes(w)||(r.description||'').toLowerCase().includes(w)||(r.language||'').toLowerCase().includes(w));
+  const m=all.filter(hit);
+  // exact/prefix matches on the name float up; the API already orders by last push
+  const rank=r=>{const n=r.fullName.toLowerCase(),b=n.split('/')[1]||n;return b===q?0:b.startsWith(q)?1:n.includes(q)?2:3;};
+  if(q)m.sort((a,b)=>rank(a)-rank(b));
+  GH.shown=m.slice(0,40);GH.hi=Math.min(GH.hi,GH.shown.length-1);
+  d.innerHTML=(GH.shown.map((r,i)=>{const isAdded=added.has(r.htmlUrl.toLowerCase());
+    return `<button type="button" class="it${i===GH.hi?' hi':''}" ${isAdded?'disabled':''} onpointerdown="event.preventDefault()" onclick="ghPick(${i})">
+      <span class="n">${esc(r.fullName)}</span>${r.private?'<span class="tag">private</span>':''}${r.fork?'<span class="tag">fork</span>':''}${r.archived?'<span class="tag">archived</span>':''}${isAdded?'<span class="tag">added</span>':''}
+      <small>${esc(r.description||'')}${r.description?' · ':''}${r.language?esc(r.language)+' · ':''}pushed ${r.pushedAt?ago(r.pushedAt):'?'}</small></button>`;}).join(''))
+    +(m.length>40?`<div class="note">${m.length-40} more — keep typing to narrow down</div>`:'')
+    +(!m.length?`<div class="note">${all.length?'No match.':'No repos visible to the portal\'s token.'} <a href="#" onclick="ghLoad(true);return false">refresh list</a></div>`
+      :`<div class="note">${all.length} repos · <a href="#" onclick="ghLoad(true);return false">refresh list</a></div>`);
+}
+function ghPick(i){
+  const r=GH.shown[i];if(!r)return;
+  $('#repo-url').value=r.url;$('#repo-search').value=r.fullName;
+  $('#repo-title').placeholder=r.fullName.split('/')[1];
+  GH.hi=-1;ghClose();
+}
+function ghKey(e){
+  const d=$('#repo-dd');
+  if(e.key==='Escape'){ghClose();return;}
+  if(d.hidden&&(e.key==='ArrowDown'||e.key==='ArrowUp')){ghOpen();return;}
+  if(e.key==='ArrowDown'){e.preventDefault();GH.hi=Math.min(GH.hi+1,GH.shown.length-1);ghFilter();d.querySelector('.it.hi')?.scrollIntoView({block:'nearest'});}
+  else if(e.key==='ArrowUp'){e.preventDefault();GH.hi=Math.max(GH.hi-1,-1);ghFilter();d.querySelector('.it.hi')?.scrollIntoView({block:'nearest'});}
+  else if(e.key==='Enter'){e.preventDefault();if(GH.hi>=0)ghPick(GH.hi);else if(GH.shown.length===1)ghPick(0);}
 }
 function renderSettings(){
   const v=$('#view-settings');
@@ -427,7 +501,8 @@ async function addRepo(){
   const url=$('#repo-url').value.trim(),name=$('#repo-title').value.trim();
   if(!url){alert('url required');return;}
   pend('repo:add','Adding…');
-  try{await api('POST','api/repos',{url,name});}catch(e){alert(e.message);}
+  try{await api('POST','api/repos',{url,name});['repo-url','repo-title','repo-search'].forEach(id=>{$('#'+id).value='';});$('#repo-title').placeholder='auto from URL';}
+  catch(e){alert(e.message);}
   pend('repo:add',null);await refresh(false);
 }
 async function delRepo(n){

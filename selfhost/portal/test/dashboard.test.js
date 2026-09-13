@@ -87,7 +87,32 @@ async function run(viewport, tag) {
   ok(`${tag}: env editor lists keys`, (await page.locator("#dlg .evk").count()) > 0);
   await shot("4-envedit");
   await page.click('#dlg button:has-text("Cancel")').catch(() => {});
-  await page.click("#t-settings"); await page.waitForTimeout(300); await shot("5-settings");
+  // Repos tab: the GitHub picker lists the token's repos, filters on typing, and a pick fills the URL
+  await page.click("#t-repos");
+  await page.click("#repo-search");
+  await page.waitForFunction(() => document.querySelectorAll("#repo-dd .it").length > 0, null, { timeout: 30000 }).catch(() => {});
+  const ddCount = await page.evaluate(() => document.querySelectorAll("#repo-dd .it").length);
+  ok(`${tag}: repo picker lists GitHub repos`, ddCount > 0, `${ddCount} shown`);
+  await page.fill("#repo-search", "claude-env");
+  await page.waitForTimeout(200);
+  const first = await page.evaluate(() => { const b = document.querySelector("#repo-dd .it"); return b ? { name: b.querySelector(".n").textContent, disabled: b.disabled } : null; });
+  ok(`${tag}: picker filters + marks already-added`, !!first && /claude-env$/i.test(first.name) && first.disabled, JSON.stringify(first));
+  await shot("5-repos-picker");
+  await page.fill("#repo-search", "");
+  await page.waitForTimeout(200);
+  const pickable = page.locator("#repo-dd .it:not([disabled])").first();
+  if (await pickable.count()) {
+    const nm = await pickable.locator(".n").textContent();
+    await pickable.click();
+    const url = await page.inputValue("#repo-url");
+    ok(`${tag}: pick fills git URL`, url.toLowerCase().includes(nm.toLowerCase()), `${nm} -> ${url}`);
+    ok(`${tag}: picker closes after pick`, await page.evaluate(() => document.getElementById("repo-dd").hidden));
+  } else console.log(`skip  ${tag}: every listed repo is already added`);
+  // a poll-driven re-render must not wipe the typed URL
+  await page.fill("#repo-url", "https://example.com/x/y.git");
+  await page.evaluate(() => render());
+  ok(`${tag}: add card survives re-render`, (await page.inputValue("#repo-url")) === "https://example.com/x/y.git");
+  await page.click("#t-settings"); await page.waitForTimeout(300); await shot("6-settings");
 
   const benign = (s) => /favicon/.test(s);
   ok(`${tag}: no console errors`, consoleErrors.length === 0, consoleErrors.join(" | ").slice(0, 300));

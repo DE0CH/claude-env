@@ -9,6 +9,7 @@ const tty = require("./lib/tty");
 const auth = require("./lib/auth");
 const imagebuild = require("./lib/imagebuild");
 const archive = require("./lib/archive");
+const github = require("./lib/github");
 
 const PORT = process.env.PORT || 8080;
 const HOST = process.env.HOST || "127.0.0.1";
@@ -161,6 +162,13 @@ app.post("/api/repos", async (req, res) => {
     await store.setRepos(repos);
     res.json({ ok: true });
   } catch (e) { res.status(500).json({ error: e.message }); }
+});
+// Your GitHub repos, for the dashboard's picker (dropdown + search). Metadata only.
+app.get("/api/github/repos", async (req, res) => {
+  try {
+    const r = await github.list({ refresh: req.query.refresh === "1" });
+    res.json({ ...r, configured: !!process.env.GITHUB_TOKEN });
+  } catch (e) { res.status(process.env.GITHUB_TOKEN ? 502 : 503).json({ error: e.message, configured: !!process.env.GITHUB_TOKEN }); }
 });
 app.delete("/api/repos/:name", async (req, res) => {
   try {
