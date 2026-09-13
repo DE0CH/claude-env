@@ -5,6 +5,15 @@ body{padding-bottom:3rem}
 /* iOS Safari zooms into any focused field whose font is under 16px — keep every input at 16px */
 .form-control,.form-select{font-size:16px !important}
 .nav-tabs .nav-link{padding:.5rem .4rem;font-size:.9rem;white-space:nowrap}
+/* Touch screens have no hover, but iOS keeps :hover stuck on the last tapped element — an outline
+   button then stays filled ("looks pressed"). Only real pointers get Bootstrap's hover fill. */
+@media (hover: none){
+  .btn-outline-secondary:hover:not(:active){color:var(--bs-secondary);background-color:transparent;border-color:var(--bs-secondary)}
+  .btn-outline-danger:hover:not(:active){color:var(--bs-danger);background-color:transparent;border-color:var(--bs-danger)}
+  .btn-primary:hover:not(:active){background-color:var(--bs-primary);border-color:var(--bs-primary)}
+  .btn-success:hover:not(:active){background-color:var(--bs-success);border-color:var(--bs-success)}
+  .nav-tabs .nav-link:hover:not(.active){border-color:transparent}
+}
 /* post-layout-shift cooldown: destructive buttons are inert + faded for 250ms */
 .btn.cool{opacity:.3;pointer-events:none;transition:opacity .15s}
 .wrap{max-width:820px}

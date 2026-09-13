@@ -13,7 +13,7 @@ export function Sheet({ open, onClose, title, left, right, snap, children, onClo
   const content = (
     <Drawer.Portal>
       <Drawer.Overlay className="sheet-overlay" />
-      <Drawer.Content className={`sheet${snap ? " snap" : ""}${className ? " " + className : ""}`} aria-describedby={undefined}>
+      <Drawer.Content className={`sheet${snap ? " snap" : ""}${className ? " " + className : ""}`} aria-describedby={undefined} onCloseAutoFocus={(e) => { e.preventDefault(); (document.activeElement as HTMLElement | null)?.blur?.(); }}>
         <div className="handle-wrap"><Drawer.Handle className="handle" /></div>
         {title !== undefined ? (
           <div className="head">

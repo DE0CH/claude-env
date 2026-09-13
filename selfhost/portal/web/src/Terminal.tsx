@@ -95,7 +95,7 @@ export function TerminalSheet({ session, open, onClose, onClosed }: { session: {
     <Drawer.Root open={open} onOpenChange={(o) => { if (!o) onClose(); }} onAnimationEnd={(o) => { if (!o) onClosed(); }} handleOnly repositionInputs={false} autoFocus={false}>
       <Drawer.Portal>
         <Drawer.Overlay className="sheet-overlay" style={{ zIndex: 30 }} />
-        <Drawer.Content className={`term${vv.kb ? " kb" : ""}`} style={{ top: vv.top, height: vv.height }} aria-describedby={undefined}>
+        <Drawer.Content className={`term${vv.kb ? " kb" : ""}`} style={{ top: vv.top, height: vv.height }} aria-describedby={undefined} onCloseAutoFocus={(e) => { e.preventDefault(); (document.activeElement as HTMLElement | null)?.blur?.(); }}>
           <div className="thandle"><Drawer.Handle className="handle" /></div>
           <div className="bar">
             <Drawer.Title className="title">{session.title}</Drawer.Title>
