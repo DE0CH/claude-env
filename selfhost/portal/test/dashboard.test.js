@@ -2,7 +2,7 @@
 // Browser smoke test for the dashboard (run before pushing UI changes, and after a rollout).
 //   node selfhost/portal/test/dashboard.test.js <baseURL> [outDir]
 //   e.g. http://127.0.0.1:18080/  or  https://tunnel.deyaochen.com/t/portal/  (CF service token
-//   is read from ~/.secrets when the URL is the tunnel). Needs `npm i playwright` +
+//   is read from the environment or ~/.secrets when the URL is the tunnel). Needs `npm i playwright` +
 //   `npx playwright install chromium` somewhere on NODE_PATH (e.g. ~/pwtest).
 // Checks: no console errors / failed requests, sessions render, Terminal shows a live frame,
 // New session dialog + environment editor open, and NO secret value appears in the DOM.
@@ -25,7 +25,7 @@ function secrets() {
   return env;
 }
 const headers = BASE.includes("tunnel.deyaochen.com")
-  ? (() => { const s = secrets(); return { "CF-Access-Client-Id": s.CF_ACCESS_CLIENT_ID || "", "CF-Access-Client-Secret": s.CF_ACCESS_CLIENT_SECRET || "" }; })()
+  ? (() => { const s = { ...secrets(), ...process.env }; return { "CF-Access-Client-Id": s.CF_ACCESS_CLIENT_ID || "", "CF-Access-Client-Secret": s.CF_ACCESS_CLIENT_SECRET || "" }; })()
   : {};
 
 const failures = [];
