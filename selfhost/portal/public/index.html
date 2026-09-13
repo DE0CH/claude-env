@@ -135,6 +135,7 @@ function renderSessions(){
     <div class="spacer"></div>
     <div class="row">
       ${m.state==='started'?`<button class="btn ghost sm" onclick="act('${m.id}','stop')">Stop</button>`:`<button class="btn ghost sm" onclick="act('${m.id}','start')">Start</button>`}
+      <button class="btn ghost sm" onclick="renameSession('${m.id}','${esc(title).replace(/'/g,'')}')">Rename</button>
       <button class="btn danger sm" onclick="destroy('${m.id}')">Destroy</button>
     </div>
     <div class="hint">Open the Claude app to chat with this session.</div>
@@ -196,6 +197,11 @@ async function startSession(){
   const label=$('#ns-label').value.trim();
   try{await api('POST','api/sessions',{environment:env,repos,label});closeDlg();setTimeout(refresh,1500);refresh();}
   catch(e){alert('Start failed: '+e.message);}
+}
+async function renameSession(id,current){
+  const name=(prompt('New session name (also updates the Claude app):',current)||'').trim();
+  if(!name||name===current)return;
+  try{await api('POST',`api/sessions/${id}/rename`,{name});setTimeout(refresh,1500);refresh();}catch(e){alert('Rename failed: '+e.message);}
 }
 async function act(id,what){try{await api('POST',`api/sessions/${id}/${what}`);setTimeout(refresh,1200);}catch(e){alert(e.message);}}
 async function destroy(id){if(!confirm('Destroy this session?'))return;try{await api('DELETE','api/sessions/'+id);refresh();}catch(e){alert(e.message);}}

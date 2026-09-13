@@ -45,6 +45,8 @@ module.exports = {
   // Run a command inside a started machine; returns {stdout, stderr, exit_code}.
   exec: (id, command, timeout = 15) =>
     call("POST", `/apps/${app()}/machines/${id}/exec`, { command, timeout }),
+  setMetadata: (id, key, value) =>
+    call("POST", `/apps/${app()}/machines/${id}/metadata/${encodeURIComponent(key)}`, { value }),
   stopMachine: (id) => call("POST", `/apps/${app()}/machines/${id}/stop`),
   startMachine: (id) => call("POST", `/apps/${app()}/machines/${id}/start`),
   destroyMachine: (id) => call("DELETE", `/apps/${app()}/machines/${id}?force=true`),
