@@ -52,6 +52,7 @@ curl -sS -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" -H "CF-Access-Client-Sec
 | add a portal-level secret by hand | write the Secret manifest (JSON is fine) at `selfhost/k8s/secrets/<x>.sops.yaml`, `sops --encrypt --in-place <path>` (rule matches by path; needs `.sops.yaml` at repo root → run from repo root), add to `secrets/kustomization.yaml`, push |
 | read a live secret value | `kubectl -n claude get secret env-default -o json` (values base64 on the wire; decode in code, never with the base64 CLI on artefacts) |
 | rebuild the session image | push the Dockerfile change to main FIRST (the portal builds from its own checkout), then `POST /api/image/rebuild` (= portal Settings → Rebuild; flyctl runs inside the portal pod and on success records the ref itself: commits `config/portal-config.yaml` + applies the ConfigMap). Poll `GET /api/image/build` from a background watcher until `running:false`; `ok:null, image:null` = the job record is gone = the portal pod restarted mid-build (see gotchas). Fallback from a session (flyctl is in the image): `flyctl deploy selfhost/session-image --config selfhost/session-image/fly.toml --app de0ch-claude-sessions --build-only --push` with `FLY_ACCESS_TOKEN=$FLY_API_TOKEN` (absolute paths; `--config` is resolved relative to the deploy dir), then record the ref by hand: edit `sessionImage` in `selfhost/k8s/config/portal-config.yaml`, commit+push, `kubectl -n claude apply -f` it. Boot-test the image before recording: `flyctl machine run <ref> --app de0ch-claude-sessions --region arn --detach --entrypoint /bin/bash -- -c "$(cat check.sh)"`, read `flyctl logs -i <id> --no-tail`, `flyctl machine destroy <id> --force` |
+| **move a running session to a bigger/other machine** | the session image supports resume: create the new machine with the SAME `SESSION_REPOS`/`environment` plus `SESSION_RESUME_ID=<the session uuid>` and `SESSION_RESUME_PATH=<WebDAV path on the Storage Box holding that session's `.jsonl`>`. Steps from the old (or any) session: (1) `PUT` the transcript `~/.claude/projects/<slug>/<uuid>.jsonl` to the Storage Box (e.g. `_transfer/<uuid>.jsonl`); (2) `POST` the Fly Machines API (or the portal, which lacks a resume field — use the API) to create a machine cloning your `CLAUDE_CREDENTIALS`/`CLAUDE_ACCOUNT`/`SESSION_*` env with those two vars added and `guest:{cpu_kind:"shared",cpus:4,memory_mb:4096}`; entrypoint.sh downloads the transcript into `~/.claude/projects/<cwd slug>/` (slug = `sed 's#[^A-Za-z0-9]#-#g'` of the workdir) and the supervisor runs `claude --remote-control … --resume <uuid>`, so it reconnects to Remote Control with full history. Resume never auto-continues — send it a prompt (SendMessage or the app) to pick the task back up. **Per-box, NOT transferred by resume:** the cf-tunnel + `~/tunnel-share`/`~/drop` are local to each machine (start a fresh `content-server.py`+`agent.js` on the new box if you need a tunnel; drop files don't move). The 1 GB default (`small`) OOM-kills Chromium on heavy pages — use `medium`/4 GB for anything that drives a browser. |
 | re-login Claude | portal Settings → Re-login (drives `claude auth login --claudeai` in a PTY; paste the code) |
 | debug Flux | `kubectl -n flux-system get gitrepository,kustomization,helmrelease -A`; `kubectl -n flux-system logs deploy/kustomize-controller --tail 50` |
 | debug the portal | `kubectl -n claude logs deploy/portal --tail 100`; `kubectl -n claude get events --sort-by=.lastTimestamp | tail` |
@@ -59,6 +60,20 @@ curl -sS -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" -H "CF-Access-Client-Sec
 
 ## Gotchas (all hit on 2026-09-13)
 
+- **Rotating `FLY_API_TOKEN` (the portal's Fly access).** It's an **org** token
+  `claude-selfhost-controller` in the **personal** org (the account requires SSO, so
+  personal-access tokens can't be minted via the UI — only org tokens at
+  `fly.io/dashboard/personal/tokens`). To rotate: create a new org token there, swap it into
+  `portal-secrets` (read all live values `kubectl -n claude get secret portal-secrets -o json`,
+  rewrite the manifest with only `FLY_API_TOKEN` changed, `sops --encrypt --in-place`, push),
+  then `kubectl -n claude rollout restart deploy/portal` (it's `envFrom`, so a secret change
+  needs a restart), verify with `GET …/portal/api/state` (it calls the Fly API), then revoke
+  the old token. Two capture pitfalls: (1) a Fly token is `FlyV1 fm2_<macaroon>,fm2_<discharge>`
+  — capture the **whole** string incl. the comma+discharge or the API 401s; read it from the
+  reveal `<input>`/`<code>` and match `/FlyV1 fm2_[A-Za-z0-9_,=\/+.-]+/` (comma inside the
+  class). (2) The create/revoke controls are Phoenix **LiveView** (`phx-click`, `data-confirm`)
+  — wait for `window.liveSocket.isConnected()` before filling/clicking or the click no-ops, and
+  accept the `data-confirm` dialog (`page.on('dialog', d=>d.accept())`).
 - **A portal rollout kills any in-flight session-image build and loses its status.** The
   build is a flyctl child process of the portal pod with the job record in memory, and every
   portal/cf-tunnel commit → GHA → Flux rollout replaces the pod. Before triggering, check the
