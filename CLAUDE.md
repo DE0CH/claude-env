@@ -593,13 +593,19 @@ up in the Claude phone app. Isolated microVM per session (install tools freely).
 - **Box lifecycle is manual:** `selfhost/cluster/create.sh` (needs `AGE_KEY_FILE`,
   `K8S_ADMIN_TOKEN_FILE`, `HETZNER_API`, `HETZNER_S3_*`) / `destroy.sh`. Rebuild = destroy +
   create; everything returns from git. First time only: make the GHCR package public (no API).
-- Cost: box ~€6.59/mo fixed; Fly sessions ~1–2¢/session-hour. Destroy sessions from the
-  dashboard when done (no idle auto-destroy yet). Dashboard rules Deyao set: name optional
-  (blank → the Claude session names itself, dashboard mirrors it); only Destroy (no
-  Start/Stop) with a pre-destroy uncommitted/unpushed check; two-phase UI (instant ack, change
-  only on confirmed state — never optimistic); 250ms cooldown on destructive buttons after a
-  list shifts; Terminal panel = tmux mirror via Fly exec; Re-login = real `claude auth login` in the
-  auth-broker pod (portal rollouts are stateless: builds in CI, PTY in the broker).
+- Cost: box ~€6.59/mo fixed; Fly sessions ~1–2¢/session-hour. Idle sessions **auto-pause**
+  (Fly stop after ~1h idle — claude status idle + no background jobs) to cut compute; a paused
+  machine keeps its rootfs, and Start resumes the SAME conversation (the session image
+  `--resume`s the newest local transcript on boot). Auto-pause is per-session (default on,
+  toggle on the card; checkbox in New session); the portal runs the pause loop, so it works
+  whether or not the dashboard is open. Pausing is NOT destroying — still Destroy sessions from
+  the dashboard when done (no idle auto-destroy). Dashboard rules Deyao set: name optional
+  (blank → the Claude session names itself, dashboard mirrors it); per-session Pause/Start plus
+  the auto-pause toggle, and Destroy with a pre-destroy uncommitted/unpushed check; two-phase UI
+  (instant ack, change only on confirmed state — never optimistic); 250ms cooldown on
+  destructive buttons after a list shifts; Terminal panel = tmux mirror via Fly exec; Re-login =
+  real `claude auth login` in the auth-broker pod (portal rollouts are stateless: builds in CI,
+  PTY in the broker).
 - Known limit: sessions share the Claude OAuth refresh token (fine for a few concurrent).
 
 ## Other files

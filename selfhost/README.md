@@ -129,8 +129,18 @@ Destroy: `selfhost/cluster/destroy.sh` (Fly sessions are separate — destroy th
 - **Portal rollouts are stateless**: every long-lived thing lives outside the portal process —
   session-image builds in CI, the Re-login PTY in the auth broker, the tunnel in its own pod —
   so a Flux rollout of the portal (RollingUpdate, new pod Ready before the old one goes) loses
-  nothing. Keep it that way: no in-process background jobs in `server.js`.
-- **Only Destroy** (no Start/Stop), with the pre-destroy uncommitted/unpushed check. **Destroy archives
+  nothing. Keep it that way: no in-process job whose state matters may live in `server.js`. The
+  one in-process job (the **auto-pause** loop) is deliberately fail-safe — its only state is an
+  in-memory "idle since" map, so a rollout just resets the idle clocks (a session runs a little
+  longer, nothing lost); during the brief two-pod overlap the fresh pod's empty map means it
+  won't pause anything, so there's no double-stop.
+- **Pause / Start** each session (Fly stop/start), and **auto-pause** idle ones (default on,
+  per-session toggle): the portal stops a machine after ~1h idle (claude status idle + no
+  background jobs) to cut compute. A stopped machine keeps its rootfs, so ~/workspace and the
+  transcript survive and **Start resumes the SAME conversation** — the session image `--resume`s
+  the newest local transcript on boot (`session-supervisor.sh`) and reuses the on-disk machineID
+  so the Claude app sees the same target. Pausing is NOT destroying; unsaved work is safe across
+  a pause. **Only Destroy** (not pause) runs the pre-destroy uncommitted/unpushed check. **Destroy archives
   first, with no AI involved**: the portal runs an uploader inside the machine that puts every
   transcript (`~/.claude/projects/**/*.jsonl`), everything under `~/artifacts/` (the mark — files or
   symlinks, subfolders kept) and a `session.json` on the Hetzner Storage Box at
@@ -151,5 +161,8 @@ Destroy: `selfhost/cluster/destroy.sh` (Fly sessions are separate — destroy th
   **Refresh login** button (`POST /api/sessions/:id/relogin`) writes the portal's current pair
   into the session and types `continue` so it carries on. A stop/start of the machine re-seeds
   the pair the machine was CREATED with (from its env), so press Refresh login after a restart too.
-- Sessions don't auto-destroy on idle (~1–2¢/hour while running).
+  This applies to **auto-pause wakes too**: a session woken after a long pause may show "Login
+  expired" if the shared refresh token rotated meanwhile — press Refresh login on the card.
+- Sessions **auto-pause** (Fly stop) on idle to cut compute, but don't auto-destroy (~1–2¢/hour
+  while running; ~free while paused apart from a small rootfs-storage cost). Destroy when done.
 - The terminal mirror has ~1 s latency and no mouse/scrollback; it's for watching and nudging.

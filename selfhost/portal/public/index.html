@@ -234,7 +234,10 @@ function render(){banners();if(TAB==='sessions')renderSessions();if(TAB==='andro
 function sessionPill(m){
   // Real state only. Fly state first; then whether claude inside has actually come up.
   if(m.state==='destroying'||m.state==='destroyed')return `<span class="pill bad"><span class="spinner"></span>${esc(m.state)}</span>`;
-  if(m.state==='created'||m.state==='starting')return `<span class="pill wait"><span class="spinner"></span>creating…</span>`;
+  if(m.state==='created')return `<span class="pill wait"><span class="spinner"></span>creating…</span>`;
+  if(m.state==='starting')return `<span class="pill wait"><span class="spinner"></span>starting…</span>`;
+  if(m.state==='stopping')return `<span class="pill wait"><span class="spinner"></span>pausing…</span>`;
+  if(m.state==='stopped'||m.state==='suspended')return `<span class="pill dim">paused</span>`;
   if(m.state==='started'){
     if(!m.status)return `<span class="pill wait"><span class="spinner"></span>booting…</span>`;
     // background jobs (watchers, long builds) keep a session "idle" in claude's own status
@@ -259,6 +262,12 @@ function renderSessions(){
     const repos=m.repos?m.repos.split(' ').map(u=>u.split('/').pop().replace(/\.git$/,'')).join(', '):'';
     const perm=m.permissionMode==='bypass'?' · <span class="pill bad" style="text-transform:none">skip perms</span>':(m.permissionMode?' · auto':'');
     const modelName=m.model?((MODELS.models[m.model]||{}).label||m.model):'';
+    const paused=(m.state==='stopped'||m.state==='suspended');
+    // auto-pause status line: off / counting down / generic; paused sessions explain Start
+    const apInfo=paused?'Paused — tap Start to resume the same conversation.'
+      :m.state==='started'?(m.autoPause==='off'?'Auto-pause off — stays running while idle.'
+        :(m.pauseInMs!=null?`Pauses in ~${Math.max(1,Math.round(m.pauseInMs/60000))} min if still idle.`:'Auto-pauses after ~1h idle.'))
+      :'';
     return `<div class="card${busy?' pending':''}">
     <div class="row" style="justify-content:space-between"><h3>${esc(title)}</h3>${sessionPill(m)}</div>
     <div class="meta">${m.environment?('env: '+esc(m.environment)):''}${repos?(' · '+esc(repos)):''}${perm}</div>
@@ -267,9 +276,12 @@ function renderSessions(){
     <div class="row">
       ${m.state==='started'?`<button class="btn ghost sm" onclick="openTerm('${m.id}','${esc(title)}')">Terminal</button>`:''}
       ${m.state==='started'?pbtn('relogin:'+m.id,'ghost sm',`reloginSession('${m.id}')`,'Refresh login'):''}
+      ${m.state==='started'?pbtn('ap:'+m.id,'ghost sm',`toggleAutoPause('${m.id}',${m.autoPause==='off'})`,m.autoPause==='off'?'Auto-pause: off':'Auto-pause: on'):''}
+      ${m.state==='started'?pbtn('stop:'+m.id,'ghost sm',`pauseSession('${m.id}')`,'Pause'):''}
+      ${paused?pbtn('start:'+m.id,'sm',`wakeSession('${m.id}')`,'Start'):''}
       ${pbtn('destroy:'+m.id,'danger sm',`destroy('${m.id}')`,'Destroy',cool)}
     </div>
-    <div class="hint">Open the Claude app to chat with this session.</div>
+    <div class="hint">${apInfo?esc(apInfo)+' ':''}${m.state==='started'?'Open the Claude app to chat with this session.':''}</div>
   </div>`}).join('');
 }
 // ---- Android (redroid box) ------------------------------------------------
@@ -479,6 +491,8 @@ function newSession(){
     ${Object.entries(MODELS.models||{}).map(([k,v])=>`<label class="choice"><input type="radio" name="ns-model" value="${esc(k)}" ${k===MODELS.default?'checked':''}><span class="t">${esc(v.label||k)}<small>${esc(k)}</small></span></label>`).join('')}
     <label>Machine size</label>
     ${Object.entries(SIZES.sizes||{}).map(([k,v])=>`<label class="choice"><input type="radio" name="ns-size" value="${esc(k)}" ${k===SIZES.default?'checked':''}><span class="t">${esc(k[0].toUpperCase()+k.slice(1))}<small>${esc(v.label)}</small></span></label>`).join('')}
+    <label>Cost</label>
+    <label class="choice"><input type="checkbox" name="ns-autopause" checked><span class="t">Auto-pause when idle<small>Stops the machine after ~1h with nothing running to save compute. Wake it with Start — files and the conversation are kept.</small></span></label>
     <label>Session title (optional)</label><input id="ns-title" type="text" name="session-topic" autocomplete="off" autocorrect="off" autocapitalize="sentences" spellcheck="false" placeholder="e.g. refactor billing module">
     <label>First prompt (optional)</label><textarea id="ns-prompt" name="session-first-prompt" autocomplete="off" autocapitalize="sentences" spellcheck="true" style="font-family:inherit;font-size:1rem;min-height:6rem" placeholder="Typed into the session as its first message once Claude is up — leave blank to start it yourself from the app."></textarea>
     <div class="hint">Shows as the session title in the Claude app too. Leave blank and the Claude session names itself.</div>
@@ -494,9 +508,10 @@ async function startSession(btn){
   const permissionMode=(document.querySelector('#dlg-body input[name=ns-perm]:checked')||{}).value||'auto';
   const size=(document.querySelector('#dlg-body input[name=ns-size]:checked')||{}).value||SIZES.default;
   const model=(document.querySelector('#dlg-body input[name=ns-model]:checked')||{}).value||MODELS.default;
+  const autoPause=(document.querySelector('#dlg-body input[name=ns-autopause]')||{}).checked!==false;
   const restore=dlgBusy(btn,'Starting…');
   try{
-    const r=await api('POST','api/sessions',{environment:env,repos,label,permissionMode,size,model,prompt});
+    const r=await api('POST','api/sessions',{environment:env,repos,label,permissionMode,size,model,prompt,autoPause});
     closeDlg();
     await refresh(false);                                 // card appears in its REAL state (creating…)
     settle(st=>{const m=(st.sessions||[]).find(x=>x.id===r.id);return !!(m&&m.state==='started'&&m.status);}); // fast-poll until claude is actually up
@@ -509,6 +524,26 @@ async function reloginSession(id){
   try{const r=await api('POST','api/sessions/'+id+'/relogin',{text:'continue'});alert('Fresh credentials written into the session'+(r.prompted?' and “'+r.text+'” sent':'')+'. Valid until '+new Date(r.expiresAt).toLocaleString()+'.');}
   catch(e){alert('Refresh login failed: '+e.message);if(/Re-login/.test(e.message))tab('settings');}
   pend('relogin:'+id,null);await refresh(false);
+}
+// ---- pause / wake / auto-pause toggle ---------------------------------------
+// Pause = Fly stop (rootfs kept); Start reboots and the session image resumes the same
+// conversation. Never optimistic: the pill only changes when Fly reports the new state.
+async function pauseSession(id){
+  pend('stop:'+id,'Pausing…');
+  try{await api('POST','api/sessions/'+id+'/stop');}catch(e){alert(e.message);}
+  pend('stop:'+id,null);await refresh(false);
+  settle(st=>{const m=(st.sessions||[]).find(x=>x.id===id);return !!(m&&(m.state==='stopped'||m.state==='suspended'));});
+}
+async function wakeSession(id){
+  pend('start:'+id,'Starting…');
+  try{await api('POST','api/sessions/'+id+'/start');}catch(e){alert(e.message);}
+  pend('start:'+id,null);await refresh(false);
+  settle(st=>{const m=(st.sessions||[]).find(x=>x.id===id);return !!(m&&m.state==='started'&&m.status);});
+}
+async function toggleAutoPause(id,enabled){
+  pend('ap:'+id,enabled?'Enabling…':'Disabling…');
+  try{await api('POST','api/sessions/'+id+'/autopause',{enabled});}catch(e){alert(e.message);}
+  pend('ap:'+id,null);await refresh(false);
 }
 async function refreshCreds(){
   pend('credrefresh','Refreshing…');

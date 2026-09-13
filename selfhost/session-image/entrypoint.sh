@@ -25,16 +25,24 @@ if [ -n "${CLAUDE_CREDENTIALS:-}" ]; then
   printf '%s' "$CLAUDE_CREDENTIALS" > "$HOME/.claude/.credentials.json"
   chmod 600 "$HOME/.claude/.credentials.json"
 fi
-# unique machineID per session so each shows as a distinct target in the app
+# machineID: reuse the one already on disk (the rootfs persists across a stop/start, so a
+# paused-then-woken machine keeps the SAME Remote Control identity in the Claude app instead
+# of showing up as a new target); only mint a fresh one on a brand-new machine. Existing
+# ~/.claude.json fields (projects trust, etc.) are preserved, then the account + fixed flags
+# are merged on top.
 MID="$(tr -d - < /proc/sys/kernel/random/uuid)"
 python3 - "$MID" <<'PY'
 import json,os,sys
-mid=sys.argv[1]
+mid=sys.argv[1]; p=os.path.expanduser("~/.claude.json")
+try: existing=json.load(open(p))
+except Exception: existing={}
 try: d=json.loads(os.environ.get("CLAUDE_ACCOUNT","") or "{}")
 except Exception: d={}
-d.update({"machineID":mid,"hasCompletedOnboarding":True,"hasUsedRemoteControl":True,
+if existing.get("machineID"): mid=existing["machineID"]
+existing.update(d)
+existing.update({"machineID":mid,"hasCompletedOnboarding":True,"hasUsedRemoteControl":True,
           "bypassPermissionsModeAccepted":True,"autoUpdates":False})
-json.dump(d,open(os.path.expanduser("~/.claude.json"),"w"))
+json.dump(existing,open(p,"w"))
 PY
 
 # --- environment secrets ---------------------------------------------------

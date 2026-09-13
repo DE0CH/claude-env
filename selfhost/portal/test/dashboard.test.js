@@ -71,6 +71,7 @@ async function run(viewport, tag) {
   ok(`${tag}: size default = medium`, await page.evaluate(() => document.querySelector('input[name=ns-size]:checked')?.value === "medium"));
   ok(`${tag}: model default = opus 4.8`, await page.evaluate(() => document.querySelector('input[name=ns-model]:checked')?.value === "claude-opus-4-8"));
   ok(`${tag}: auto perm default`, await page.evaluate(() => document.querySelector('input[name=ns-perm]:checked')?.value === "auto"));
+  ok(`${tag}: auto-pause default on`, await page.evaluate(() => document.querySelector('input[name=ns-autopause]')?.checked === true));
   await shot("3-newsession");
   // action bar must sit at the very bottom of the dialog viewport
   const gap = await page.evaluate(() => { const d = document.getElementById("dlg").getBoundingClientRect(); const a = document.querySelector("#dlg .actions").getBoundingClientRect(); return Math.round(d.bottom - a.bottom); });

@@ -44,10 +44,19 @@ start() {
     bypass) export SESSION_PERM_FLAG="--dangerously-skip-permissions" ;;
     *)      export SESSION_PERM_FLAG="" ;;
   esac
-  # Resume: entrypoint.sh has already placed the transcript in ~/.claude/projects (it unsets
-  # SESSION_RESUME_ID if that failed). A uuid, so the unquoted expansion below is safe.
+  # Resume the conversation. Priority: (1) a cross-machine move — entrypoint.sh placed the
+  # transcript and set SESSION_RESUME_ID (unset if that failed). (2) Otherwise the newest
+  # transcript already on this machine's rootfs: set on a stop/start WAKE (rootfs persists
+  # while paused) or a host crash, so the same conversation continues instead of starting
+  # blank. (3) Nothing on a brand-new machine -> a fresh session. All ids are uuids, so the
+  # unquoted expansion below is safe.
   export SESSION_RESUME_FLAG=""
-  [ -n "${SESSION_RESUME_ID:-}" ] && export SESSION_RESUME_FLAG="--resume $SESSION_RESUME_ID"
+  local rid="${SESSION_RESUME_ID:-}"
+  if [ -z "$rid" ]; then
+    local latest; latest="$(ls -t "$HOME"/.claude/projects/*/*.jsonl 2>/dev/null | head -1)"
+    [ -n "$latest" ] && rid="$(basename "$latest" .jsonl)"
+  fi
+  [ -n "$rid" ] && export SESSION_RESUME_FLAG="--resume $rid"
   if [ -n "$SESSION_LABEL" ]; then
     # --remote-control <name> names it in the Claude app; --name sets the local display
     # name (the session registry the dashboard reads), so both start identical.
@@ -58,7 +67,7 @@ start() {
   fi
   # fixed 120x40 window: the dashboard's terminal panel mirrors this pane (tmux capture-pane)
   tmux new-session -d -s "$SESSION" -x 120 -y 40 -c "$WD" "$CMD"
-  echo "[supervisor] started remote-control host in $WD (name: ${SESSION_LABEL:-auto}, model: $SESSION_MODEL, perm: ${SESSION_PERMISSION_MODE:-auto}, resume: ${SESSION_RESUME_ID:-none})"
+  echo "[supervisor] started remote-control host in $WD (name: ${SESSION_LABEL:-auto}, model: $SESSION_MODEL, perm: ${SESSION_PERMISSION_MODE:-auto}, resume: ${rid:-none})"
 }
 
 # First prompt (optional, SESSION_PROMPT from the machine env): once the remote-control host

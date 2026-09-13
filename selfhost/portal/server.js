@@ -125,6 +125,38 @@ async function readRegistry(machineId) {
   return data;
 }
 
+// ---- auto-pause idle sessions ---------------------------------------------
+// A started session idle for IDLE_PAUSE_MS (claude status exactly "idle", no background jobs)
+// is stopped to save Fly compute. A stopped machine keeps its rootfs, so ~/workspace and the
+// transcript survive and the session image resumes the SAME conversation on the next Start
+// (see session-supervisor.sh). Opt out per session via metadata autoPause=off (dashboard
+// toggle). idleSince tracks when a machine first looked idle; it is reset the moment it is
+// busy/waiting/unreachable, so only a sustained idle actually pauses.
+const IDLE_PAUSE_MS = 60 * 60 * 1000;
+const AUTOPAUSE_TICK_MS = 2 * 60 * 1000;
+const idleSince = new Map(); // machineId -> ms it first looked idle
+function idleEligible(reg) { return !!(reg && reg.status === "idle" && !reg.bgTasks); }
+async function autoPauseTick() {
+  if (!process.env.FLY_API_TOKEN) return;
+  let machines;
+  try { machines = await fly.listMachines(); } catch { return; }
+  const alive = new Set();
+  for (const m of machines) {
+    if (m.state !== "started") { idleSince.delete(m.id); continue; }
+    alive.add(m.id);
+    if ((m.config?.metadata?.autoPause || "on") === "off") { idleSince.delete(m.id); continue; }
+    let reg = null;
+    try { reg = await readRegistry(m.id); } catch { reg = null; }
+    if (!idleEligible(reg)) { idleSince.delete(m.id); continue; } // booting/busy/needs-you/unreachable
+    if (!idleSince.has(m.id)) idleSince.set(m.id, Date.now());
+    if (Date.now() - idleSince.get(m.id) >= IDLE_PAUSE_MS) {
+      try { await fly.stopMachine(m.id); idleSince.delete(m.id); console.log(`[autopause] paused idle session ${m.id} (${m.name})`); }
+      catch (e) { console.error(`[autopause] stop ${m.id} failed: ${e.message}`); }
+    }
+  }
+  for (const id of [...idleSince.keys()]) if (!alive.has(id)) idleSince.delete(id); // forget gone machines
+}
+
 // ---- state ----------------------------------------------------------------
 app.get("/api/state", async (req, res) => {
   try {
@@ -150,6 +182,7 @@ app.get("/api/state", async (req, res) => {
           permissionMode: m.config?.metadata?.permissionMode || "",
           size: m.config?.metadata?.size || "",
           model: m.config?.metadata?.model || "",
+          autoPause: m.config?.metadata?.autoPause || "on", // default on (also covers pre-feature sessions)
           guest: m.config?.guest ? `${m.config.guest.cpus}×${m.config.guest.cpu_kind} · ${Math.round((m.config.guest.memory_mb || 0) / 1024)} GB` : "",
         }));
         // stable order: newest first, id as tie-break (Fly's list order is not deterministic)
@@ -159,6 +192,10 @@ app.get("/api/state", async (req, res) => {
           if (s.state !== "started") return;
           const reg = await readRegistry(s.id);
           if (reg) Object.assign(s, reg);
+          // how long until auto-pause, if the loop is already counting this one down
+          if (s.autoPause !== "off" && idleEligible(reg) && idleSince.has(s.id)) {
+            s.pauseInMs = Math.max(0, idleSince.get(s.id) + IDLE_PAUSE_MS - Date.now());
+          }
         }));
       } catch (e) { flyError = e.message; }
     } else { flyError = "FLY_API_TOKEN not set"; }
@@ -301,7 +338,7 @@ app.post("/api/sessions", async (req, res) => {
     catch (e) { if (e.needLogin) return res.status(409).json({ error: e.message, needLogin: true }); console.error(`[creds] ${e.message}`); }
     const creds = await store.getClaudeCredentials();
     if (!creds.credentials) return res.status(409).json({ error: "no Claude credentials — Re-login from Settings", needLogin: true });
-    const { environment, repos = [], label, permissionMode, size, model, prompt } = req.body || {};
+    const { environment, repos = [], label, permissionMode, size, model, prompt, autoPause } = req.body || {};
     const env = cfg.environments[environment];
     if (environment && !env) return res.status(400).json({ error: `unknown environment '${environment}'` });
     const sizeKey = size && SIZES[size] ? size : DEFAULT_SIZE;
@@ -315,6 +352,9 @@ app.post("/api/sessions", async (req, res) => {
     // Permission mode for the remote-control host: "auto" (the default auto-approve
     // permission mode with the classifier) or "bypass" (--dangerously-skip-permissions).
     const permMode = permissionMode === "bypass" ? "bypass" : "auto";
+    // Auto-pause when idle (default on): stop the machine after ~1h idle to save compute; it
+    // resumes the same conversation on Start. Stored in metadata; the auto-pause loop reads it.
+    const autoPauseVal = autoPause === false ? "off" : "on";
 
     // Session title. If the user typed one, pin it everywhere: dashboard card, Fly machine,
     // AND the Remote Control session name in the Claude app (`claude --remote-control <name>`).
@@ -355,10 +395,11 @@ app.post("/api/sessions", async (req, res) => {
         permissionMode: permMode,
         size: sizeKey,
         model: modelId,
+        autoPause: autoPauseVal,
         hasPrompt: firstPrompt ? "1" : "",
       },
     });
-    res.json({ ok: true, id: machine.id, name, label: userLabel, state: machine.state, size: sizeKey, model: modelId, hasPrompt: !!firstPrompt });
+    res.json({ ok: true, id: machine.id, name, label: userLabel, state: machine.state, size: sizeKey, model: modelId, autoPause: autoPauseVal, hasPrompt: !!firstPrompt });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 // Pre-destroy check: uncommitted / unpushed work in each repo inside the session.
@@ -426,6 +467,16 @@ app.post("/api/sessions/:id/stop", async (req, res) => {
 app.post("/api/sessions/:id/start", async (req, res) => {
   try { res.json(await fly.startMachine(req.params.id)); } catch (e) { res.status(500).json({ error: e.message }); }
 });
+// Toggle auto-pause for one session (metadata autoPause=on|off). Default is on; turning it
+// off keeps the machine running through idle periods. Resets the idle countdown either way.
+app.post("/api/sessions/:id/autopause", async (req, res) => {
+  try {
+    const enabled = !(req.body && req.body.enabled === false);
+    await fly.setMetadata(req.params.id, "autoPause", enabled ? "on" : "off");
+    idleSince.delete(req.params.id);
+    res.json({ ok: true, autoPause: enabled ? "on" : "off" });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
 // Destroy = archive first (transcripts + ~/artifacts -> Storage Box, done by the portal, no AI),
 // then delete the machine. If archiving fails the machine is kept unless ?force=1.
 app.delete("/api/sessions/:id", async (req, res) => {
@@ -490,4 +541,6 @@ app.listen(PORT, HOST, () => {
   console.log(`[portal] v${VERSION} listening on ${HOST}:${PORT}`);
   store.get().then((c) => console.log(`[portal] cluster ok: ${Object.keys(c.environments).length} environment(s), ${(c.repos || []).length} repo(s), image ${c.sessionImage || "none"}`))
     .catch((e) => console.error("[portal] cluster read failed (will retry on requests):", e.message));
+  // Auto-pause idle sessions (single portal replica, so one timer is enough).
+  setInterval(() => autoPauseTick().catch((e) => console.error("[autopause]", e.message)), AUTOPAUSE_TICK_MS);
 });
