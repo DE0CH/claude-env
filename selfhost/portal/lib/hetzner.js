@@ -1,5 +1,5 @@
 // Thin Hetzner Cloud API client — just what the portal needs to manage the redroid
-// Android box (find it by label, power it on/off, delete it). Docs: docs.hetzner.cloud
+// Android box (find it by label, delete it). Docs: docs.hetzner.cloud
 const API = "https://api.hetzner.cloud/v1";
 
 async function call(method, path, token, body) {
@@ -41,6 +41,5 @@ async function find(token) {
 
 module.exports = {
   find,
-  action: (id, name, token) => call("POST", `/servers/${id}/actions/${name}`, token),
   del: (id, token) => call("DELETE", `/servers/${id}`, token),
 };

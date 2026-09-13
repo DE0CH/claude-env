@@ -273,8 +273,9 @@ function renderSessions(){
   </div>`}).join('');
 }
 // ---- Android (redroid box) ------------------------------------------------
-// A Hetzner VM managed via HETZNER_API. Start/Stop power it without deleting; Release
-// deletes it. Debug is READ-ONLY: a live screenshot + health pulled over SSH on demand.
+// A Hetzner VM managed via HETZNER_API. The only action is Release (delete): Hetzner bills a
+// powered-off server exactly like a running one, so a Stop button would save nothing.
+// Debug is READ-ONLY: a live screenshot + health pulled over SSH on demand.
 const ANDROID={loading:false,server:null,err:null,screenTs:0};
 async function loadAndroid(){
   if(ANDROID.loading)return; ANDROID.loading=true;
@@ -301,7 +302,7 @@ function renderAndroid(){
       <div class="meta" id="rd-meta"></div>
       <div class="spacer"></div>
       <div class="row" id="rd-actions"></div>
-      <div class="hint">Stop pauses the phone but the VM still bills — only <b>Release</b> stops the monthly cost. Release deletes the box (rebuild with <code>redroid/provision.sh</code>).</div>
+      <div class="hint">The box bills by the hour whether it runs or not — <b>Release</b> deletes it and stops the cost (rebuild with <code>redroid/provision.sh</code>).</div>
     </div>
     <div class="card" id="rd-debug">
       <div class="row" style="justify-content:space-between"><h3>Debug — view only</h3><span id="rd-dbtn"></span></div>
@@ -312,25 +313,9 @@ function renderAndroid(){
   }
   $('#rd-pill').innerHTML=rdPill(s.status);
   $('#rd-meta').innerHTML=`${esc(s.type||'')}${s.cores?` · ${s.cores} vCPU`:''}${s.memoryGb?` · ${s.memoryGb} GB`:''}${s.datacenter?` · ${esc(s.datacenter)}`:''}<br>${s.ip?esc(s.ip):'(no IP)'}${s.created?` · created ${ago(s.created)}`:''}`;
-  const a=[];
-  if(s.status==='off')a.push(pbtn('rd:start','sm',"rdAction('start','Starting…')",'Start'));
-  if(s.status==='running')a.push(pbtn('rd:stop','ghost sm',"rdAction('stop','Stopping…')",'Stop'));
-  a.push(pbtn('rd:release','danger sm','rdRelease()','Release'));
-  $('#rd-actions').innerHTML=a.join('');
+  $('#rd-actions').innerHTML=pbtn('rd:release','danger sm','rdRelease()','Release');
   $('#rd-debug').style.display=s.status==='running'?'':'none';
   $('#rd-dbtn').innerHTML=pbtn('rd:debug','ghost sm','rdDebug()',ANDROID.screenTs?'Refresh':'Load');
-}
-async function rdAction(kind,label){
-  // Two-phase, never optimistic: the request returns as soon as Hetzner ACCEPTS the action
-  // (an ACPI shutdown then takes ~25s, a start ~15s), so keep the pending indicator until
-  // the box actually reports the new state (or 3 min pass), fast-polling meanwhile.
-  const want=kind==='stop'?'off':'running';
-  pend('rd:'+kind,label);
-  try{await api('POST','api/redroid/'+kind);}
-  catch(e){alert(e.message);pend('rd:'+kind,null);return;}
-  const deadline=Date.now()+180000;
-  settle(()=>{const done=(ANDROID.server||{}).status===want||Date.now()>deadline;if(done)pend('rd:'+kind,null);return done;},180000);
-  await loadAndroid();
 }
 async function rdRelease(){
   if(!confirm('Release (DELETE) the cloud-Android box?\n\nThis permanently deletes the VM and everything on it — apps, logins, data. It stops the monthly cost. Rebuild later with redroid/provision.sh. This cannot be undone.'))return;

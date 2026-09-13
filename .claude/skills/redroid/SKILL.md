@@ -31,18 +31,16 @@ Debug health shows an empty boot flag.
 
 ## Manage it from the portal (dashboard)
 The portal has an **Android** tab (self-hosted controller, `selfhost/portal`):
-- **Start / Stop** — power the Hetzner VM on/off without deleting it. Stop = ACPI shutdown
-  (~25 s), with a server-side fallback to hard `poweroff` if the box is still running 60 s
-  later (the guest ignores ACPI while it is still booting). The button stays "Stopping…" /
-  "Starting…" until Hetzner reports the new state (never optimistic). NOTE: a stopped VM
-  still bills (Hetzner charges powered-off servers); only Release stops the monthly cost.
-- **Release** — deletes the VM (irreversible; rebuild with `redroid/provision.sh`).
+- **Release** — deletes the VM (irreversible; rebuild with `redroid/provision.sh`). This is
+  the only lifecycle button, deliberately: Hetzner bills a powered-off server exactly like a
+  running one, so a Stop would save nothing (Deyao, 2026-09-13). Running or released — no
+  in-between.
 - **Debug (view-only)** — a live screenshot + health (boot flag, container up/down, exit IP,
   proxy state, load/mem/disk/uptime), pulled on demand over SSH.
 
 The portal reads `HETZNER_API` and the **control key `REDROID_SSH_KEY`** from the **default
-environment** secrets (single source of truth). Endpoints: `GET/POST /api/redroid/{state,start,
-stop}`, `DELETE /api/redroid`, `GET /api/redroid/{debug,screen.png}` (portal `lib/redroid.js` +
+environment** secrets (single source of truth). Endpoints: `GET /api/redroid/state`,
+`DELETE /api/redroid`, `GET /api/redroid/{debug,screen.png}` (portal `lib/redroid.js` +
 `lib/hetzner.js`). The box is found by Hetzner label `purpose=redroid-android` — no hardcoded id.
 
 ## Control key in the default store (for sessions)
@@ -102,5 +100,5 @@ curl -X DELETE -H "Authorization: Bearer $HETZNER_API" https://api.hetzner.cloud
   scrcpy/adb port through SSH into the session and expose it through the per-session
   cf-tunnel (CF Access gated), then tear it down.
 - Portal buttons: `pbtn(key, cls, onclick, label)` drops `onclick` into a double-quoted HTML
-  attribute — write the handler with **single** quotes (`"rdAction('stop','…')"`), or the
-  attribute truncates and the button silently does nothing (the original Stop/Start bug).
+  attribute — write the handler with **single** quotes (`"someFn('arg')"`), or the
+  attribute truncates and the button silently does nothing (bit the old Stop/Start buttons).
