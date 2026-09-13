@@ -36,6 +36,8 @@ cp "$SECRETS_FILE" "$STAGE/.secrets"
 cp "$CRED_FILE" "$STAGE/.claude/.credentials.json"
 cp "$WORK/dot-claude.json" "$STAGE/.claude.json"
 [ -f "$HOME/.claude/settings.json" ] && cp "$HOME/.claude/settings.json" "$STAGE/.claude/settings.json" || true
+# portal store (environments/repos/image ref) — plain file; carried along so a rebuild keeps it
+if [ -f "$HOME/.selfhost/config.json" ]; then mkdir -p "$STAGE/.selfhost"; cp "$HOME/.selfhost/config.json" "$STAGE/.selfhost/config.json"; fi
 tar -C "$STAGE" -czf "$WORK/bundle.tgz" .
 PASSPHRASE="$(openssl rand -hex 32)"
 openssl enc -aes-256-cbc -pbkdf2 -salt -pass "pass:$PASSPHRASE" -in "$WORK/bundle.tgz" -out "$WORK/bundle.tgz.enc"

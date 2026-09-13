@@ -20,10 +20,11 @@ phone ─ Claude app (chat)          ─ dashboard  https://tunnel.deyaochen.com
           ── session machine B (env Z, repos…)  claude --remote-control   ← isolated microVMs
 ```
 
-- **Controller** holds no precious state. All portal state (environments + secrets, repo
-  list, session image ref) lives **encrypted in Hetzner S3** (`lib/store.js`, AES-256-GCM,
-  key = `PORTAL_ENC_KEY`). Nuke the box → `controller/create.sh` rebuilds it → portal
-  reloads everything from S3.
+- **Controller state = two plain files** (Deyao's choice: simple over stateless-purist):
+  `~/.secrets` (API keys) and `~/.selfhost/config.json` (environments + their secrets, repo
+  list, session image ref; `lib/store.js`, mode 600, unencrypted). `controller/create.sh`
+  bundles both from the machine it runs on, so a rebuild keeps them — keep a copy of the
+  controller's two files wherever you rebuild from.
 - **Sessions** are Fly Machines from one prebuilt image (`session-image/`). The portal
   injects the environment's secrets, the repos, and the Claude OAuth creds, then boots
   `claude --remote-control` with a unique machineID so each shows as its own target.
@@ -33,17 +34,18 @@ phone ─ Claude app (chat)          ─ dashboard  https://tunnel.deyaochen.com
 | var | for |
 |---|---|
 | `HETZNER_API` | create/destroy the controller box |
-| `HETZNER_S3_*` | encrypted config store (already present) |
+| `HETZNER_S3_*` | only for `create.sh`'s one-shot bootstrap bundle (presigned URL) |
 | `CF_ACCESS_CLIENT_ID/SECRET` | cf-tunnel agent (already present) |
 | `FLY_API_TOKEN` | create/destroy session machines + build the image |
-| `PORTAL_ENC_KEY` | 64-hex key encrypting the S3 config (generate once) |
-| `GITHUB_TOKEN` | pushing this repo; private-repo clones in sessions |
+| `GITHUB_TOKEN` | pushing this repo; private-repo clones / pushes in sessions |
 | Claude OAuth | `~/.claude/.credentials.json` (bundled at provision) |
 
 These live as a plain `~/.secrets` (mode 600) on the controller — that file is their home.
-All three are additionally kept in the `default` environment (sessions can push). When
-rebuilding the controller from a different machine, copy the controller's `~/.secrets` over
-first, since `create.sh` bundles the `~/.secrets` of the machine it runs on.
+`FLY_API_TOKEN` and `GITHUB_TOKEN` are also in the `default` environment (sessions can push).
+The portal's own store is `~/.selfhost/config.json` next to it. When rebuilding the controller
+from a different machine, copy both files over first — `create.sh` bundles whatever the
+machine it runs on has. (`PORTAL_ENC_KEY` is obsolete — nothing is encrypted any more.)
+Run `deploy-session-image.sh` **on the controller** (it records the image ref in that file).
 
 ## Bring-up
 

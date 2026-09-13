@@ -295,7 +295,7 @@ async function editEnv(name){
     <label>Name</label><input id="ev-title" type="text" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" value="${esc(name)}" ${name?'readonly':''} placeholder="e.g. default">
     <label>Secrets (KEY=VALUE, one per line)</label>
     <textarea id="ev-secrets" placeholder="LOBSTER_TOKEN=...\nSERPAPI_KEY=...">${esc(text)}</textarea>
-    <div class="hint">Saved encrypted. Blank value on an existing key deletes it.</div>
+    <div class="hint">Saved on the controller. Blank value on an existing key deletes it.</div>
     <div class="actions">
       <button class="btn ghost" onclick="closeDlg()">Cancel</button>
       <button class="btn" onclick="saveEnv(this)">Save</button></div>`);

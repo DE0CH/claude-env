@@ -557,18 +557,19 @@ Access, my email only) + a cf-tunnel agent, both under systemd. Each **session**
 **Fly.io Machine** (app `de0ch-claude-sessions`) booting a prebuilt image that injects an
 environment's secrets + repos and runs `claude --remote-control` — so it shows up in the
 Claude phone app. Isolated microVM per session (install tools freely). Portal state
-(environments = named secret sets, repos, session image ref) lives **encrypted in Hetzner
-S3** (`selfhost/portal/lib/store.js`); nuke the controller and `selfhost/controller/create.sh`
-rebuilds it identically.
+(environments = named secret sets, repos, session image ref) is a **plain file on the
+controller**, `~/.selfhost/config.json` (mode 600, unencrypted — Deyao's choice); together with
+`~/.secrets` it is all the controller's state, and `selfhost/controller/create.sh` bundles both
+from the machine it runs on when rebuilding.
 
 - Commands (run where `~/.secrets` + `~/.claude` creds live): `selfhost/controller/create.sh`
   / `destroy.sh`; `selfhost/deploy-session-image.sh` to (re)build the session image on Fly.
-- **Secrets home = the controller's disk.** `FLY_API_TOKEN` (Fly org token), `PORTAL_ENC_KEY`
-  (64-hex, encrypts the S3 config) and `GITHUB_TOKEN` live in plain `~/.secrets` (mode 600) on
-  the controller (Deyao's decision, 2026-09-13 — do NOT nag him to persist them in the env
-  config). All three are also stored in the `default` environment (so sessions can push).
-  To rebuild the controller from another box, copy the controller's `~/.secrets` there first
-  (`create.sh` bundles the runner's `~/.secrets`). Fly login: `flyctl auth login --email/--password`.
+- **Secrets home = the controller's disk.** `FLY_API_TOKEN` (Fly org token) and `GITHUB_TOKEN`
+  live in plain `~/.secrets` (mode 600) on the controller (Deyao's decision, 2026-09-13 — do NOT
+  nag him to persist them in the env config); both are also in the `default` environment so
+  sessions can push. `PORTAL_ENC_KEY` is obsolete (store is unencrypted). To rebuild the
+  controller from another box, copy its `~/.secrets` + `~/.selfhost/config.json` there first.
+  Fly login: `flyctl auth login --email/--password`.
 - Cost: controller ~€6.59/mo fixed; Fly sessions ~1–2¢/session-hour. Destroy sessions from
   the dashboard when done (no idle auto-destroy yet). Dashboard rules Deyao set: name chosen
   once at creation and then mirrored from the Claude app; only Destroy (no Start/Stop) with a
