@@ -211,6 +211,7 @@ function sessionPill(m){
     // background jobs (watchers, long builds) keep a session "idle" in claude's own status
     const bg=m.bgTasks?` · ${m.bgTasks} background`:'';
     if(m.status==='busy')return `<span class="pill wait">working</span>`; // foreground shells are counted too while busy
+    if(m.status==='waiting')return `<span class="pill bad">needs you</span>`; // claude is waiting for input / a permission answer
     return m.bgTasks?`<span class="pill wait">idle${esc(bg)}</span>`:`<span class="pill ok">idle</span>`;
   }
   return `<span class="pill dim">${esc(m.state)}</span>`;
