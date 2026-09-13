@@ -319,10 +319,15 @@ function renderAndroid(){
   $('#rd-dbtn').innerHTML=pbtn('rd:debug','ghost sm','rdDebug()',ANDROID.screenTs?'Refresh':'Load');
 }
 async function rdAction(kind,label){
+  // Two-phase, never optimistic: the request returns as soon as Hetzner ACCEPTS the action
+  // (an ACPI shutdown then takes ~25s, a start ~15s), so keep the pending indicator until
+  // the box actually reports the new state (or 3 min pass), fast-polling meanwhile.
+  const want=kind==='stop'?'off':'running';
   pend('rd:'+kind,label);
-  try{await api('POST','api/redroid/'+kind);}catch(e){alert(e.message);}
-  pend('rd:'+kind,null);
-  fastUntil=Math.max(fastUntil,Date.now()+90000); // fast-poll until the box status settles
+  try{await api('POST','api/redroid/'+kind);}
+  catch(e){alert(e.message);pend('rd:'+kind,null);return;}
+  const deadline=Date.now()+180000;
+  settle(()=>{const done=(ANDROID.server||{}).status===want||Date.now()>deadline;if(done)pend('rd:'+kind,null);return done;},180000);
   await loadAndroid();
 }
 async function rdRelease(){
@@ -330,7 +335,7 @@ async function rdRelease(){
   pend('rd:release','Releasing…');
   try{await api('DELETE','api/redroid');ANDROID.server=null;ANDROID.screenTs=0;}catch(e){alert(e.message);}
   pend('rd:release',null);
-  fastUntil=Math.max(fastUntil,Date.now()+30000);
+  settle(()=>!ANDROID.server,30000);
   await loadAndroid();
 }
 async function rdDebug(){
