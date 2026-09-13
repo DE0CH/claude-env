@@ -18,4 +18,4 @@ images:
   newTag: sha-3f6e62f88e8d
 - name: claude-tunnel-agent
   newName: ghcr.io/de0ch/claude-portal
-  newTag: sha-f1905b16980e
+  newTag: sha-3f6e62f88e8d

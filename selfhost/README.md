@@ -129,5 +129,8 @@ Destroy: `selfhost/cluster/destroy.sh` (Fly sessions are separate — destroy th
   (`push-claude-credentials`, via `POST /api/credentials`; newest expiry wins) and the portal
   refreshes the stored pair itself before starting a session. If that refresh is rejected the
   dashboard says so and the only fix is Re-login (Settings). See `API.md`.
+  Remaining limit: the refresh token is single-use, so with several long-running sessions the
+  first one to refresh (≈8 h in) wins and the others can't refresh their own copy when theirs
+  expires — they'd need a re-start (new sessions always get the newest pair).
 - Sessions don't auto-destroy on idle (~1–2¢/hour while running).
 - The terminal mirror has ~1 s latency and no mouse/scrollback; it's for watching and nudging.
