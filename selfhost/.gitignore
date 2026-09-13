@@ -1,2 +1,4 @@
 node_modules/
 *.log
+# dashboard build output (selfhost/portal/web → vite build); rebuilt in the portal image
+portal/public/

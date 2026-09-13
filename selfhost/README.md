@@ -121,7 +121,21 @@ Destroy: `selfhost/cluster/destroy.sh` (Fly sessions are separate — destroy th
 - **Secret values are write-only**: the dashboard lists key names and lets you set a new value, delete
   a key, or add keys; values are never sent to the browser (there is no reveal endpoint).
 - **Terminal**: mirrors the session's tmux pane (1 Hz `capture-pane` over the Fly exec API,
-  keys via `send-keys`) — no WireGuard/PTY; works through the tunnel; "Fit" resizes tmux.
+  keys via `send-keys`) — no WireGuard/PTY; works through the tunnel. It **auto-fits**: on open,
+  on rotation and when the phone keyboard appears, xterm is refitted and the remote tmux window
+  resized to match (a ResizeObserver on the terminal area; the panel is sized to the
+  `visualViewport`, which is what the iOS keyboard shrinks — `100dvh` is not). Touch devices type
+  through the input row + key chips (xterm's own hidden textarea is disabled there).
+- **Front-end** (`portal/web/`): Vite + React + TypeScript, styled with stock **Bootstrap 5**
+  (Deyao's pick — no custom theme, no gradients/shadows; colour mode follows the OS via
+  `data-bs-theme`). Sheets are **vaul** drawers (the library behind shadcn/ui's Drawer), which
+  own the gestures: drag the handle up to the full-screen snap point, flick down to dismiss,
+  keyboard-aware input repositioning; the terminal is a `handleOnly` drawer. Per-session actions
+  beyond Terminal/Start live behind a **More** action sheet (one row of at most two buttons per
+  card). `npm run build` in `web/` writes `portal/public/` (git-ignored; the portal image builds
+  it in a Docker stage). Actions are never optimistic: `pendUntil` keeps a button in its pending
+  state until `/api/state` reports the new value (Fly's list lags metadata/state changes by a
+  few seconds), so a toggle never flips back to the old state before settling.
 - **Re-login** (Settings): drives the real `claude auth login --claudeai` in a PTY inside the
   **auth-broker** pod (`portal/auth-broker.js`, `k8s/auth/` — same image as the portal, pinned
   separately so portal rollouts never kill a login in progress); the portal relays the sign-in

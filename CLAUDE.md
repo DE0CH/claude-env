@@ -603,9 +603,14 @@ up in the Claude phone app. Isolated microVM per session (install tools freely).
   (blank → the Claude session names itself, dashboard mirrors it); per-session Pause/Start plus
   the auto-pause toggle, and Destroy with a pre-destroy uncommitted/unpushed check; two-phase UI
   (instant ack, change only on confirmed state — never optimistic); 250ms cooldown on
-  destructive buttons after a list shifts; Terminal panel = tmux mirror via Fly exec; Re-login =
-  real `claude auth login` in the auth-broker pod (portal rollouts are stateless: builds in CI,
-  PTY in the broker).
+  destructive buttons after a list shifts; Terminal panel = tmux mirror via Fly exec that
+  auto-fits to the visible area (keyboard included); Re-login = real `claude auth login` in the
+  auth-broker pod (portal rollouts are stateless: builds in CI, PTY in the broker). Look & feel
+  rules (Deyao, 2026-09-13): **stock Bootstrap 5** styling, no custom theme, no purple, no
+  gradients, no drop shadows, no iOS look-alike chrome; sheets are vaul drawers (drag handle to
+  expand/dismiss); per-card actions = one primary button + a "More" action sheet, never a wall
+  of buttons; nothing optimistic — a toggle's spinner stays until the server reports the new
+  state.
 - Known limit: sessions share the Claude OAuth refresh token (fine for a few concurrent).
 
 ## Other files

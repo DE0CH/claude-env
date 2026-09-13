@@ -1,0 +1,136 @@
+import { useState } from "react";
+import { api, ago, REGION, sessionTitle, type Session } from "../api";
+import { useStore, pendUntil, pend, refresh, settle, setTab } from "../store";
+import { PButton, Pill, Spinner, useCoolAfterShift } from "../ui";
+import { ActionSheet } from "../Sheet";
+
+function SessionPill({ m }: { m: Session }) {
+  // Real state only. Fly state first; then whether claude inside has actually come up.
+  if (m.state === "destroying" || m.state === "destroyed") return <Pill kind="bad"><Spinner />{m.state}</Pill>;
+  if (m.state === "created" || m.state === "starting") return <Pill kind="wait"><Spinner />creating…</Pill>;
+  if (m.state === "stopped" || m.state === "suspended") return <Pill kind="dim">paused</Pill>;
+  if (m.state === "started") {
+    if (!m.status) return <Pill kind="wait"><Spinner />booting…</Pill>;
+    if (m.status === "busy") return <Pill kind="wait">working</Pill>;
+    if (m.status === "waiting") return <Pill kind="bad">needs you</Pill>;
+    return m.bgTasks ? <Pill kind="wait">idle · {m.bgTasks} background</Pill> : <Pill kind="ok">idle</Pill>;
+  }
+  return <Pill kind="dim">{m.state}</Pill>;
+}
+
+const isPaused = (m: Session) => m.state === "stopped" || m.state === "suspended";
+const find = (s: any, id: string): Session | undefined => (s.sessions || []).find((x: Session) => x.id === id);
+
+// ---- actions (never optimistic: the pending label stays until the server confirms) ----
+export function pauseSession(id: string) {
+  return pendUntil("s:" + id, "Pausing…", () => api("POST", "api/sessions/" + id + "/stop"), (s) => { const m = find(s, id); return !!m && isPaused(m); }, 60000);
+}
+export function wakeSession(id: string) {
+  return pendUntil("s:" + id, "Starting…", () => api("POST", "api/sessions/" + id + "/start"), (s) => { const m = find(s, id); return !!m && m.state === "started"; }, 60000)
+    .then(() => settle((s) => { const m = find(s, id); return !!(m && m.state === "started" && m.status); }));
+}
+export function toggleAutoPause(id: string, enabled: boolean) {
+  return pendUntil("s:" + id, enabled ? "Enabling auto-pause…" : "Disabling auto-pause…", () => api("POST", "api/sessions/" + id + "/autopause", { enabled }),
+    (s) => { const m: any = find(s, id); return !!m && (m.autoPause === "off") === !enabled; });
+}
+// Session says "Login expired · Please run /login" (another session rotated the shared refresh
+// token): write the portal's current pair into the session and type "continue" so it resumes.
+export async function reloginSession(id: string) {
+  pend("s:" + id, "Refreshing login…");
+  try { const r = await api("POST", "api/sessions/" + id + "/relogin", { text: "continue" }); alert("Fresh credentials written into the session" + (r.prompted ? " and “" + r.text + "” sent" : "") + ". Valid until " + new Date(r.expiresAt).toLocaleString() + "."); }
+  catch (e: any) { alert("Refresh login failed: " + e.message); if (/Re-login/.test(e.message)) setTab("settings"); }
+  pend("s:" + id, null); await refresh(false);
+}
+export async function destroySession(id: string) {
+  pend("s:" + id, "Checking…");
+  let msg = "Destroy this session?\n\n";
+  try {
+    const c = await api("GET", `api/sessions/${id}/changes`);
+    if (c.checked) {
+      const dirty = (c.repos || []).filter((r: any) => r.uncommitted > 0 || r.unpushed > 0 || r.unpushed === -1);
+      if (c.status === "busy") msg += "⚠️ Claude is still WORKING in this session.\n\n";
+      if (dirty.length) {
+        msg += "⚠️ Unsaved work will be LOST:\n" + dirty.map((r: any) => "• " + r.name + ": "
+          + (r.uncommitted > 0 ? r.uncommitted + " uncommitted file(s)" : "")
+          + (r.uncommitted > 0 && (r.unpushed > 0 || r.unpushed === -1) ? ", " : "")
+          + (r.unpushed > 0 ? r.unpushed + " unpushed commit(s)" : r.unpushed === -1 ? "branch has no upstream (nothing pushed)" : "")).join("\n") + "\n";
+      } else if (c.status !== "busy") msg += "✓ No uncommitted or unpushed changes found.\n";
+    } else msg += "⚠️ Could not check for unsaved changes (" + (c.reason || "unknown") + ").\n";
+  } catch { msg += "⚠️ Could not check for unsaved changes.\n"; }
+  msg += "\nTranscripts and ~/artifacts are archived to the Storage Box first; then the container is deleted. Your repos on GitHub are not affected.";
+  pend("s:" + id, null);
+  if (!confirm(msg)) return;
+  pend("s:" + id, "Archiving…");
+  try {
+    let r;
+    try { r = await api("DELETE", "api/sessions/" + id); }
+    catch (e: any) {
+      if (!/archive/i.test(e.message)) throw e;
+      if (!confirm("Archiving to the Storage Box FAILED:\n" + e.message + "\n\nDestroy anyway (records will be lost)?")) { pend("s:" + id, null); return; }
+      pend("s:" + id, "Destroying…"); r = await api("DELETE", "api/sessions/" + id + "?force=1");
+    }
+    if (r && r.archived && r.archived.dir) console.log("archived", r.archived.files, "file(s) to", r.archived.dir);
+  } catch (e: any) { alert(e.message); }
+  pend("s:" + id, null);
+  await refresh(false);                                   // card shows destroying/destroyed until Fly drops it
+  settle((st) => !(st.sessions || []).some((x) => x.id === id), 60000);
+}
+
+export function Sessions({ onTerminal }: { onTerminal: (id: string, title: string) => void }) {
+  const sessions = useStore((s) => s.state.sessions) || [];
+  const models = useStore((s) => s.models);
+  const pending = useStore((s) => s.pending);
+  const [menu, setMenu] = useState<{ id: string; open: boolean } | null>(null);
+  // stable order (newest first) so cards never swap between polls
+  const list = [...sessions].sort((a, b) => String(b.created || "").localeCompare(String(a.created || "")) || String(a.id).localeCompare(String(b.id)));
+  const cool = useCoolAfterShift(list.map((m) => m.id).join("|"));
+  if (!list.length) return <div className="text-center text-body-secondary py-5">No sessions running.<br />Tap “New session”.</div>;
+  const menuFor = menu ? list.find((m) => m.id === menu.id) : undefined;
+  return (
+    <>
+      {list.map((m: any) => {
+        const title = sessionTitle(m);
+        const busy = pending.get("s:" + m.id);
+        const repos = m.repos ? m.repos.split(" ").map((u: string) => u.split("/").pop()!.replace(/\.git$/, "")).join(", ") : "";
+        const modelName = m.model ? ((models.models[m.model] || {}).label || m.model) : "";
+        const paused = isPaused(m);
+        // auto-pause status line: off / counting down / generic; paused sessions explain Start
+        const apInfo = paused ? "Paused — Start resumes the same conversation."
+          : m.state === "started" ? (m.autoPause === "off" ? "Auto-pause off — stays running while idle."
+            : (m.pauseInMs != null ? `Pauses in ~${Math.max(1, Math.round(m.pauseInMs / 60000))} min if still idle.` : "Auto-pauses after ~1h idle.")) : "";
+        return (
+          <div className={`card mb-3${busy ? " opacity-75" : ""}`} key={m.id}>
+            <div className="card-body">
+              <div className="d-flex justify-content-between align-items-start gap-2 mb-1"><h5 className="card-title mb-0 text-break">{title}</h5><SessionPill m={m} /></div>
+              <div className="text-body-secondary small">{m.environment ? "env: " + m.environment : ""}{repos ? " · " + repos : ""}{m.permissionMode === "bypass" ? <> · <Pill kind="bad">skip perms</Pill></> : (m.permissionMode ? " · auto" : "")}</div>
+              <div className="text-body-secondary small">{REGION[m.region] || m.region || ""}{m.guest ? " · " + m.guest : ""}{modelName ? " · " + modelName : ""}{m.created ? " · created " + ago(m.created) : ""}</div>
+              {apInfo && <div className="text-body-secondary small mt-1">{apInfo}</div>}
+              <div className="d-flex gap-2 mt-3 actions">
+                {m.state === "started" && <button className="btn btn-primary btn-sm" onClick={() => onTerminal(m.id, title)}>Terminal</button>}
+                {paused && <PButton pkey={"s:" + m.id} cls="btn-success" onClick={() => wakeSession(m.id)} label="Start" />}
+                {busy ? (m.state === "started" ? <button className="btn btn-outline-secondary btn-sm" disabled><Spinner />{busy}</button> : null)
+                  : <button className={`btn btn-outline-secondary btn-sm${cool ? " cool" : ""}`} aria-label="More actions" onClick={() => setMenu({ id: m.id, open: true })}>More ▾</button>}
+              </div>
+            </div>
+          </div>
+        );
+      })}
+      <ActionSheet open={!!menu?.open} onClose={() => setMenu((m) => (m ? { ...m, open: false } : m))} onClosed={() => setMenu(null)}
+        title={menuFor ? sessionTitle(menuFor) : ""}
+        items={menuFor ? menuItems(menuFor) : []} />
+    </>
+  );
+}
+function menuItems(m: any) {
+  const items = [] as { label: string; sub?: string; danger?: boolean; onClick: () => void }[];
+  if (m.state === "started") {
+    items.push({ label: "Refresh login", sub: "Write fresh Claude credentials into the session and send “continue”", onClick: () => reloginSession(m.id) });
+    items.push(m.autoPause === "off"
+      ? { label: "Turn auto-pause on", sub: "Pause automatically after ~1h idle", onClick: () => toggleAutoPause(m.id, true) }
+      : { label: "Turn auto-pause off", sub: "Keep the machine running while idle", onClick: () => toggleAutoPause(m.id, false) });
+    items.push({ label: "Pause", sub: "Stop the machine now; files and the conversation are kept", onClick: () => pauseSession(m.id) });
+  }
+  if (isPaused(m)) items.push({ label: "Start", sub: "Resume the same conversation", onClick: () => wakeSession(m.id) });
+  items.push({ label: "Destroy", sub: "Archive transcripts + ~/artifacts, then delete the machine", danger: true, onClick: () => destroySession(m.id) });
+  return items;
+}

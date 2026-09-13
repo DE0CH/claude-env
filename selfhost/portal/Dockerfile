@@ -12,6 +12,15 @@ WORKDIR /app/cf-tunnel
 COPY cf-tunnel/package.json cf-tunnel/package-lock.json ./
 RUN npm ci --omit=dev
 
+# Dashboard front-end: Vite + React (+ vaul sheets, xterm, Bootstrap) in selfhost/portal/web,
+# built here into portal/public — the only thing server.js serves statically.
+FROM node:22-bookworm-slim AS web
+WORKDIR /web
+COPY selfhost/portal/web/package.json selfhost/portal/web/package-lock.json ./
+RUN npm ci
+COPY selfhost/portal/web ./
+RUN npm run build
+
 FROM node:22-bookworm-slim
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -22,6 +31,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
  && useradd -m -u 1001 -s /bin/bash portal
 COPY --from=deps /app /app
 COPY selfhost/portal /app/portal
+COPY --from=web /public /app/portal/public
 COPY cf-tunnel /app/cf-tunnel
 COPY .sops.yaml /app/.sops.yaml
 RUN chown -R portal:portal /app
