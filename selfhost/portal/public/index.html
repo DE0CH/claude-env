@@ -355,11 +355,20 @@ async function destroy(id){
       }else if(c.status!=='busy'){msg+='✓ No uncommitted or unpushed changes found.\n';}
     }else{msg+='⚠️ Could not check for unsaved changes ('+(c.reason||'unknown')+').\n';}
   }catch(e){msg+='⚠️ Could not check for unsaved changes.\n';}
-  msg+='\nThe container and everything in it will be deleted. Your repos on GitHub are not affected.';
+  msg+='\nTranscripts and ~/artifacts are archived to the Storage Box first; then the container is deleted. Your repos on GitHub are not affected.';
   pend('destroy:'+id,null);
   if(!confirm(msg))return;
-  pend('destroy:'+id,'Destroying…');
-  try{await api('DELETE','api/sessions/'+id);}catch(e){alert(e.message);}
+  pend('destroy:'+id,'Archiving…');
+  try{
+    let r;
+    try{r=await api('DELETE','api/sessions/'+id);}
+    catch(e){
+      if(!/archive/i.test(e.message))throw e;
+      if(!confirm('Archiving to the Storage Box FAILED:\n'+e.message+'\n\nDestroy anyway (records will be lost)?')){pend('destroy:'+id,null);return;}
+      pend('destroy:'+id,'Destroying…');r=await api('DELETE','api/sessions/'+id+'?force=1');
+    }
+    if(r&&r.archived&&r.archived.dir)console.log('archived',r.archived.files,'file(s) to',r.archived.dir);
+  }catch(e){alert(e.message);}
   pend('destroy:'+id,null);
   await refresh(false);                                   // card shows destroying/destroyed until Fly drops it
   settle(st=>!(st.sessions||[]).some(x=>x.id===id),60000);

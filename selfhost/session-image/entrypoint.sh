@@ -12,7 +12,9 @@
 # the session can drive the controller cluster with kubectl.
 set -uo pipefail
 HOME=/home/claude; cd "$HOME"
-mkdir -p "$HOME/.claude" "$HOME/workspace"
+# ~/artifacts: anything the session puts (or symlinks) here is archived to the Storage Box by
+# the portal when the session is destroyed (alongside the transcripts) — see CLAUDE.md.
+mkdir -p "$HOME/.claude" "$HOME/workspace" "$HOME/artifacts"
 
 # --- Claude auth -----------------------------------------------------------
 if [ -n "${CLAUDE_CREDENTIALS:-}" ]; then

@@ -8,6 +8,7 @@ const fly = require("./lib/fly");
 const tty = require("./lib/tty");
 const auth = require("./lib/auth");
 const imagebuild = require("./lib/imagebuild");
+const archive = require("./lib/archive");
 
 const PORT = process.env.PORT || 8080;
 const HOST = process.env.HOST || "127.0.0.1";
@@ -281,8 +282,27 @@ app.post("/api/sessions/:id/stop", async (req, res) => {
 app.post("/api/sessions/:id/start", async (req, res) => {
   try { res.json(await fly.startMachine(req.params.id)); } catch (e) { res.status(500).json({ error: e.message }); }
 });
+// Destroy = archive first (transcripts + ~/artifacts -> Storage Box, done by the portal, no AI),
+// then delete the machine. If archiving fails the machine is kept unless ?force=1.
 app.delete("/api/sessions/:id", async (req, res) => {
-  try { res.json(await fly.destroyMachine(req.params.id)); } catch (e) { res.status(500).json({ error: e.message }); }
+  const id = req.params.id, force = req.query.force === "1";
+  let archived = null;
+  try {
+    const m = await fly.getMachine(id);
+    if (m.state === "started") {
+      const reg = await readRegistry(id);
+      const md = m.config?.metadata || {};
+      const title = (reg && reg.nameSource && reg.nameSource !== "derived" && reg.liveName) || (reg && reg.aiTitle) || md.label || (reg && reg.liveName) || m.name;
+      try {
+        archived = await archive.run(id, { id, machineName: m.name, title, environment: md.environment || "", repos: md.repos || "",
+          permissionMode: md.permissionMode || "", created: m.created_at, bridgeSessionId: (reg && reg.bridgeSessionId) || "" });
+      } catch (e) {
+        if (!force) return res.status(409).json({ error: e.message, archiveFailed: true });
+        archived = { error: e.message };
+      }
+    }
+    res.json({ ...(await fly.destroyMachine(id)), archived });
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
 app.use(express.static(path.join(__dirname, "public")));

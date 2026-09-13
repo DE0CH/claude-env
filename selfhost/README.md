@@ -100,7 +100,12 @@ Destroy: `selfhost/cluster/destroy.sh` (Fly sessions are separate — destroy th
   keys via `send-keys`) — no WireGuard/PTY; works through the tunnel; "Fit" resizes tmux.
 - **Re-login** (Settings): drives the real `claude auth login --claudeai` in a PTY inside the
   portal pod, shows the sign-in link, takes the pasted code, stores the new creds (git + cluster).
-- **Only Destroy** (no Start/Stop), with the pre-destroy uncommitted/unpushed check.
+- **Only Destroy** (no Start/Stop), with the pre-destroy uncommitted/unpushed check. **Destroy archives
+  first, with no AI involved**: the portal runs an uploader inside the machine that puts every
+  transcript (`~/.claude/projects/**/*.jsonl`), everything under `~/artifacts/` (the mark — files or
+  symlinks, subfolders kept) and a `session.json` on the Hetzner Storage Box at
+  `claude-records/<yyyy-mm-dd> <title>/`, then deletes the machine. If the upload fails the machine is
+  kept and the dashboard offers "destroy anyway". Sessions never upload their own transcript.
 - **Two-phase UI, never optimistic**; layout-shift guard; newest-first stable ordering.
 
 ## Known limitations

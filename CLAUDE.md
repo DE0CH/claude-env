@@ -485,12 +485,24 @@ this is what I mean:
 
 ## End-of-task records → Hetzner Storage Box `claude-records`
 
-At the end of EVERY task, upload the task's records to the Hetzner Storage Box
-(BX11 `claude-records`, box id 635000, project "Cloud Code"; provisioned
-2026-08-17, replacing the old Google Drive flow, which kept falling apart).
-Credentials are env vars: `STORAGEBOX_HOST` / `STORAGEBOX_USER` /
-`STORAGEBOX_PASSWORD` (WebDAV basic auth), plus `HETZNER_API` (project API
-token for managing the box itself via `api.hetzner.com/v1/storage_boxes`).
+Every task's records end up on the Hetzner Storage Box (BX11 `claude-records`, box id
+635000, project "Cloud Code"). Credentials are env vars: `STORAGEBOX_HOST` /
+`STORAGEBOX_USER` / `STORAGEBOX_PASSWORD` (WebDAV basic auth), plus `HETZNER_API`
+(project API token for managing the box itself via `api.hetzner.com/v1/storage_boxes`).
+
+**In a self-hosted session (runtime 3 — started from the dashboard) you do NOT upload
+anything yourself, and never your transcript.** When Deyao presses Destroy, the portal
+archives the session with no AI involved: every transcript under `~/.claude/projects/`
+plus **everything under `~/artifacts/`**, into `claude-records/<date> <session title>/`.
+So the only rule for you: anything worth keeping besides the transcript — the task
+record/chronicle (`~/artifacts/record.md`), screenshots, downloaded or generated
+files, reports, support-chat transcripts — must be **placed or symlinked under
+`~/artifacts/`** (that directory is the mark the uploader looks for; subfolders are
+fine). Anything elsewhere on the machine is lost with it. If an artefact can't be
+copied there (e.g. a remote recording), list its location/URL in `record.md`.
+
+**In the other runtimes (Mac, Claude-on-the-web pod)** there is no portal, so upload
+at the end of the task yourself, as before:
 
 Upload with **`scripts/storagebox-upload.sh`** — WebDAV over 443, so it works
 from Claude-on-the-web pods (SSH/rsync/SFTP on ports 22/23 are gateway-blocked
@@ -523,10 +535,9 @@ Upload into that directory:
    customer-service/support agents — the full chat transcript of that conversation.
 
 Verify an upload by GETting it back (or `curl -X PROPFIND` on the directory).
-This is a standing rule — do it without being asked, before reporting the task
-done. The old Google Drive flow (`scripts/drive-browser-upload.js`, folder
-`1lwmr6JE_51udrvKdFpHlSi090O54VWdx`) still exists if the box is ever
-unreachable — historical records up to 2026-08-17 live there.
+This is a standing rule for those runtimes — do it without being asked, before
+reporting the task done. (In a self-hosted session the same three items apply, but
+they go under `~/artifacts/` and the portal does the upload on Destroy.)
 
 ## Git
 
