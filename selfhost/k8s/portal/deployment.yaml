@@ -25,7 +25,8 @@ spec:
       terminationGracePeriodSeconds: 20
       containers:
         - name: portal
-          image: ghcr.io/de0ch/claude-portal
+          # placeholder name; selfhost/k8s/kustomization.yaml maps it to the built image + tag
+          image: claude-portal
           ports:
             - containerPort: 8080
           env:

@@ -50,7 +50,7 @@ jobs:
           set -e
           # direct release tarball: the install_kustomize.sh helper calls the GitHub API unauthenticated and 401s
           curl -fsSL "https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv5.6.0/kustomize_v5.6.0_linux_amd64.tar.gz" | sudo tar -xz -C /usr/local/bin kustomize
-          cd selfhost/k8s && kustomize edit set image "$IMAGE=$IMAGE:${{ steps.meta.outputs.tag }}"
+          cd selfhost/k8s && kustomize edit set image "claude-portal=$IMAGE:${{ steps.meta.outputs.tag }}"
           # tunnel agent: same image, separate pin — bump only if cf-tunnel/** changed in this push
           # (a portal-only build must not restart the tunnel pod, or the tunnel goes down)
           BEFORE="${{ github.event.before }}"
