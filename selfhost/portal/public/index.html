@@ -157,7 +157,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0.10.0/lib/addon-fit.js"></script>
 <script>
 const $=s=>document.querySelector(s);
-let STATE={environments:{},repos:[],sessions:[],sessionImage:null,flyError:null,hasCreds:true,imageBuild:{},auth:{}};
+let STATE={environments:{},repos:[],sessions:[],sessionImage:null,flyError:null,hasCreds:true,auth:{}};
 window.getState=()=>STATE; // read hook for test/dashboard.test.js
 let SIZES={sizes:{},default:'medium'}; fetch('api/sizes').then(r=>r.json()).then(j=>{SIZES=j;}).catch(()=>{});
 let TAB='sessions';
@@ -224,7 +224,7 @@ function banners(){
   let h='';
   if(STATE.hasCreds===false)h+='<div class="banner err">No Claude credentials — sessions can\'t authenticate. Re-login from Settings.</div>';
   else if((STATE.creds||{}).stale)h+='<div class="banner err">Claude login expired and the token refresh was rejected — new sessions can\'t sign in. Re-login from Settings.</div>';
-  if(!STATE.sessionImage)h+='<div class="banner warn">No session image yet. Build one from Settings.</div>';
+  if(!STATE.sessionImage)h+='<div class="banner warn">No session image pinned yet — run the session-image workflow on GitHub (see Settings).</div>';
   if(STATE.flyError)h+='<div class="banner err">Fly: '+esc(STATE.flyError)+'</div>';
   $('#banners').innerHTML=h;
 }
@@ -446,29 +446,25 @@ function renderSettings(){
   const v=$('#view-settings');
   const c=STATE.creds||{};
   const exp=c.expiresAt?new Date(c.expiresAt):null;
-  const b=STATE.imageBuild||{};
   const authBusy=PENDING.get('auth');
   v.innerHTML=`
     <div class="card"><h3>Claude account</h3>
       <div class="meta">${STATE.hasCreds?`Signed in${c.subscriptionType?' · '+esc(c.subscriptionType):''}${exp?' · access token '+(exp>new Date()?'expires':'expired')+' '+ago(exp.toISOString()).replace(' ago','')+(exp>new Date()?' from now':' ago'):''}`:'Not signed in'}</div>
       ${c.stale?`<div class="meta" style="color:var(--err)">Token refresh rejected: ${esc(c.error||'')}</div>`:''}
-      <div class="hint">Runs the real <code>claude auth login</code> on the controller: you open the link, sign in, and paste the code back here. New sessions use the stored credentials; the portal refreshes them before each start and running sessions push their refreshed copy back.</div>
+      <div class="hint">Runs the real <code>claude auth login</code> on the controller (in the auth-broker pod, which portal rollouts never restart): you open the link, sign in, and paste the code back here.${(STATE.auth||{}).unavailable?' <b style="color:var(--err)">Auth broker unreachable</b> — check the auth-broker pod.':''} New sessions use the stored credentials; the portal refreshes them before each start and running sessions push their refreshed copy back.</div>
       <div class="spacer"></div>
       <div class="row">${pbtn('auth','sm','relogin()','Re-login')}${STATE.hasCreds?pbtn('credrefresh','ghost sm','refreshCreds()','Refresh token'):''}</div>
     </div>
     <div class="card"><h3>Session image</h3>
-      <div class="meta">${STATE.sessionImage?esc(STATE.sessionImage):'none yet'}</div>
-      ${b.running?`<div class="meta"><span class="spinner"></span> building on Fly (started ${ago(new Date(b.startedAt).toISOString())})…</div>`:(b.startedAt?`<div class="meta">last build: ${b.ok?'✓ '+esc(b.image):'✗ failed'}</div>`:'')}
-      <div class="hint">Rebuilds selfhost/session-image from the current main on Fly's remote builder (~5 min) and records the new ref.</div>
+      <div class="meta">${STATE.sessionImage?esc(STATE.sessionImage):'none pinned yet'}</div>
+      <div class="hint">Built by GitHub Actions (<code>session-image</code> workflow) on every push that touches <code>selfhost/session-image/</code>, pushed to the public package <code>ghcr.io/de0ch/claude-sessions</code> and pinned into <code>selfhost/k8s/config/portal-config.yaml</code>; Flux applies the ref within a minute and the next session boots from it. To rebuild without a code change, re-run the workflow on GitHub. Nothing builds inside the portal, so rollouts can't lose a build.</div>
       <div class="spacer"></div>
-      <div class="row">${pbtn('image','sm','rebuildImage()',b.running?'Building…':'Rebuild image')}<button class="btn ghost sm" onclick="showBuildLog()">Build log</button></div>
-      <pre class="log" id="build-log" hidden></pre>
+      <div class="row"><a class="btn ghost sm" href="https://github.com/DE0CH/claude-env/actions/workflows/session-image.yml" target="_blank" rel="noopener" style="text-decoration:none">Workflow runs ↗</a></div>
     </div>
     <div class="card"><h3>Controller</h3>
       <div class="meta">portal v${esc(STATE.version||'?')} · Fly app ${esc(STATE.flyApp||'')}</div>
       <div class="hint">Everything here is reconciled by Flux from the claude-env repo (selfhost/k8s). Edits made in this dashboard are committed back to git (secrets encrypted with sops) and applied immediately.</div>
     </div>`;
-  if(b.running)settle(st=>!(st.imageBuild||{}).running,900000);
 }
 
 // ---- dialogs --------------------------------------------------------------
@@ -626,7 +622,7 @@ async function delRepo(n){
   pend('repo:'+n,null);await refresh(false);
 }
 
-// ---- settings: re-login + image rebuild ----------------------------------
+// ---- settings: re-login (runs in the auth broker; the portal relays) ----------------------------------
 async function relogin(){
   pend('auth','Starting…');
   let url;
@@ -648,16 +644,6 @@ async function submitCode(btn){
   const restore=dlgBusy(btn,'Signing in…');
   try{const r=await api('POST','api/auth/code',{code});closeDlg();await refresh(false);alert('Signed in. New sessions will use the refreshed credentials.');}
   catch(e){restore();$('#auth-msg').textContent=e.message;}
-}
-async function rebuildImage(){
-  if(!confirm('Rebuild the session image on Fly from the current main? (~5 min)'))return;
-  pend('image','Starting…');
-  try{await api('POST','api/image/rebuild');}catch(e){alert(e.message);}
-  pend('image',null);await refresh(false);
-}
-async function showBuildLog(){
-  const el=$('#build-log');el.hidden=false;
-  try{const s=await api('GET','api/image/build');el.textContent=(s.log||'(no build yet)');el.scrollTop=el.scrollHeight;}catch(e){el.textContent=e.message;}
 }
 
 // ---- terminal (tmux mirror of the session, via SSE + send-keys) --------------

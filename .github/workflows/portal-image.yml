@@ -50,22 +50,32 @@ jobs:
           set -e
           # direct release tarball: the install_kustomize.sh helper calls the GitHub API unauthenticated and 401s
           curl -fsSL "https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize%2Fv5.6.0/kustomize_v5.6.0_linux_amd64.tar.gz" | sudo tar -xz -C /usr/local/bin kustomize
-          cd selfhost/k8s && kustomize edit set image "claude-portal=$IMAGE:${{ steps.meta.outputs.tag }}"
-          # tunnel agent: same image, separate pin — bump only if cf-tunnel/** changed in this push
-          # (a portal-only build must not restart the tunnel pod, or the tunnel goes down).
-          # ":/" = repo-root pathspec: we are inside selfhost/k8s here.
+          TAG="${{ steps.meta.outputs.tag }}"
+          # The tunnel agent and the auth broker run this same image but are pinned SEPARATELY:
+          # bump them only if their own files changed in this push, so a portal-only build never
+          # restarts the tunnel (it goes down) or the auth broker (it holds the Re-login PTY).
           BEFORE="${{ github.event.before }}"
           if [ "${{ github.event_name }}" = "workflow_dispatch" ] || [ -z "$BEFORE" ] || ! git cat-file -e "$BEFORE^{commit}" 2>/dev/null; then
-            CHANGED=$(git diff --name-only HEAD~1 HEAD -- ":/cf-tunnel/" || true)
+            RANGE="$GITHUB_SHA~1 $GITHUB_SHA"
           else
-            CHANGED=$(git diff --name-only "$BEFORE" HEAD -- ":/cf-tunnel/" || true)
+            RANGE="$BEFORE $GITHUB_SHA"
           fi
-          if [ -n "$CHANGED" ]; then
-            echo "cf-tunnel changed; bumping tunnel-agent pin"; kustomize edit set image "claude-tunnel-agent=$IMAGE:${{ steps.meta.outputs.tag }}"
-          fi
-          cd "$GITHUB_WORKSPACE"
+          TUNNEL=$(git diff --name-only $RANGE -- cf-tunnel/ || true)
+          BROKER=$(git diff --name-only $RANGE -- selfhost/portal/lib/auth.js selfhost/portal/auth-broker.js || true)
           git config user.name "portal-image bot"; git config user.email "actions@users.noreply.github.com"
-          git add selfhost/k8s/kustomization.yaml
-          git diff --cached --quiet && exit 0
-          git commit -m "k8s: portal image ${{ steps.meta.outputs.tag }} [skip ci]"
-          git pull --rebase origin main && git push origin HEAD:main
+          # Pin AFTER syncing to the latest main and retry on push races (two workflows commit
+          # pins concurrently; "commit then rebase" conflicts on the pinned line — seen 2026-09-13).
+          for attempt in 1 2 3 4 5; do
+            git fetch -q origin main && git reset -q --hard origin/main
+            ( cd selfhost/k8s
+              kustomize edit set image "claude-portal=$IMAGE:$TAG"
+              [ -n "$TUNNEL" ] && { echo "cf-tunnel changed; bumping tunnel-agent pin"; kustomize edit set image "claude-tunnel-agent=$IMAGE:$TAG"; }
+              [ -n "$BROKER" ] && { echo "auth broker changed; bumping auth-broker pin"; kustomize edit set image "claude-auth-broker=$IMAGE:$TAG"; }
+              true )
+            git add selfhost/k8s/kustomization.yaml
+            if git diff --cached --quiet; then echo "already pinned"; exit 0; fi
+            git commit -q -m "k8s: portal image $TAG [skip ci]"
+            if git push -q origin HEAD:main; then echo "pinned $TAG"; exit 0; fi
+            echo "push rejected (attempt $attempt); retrying"; sleep $((attempt * 5))
+          done
+          echo "::error::could not push the pin after 5 attempts"; exit 1

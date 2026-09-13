@@ -1,0 +1,49 @@
+# Auth broker (selfhost/portal/auth-broker.js, shipped inside the portal image): the one
+# process that holds the Re-login PTY (`claude auth login --claudeai`). It is a SEPARATE
+# Deployment from the portal, with its own image pin (`claude-auth-broker` in
+# selfhost/k8s/kustomization.yaml) that CI bumps ONLY when portal/lib/auth.js or
+# portal/auth-broker.js change — so a portal rollout never kills a login in progress.
+# The portal relays /api/auth/* to it (AUTH_BROKER_URL) and stores the pair it returns.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: auth-broker
+  namespace: claude
+spec:
+  replicas: 1
+  # Recreate: the PTY lives in one process; two brokers behind the Service would answer
+  # /code from the wrong one.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: auth-broker
+  template:
+    metadata:
+      labels:
+        app: auth-broker
+    spec:
+      terminationGracePeriodSeconds: 10
+      containers:
+        - name: broker
+          image: claude-auth-broker
+          command: ["node", "/app/portal/auth-broker.js"]
+          ports:
+            - containerPort: 8081
+          env:
+            - name: PORT
+              value: "8081"
+            - name: HOST
+              value: "0.0.0.0"
+          resources:
+            requests:
+              cpu: 10m
+              memory: 64Mi
+            limits:
+              memory: 768Mi
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8081
+            initialDelaySeconds: 2
+            periodSeconds: 5

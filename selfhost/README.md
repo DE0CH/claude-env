@@ -41,8 +41,10 @@ phone ─ Claude app (chat)            dashboard  https://tunnel.deyaochen.com/t
 - **The box's lifecycle is manual** (`cluster/create.sh` / `destroy.sh`), not CI-managed. Its
   only stateful inputs are the age private key and the static k8s admin token, both baked in
   by cloud-init and kept in Deyao's password manager.
-- **Sessions** are Fly Machines from one prebuilt image (`session-image/`, rebuilt from the
-  dashboard → Settings, on Fly's remote builder). The portal injects the environment's secrets
+- **Sessions** are Fly Machines from one prebuilt image (`session-image/`, built by GitHub
+  Actions on every change — `.github/workflows/session-image.yml` pushes the public package
+  `ghcr.io/de0ch/claude-sessions:sha-…` and pins the ref into `k8s/config/portal-config.yaml`;
+  Fly pulls it anonymously. Nothing builds inside the portal). The portal injects the environment's secrets
   (as JSON → shell-quoted `~/.secrets`, so values with spaces survive), the repos, the Claude
   OAuth creds, the permission mode and model (default `claude-opus-4-8`), then boots
   `claude --remote-control` in a 120×40 tmux window. Sessions get `kubectl` + a kubeconfig for
@@ -90,8 +92,9 @@ Encrypt by hand: put a Secret manifest at `selfhost/k8s/secrets/<x>.sops.yaml`, 
 AGE_KEY_FILE=age.agekey K8S_ADMIN_TOKEN_FILE=k8s_admin_token selfhost/cluster/create.sh
 #    -> cloud-init: k3s (--tls-san <ip>, static token auth) → flux install → sops-age secret
 #       → applies selfhost/k8s/flux/sync.yaml → Flux brings up everything from main
-# 2. first time only: make the ghcr.io/de0ch/claude-portal package PUBLIC (GitHub UI,
-#    package settings → Change visibility) — GHCR packages start private and there is no API.
+# 2. first time only: make the ghcr.io/de0ch/claude-portal AND ghcr.io/de0ch/claude-sessions
+#    packages PUBLIC (GitHub UI, package settings → Change visibility) — GHCR packages start
+#    private and there is no API. The session-image workflow refuses to pin a private image.
 # 3. add KUBE_SERVER=https://<ip>:6443 + KUBE_CA to the default environment (Settings → env)
 kubectl --server https://<ip>:6443 --token "$(cat k8s_admin_token)" --insecure-skip-tls-verify get pods -A
 ```
@@ -118,7 +121,13 @@ Destroy: `selfhost/cluster/destroy.sh` (Fly sessions are separate — destroy th
 - **Terminal**: mirrors the session's tmux pane (1 Hz `capture-pane` over the Fly exec API,
   keys via `send-keys`) — no WireGuard/PTY; works through the tunnel; "Fit" resizes tmux.
 - **Re-login** (Settings): drives the real `claude auth login --claudeai` in a PTY inside the
-  portal pod, shows the sign-in link, takes the pasted code, stores the new creds (git + cluster).
+  **auth-broker** pod (`portal/auth-broker.js`, `k8s/auth/` — same image as the portal, pinned
+  separately so portal rollouts never kill a login in progress); the portal relays the sign-in
+  link and the pasted code, and stores the new creds (git + cluster).
+- **Portal rollouts are stateless**: every long-lived thing lives outside the portal process —
+  session-image builds in CI, the Re-login PTY in the auth broker, the tunnel in its own pod —
+  so a Flux rollout of the portal (RollingUpdate, new pod Ready before the old one goes) loses
+  nothing. Keep it that way: no in-process background jobs in `server.js`.
 - **Only Destroy** (no Start/Stop), with the pre-destroy uncommitted/unpushed check. **Destroy archives
   first, with no AI involved**: the portal runs an uploader inside the machine that puts every
   transcript (`~/.claude/projects/**/*.jsonl`), everything under `~/artifacts/` (the mark — files or

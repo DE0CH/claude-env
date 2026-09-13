@@ -37,8 +37,11 @@ keeps the traps and non-obvious facts a future session must still know.
   the owner clicks Package settings → Change visibility. Until then pods sit in
   `ImagePullBackOff` while Flux reports Ready (`wait: false`).
 - **Reading a GHCR package via API needs `read:packages`** on the PAT (403 otherwise).
-- `flyctl deploy <dir> --config <path>` resolves `--config` relative to `<dir>` — pass
-  `fly.toml` (or an absolute path), not a repo-relative one.
+- **Anything long-running inside the portal process dies on a rollout.** The in-pod session
+  image build (a flyctl child + in-memory job record) was lost when Flux replaced the pod
+  mid-build (2026-09-13); builds now run in CI and the Re-login PTY in its own auth-broker
+  Deployment. Two CI runs that both "commit then rebase" a pin line conflict — pin AFTER
+  `git reset --hard origin/main` and retry the push instead.
 - The kustomize `install_kustomize.sh` helper calls the GitHub API unauthenticated and 401s in
   CI; download the release tarball directly.
 - kubeconform flags sops-encrypted Secrets ("additional properties 'sops' not allowed") —

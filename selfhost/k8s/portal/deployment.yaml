@@ -47,6 +47,9 @@ spec:
               value: main
             - name: FLY_APP
               value: de0ch-claude-sessions
+            # Re-login PTY lives in the auth-broker Deployment (k8s/auth); the portal relays to it
+            - name: AUTH_BROKER_URL
+              value: http://auth-broker.claude.svc.cluster.local:80
           envFrom:
             - secretRef:
                 name: portal-secrets

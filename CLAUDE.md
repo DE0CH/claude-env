@@ -54,11 +54,12 @@ or add a new skill, install its dependencies the proper way (brew/apt/pip) and n
 installs a tool — apt/pip/npm package, a binary, a config that had to be set by hand —
 that might be useful again, add it to `selfhost/session-image/Dockerfile` in the same
 task and push. The session microVM is ephemeral; the image is what persists, so a
-per-session install that isn't in the build script is lost. Then **trigger the rebuild
-yourself** — `POST https://tunnel.deyaochen.com/t/portal/api/image/rebuild` with the CF
-Access service-token headers, poll `GET …/api/image/build` from a background watcher — and
-don't ask me first: it's a cheap build and the previous `sessionImage` ref stays in git, so
-a bad image is a one-line revert.
+per-session install that isn't in the build script is lost. **Pushing IS the rebuild**: the
+`session-image` GitHub Actions workflow builds on every push touching that directory, pushes
+`ghcr.io/de0ch/claude-sessions` and pins the ref in `selfhost/k8s/config/portal-config.yaml`
+(watch it with `gh run list -w session-image` from a background job). Don't ask me first:
+it's a cheap build and the previous `sessionImage` ref stays in git, so a bad image is a
+one-line revert.
 
 If claude-in-chrome is avaliable and it's running on mac, use it and normal tools.
 
@@ -588,7 +589,7 @@ up in the Claude phone app. Isolated microVM per session (install tools freely).
 - **Secrets:** git is the source of truth (sops). Dashboard edits are committed encrypted then
   applied. To add/rotate by hand: edit the Secret manifest, `sops --encrypt --in-place`, push.
   The age private key + k8s admin token live in Deyao's password manager (never in CI).
-  Session image rebuild: dashboard → Settings → Rebuild (flyctl inside the portal pod).
+  Session image: built by CI on push (see the Tools section); nothing builds inside the portal.
 - **Box lifecycle is manual:** `selfhost/cluster/create.sh` (needs `AGE_KEY_FILE`,
   `K8S_ADMIN_TOKEN_FILE`, `HETZNER_API`, `HETZNER_S3_*`) / `destroy.sh`. Rebuild = destroy +
   create; everything returns from git. First time only: make the GHCR package public (no API).
@@ -597,7 +598,8 @@ up in the Claude phone app. Isolated microVM per session (install tools freely).
   (blank → the Claude session names itself, dashboard mirrors it); only Destroy (no
   Start/Stop) with a pre-destroy uncommitted/unpushed check; two-phase UI (instant ack, change
   only on confirmed state — never optimistic); 250ms cooldown on destructive buttons after a
-  list shifts; Terminal panel = tmux mirror via Fly exec; Re-login = real `claude auth login`.
+  list shifts; Terminal panel = tmux mirror via Fly exec; Re-login = real `claude auth login` in the
+  auth-broker pod (portal rollouts are stateless: builds in CI, PTY in the broker).
 - Known limit: sessions share the Claude OAuth refresh token (fine for a few concurrent).
 
 ## Other files

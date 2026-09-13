@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: auth-broker
+  namespace: claude
+spec:
+  selector:
+    app: auth-broker
+  ports:
+    - port: 80
+      targetPort: 8081

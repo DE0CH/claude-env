@@ -1,6 +1,8 @@
 # Root of everything Flux reconciles onto the controller cluster (see flux/sync.yaml).
 # The portal image tag (claude-portal) is bumped by .github/workflows/portal-image.yml on each
-# build; the tunnel-agent pin only when cf-tunnel/** changed, so portal builds don't restart it.
+# build; the tunnel-agent pin only when cf-tunnel/** changed and the auth-broker pin only when
+# portal/lib/auth.js or portal/auth-broker.js changed, so portal builds don't restart them.
+# The SESSION image ref lives in config/portal-config.yaml (pinned by session-image.yml).
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:
@@ -9,7 +11,8 @@ resources:
 - config
 - portal
 - tunnel
-# Both Deployments run the same built image but are pinned SEPARATELY via placeholder names
+- auth
+# All three Deployments run the same built image but are pinned SEPARATELY via placeholder names
 # (`kustomize edit set image` sorts these entries, so no entry's `name` may equal another's
 # `newName` — a chained rewrite would re-tag the tunnel agent on every portal build).
 images:
@@ -19,3 +22,6 @@ images:
 - name: claude-tunnel-agent
   newName: ghcr.io/de0ch/claude-portal
   newTag: sha-3f6e62f88e8d
+- name: claude-auth-broker
+  newName: ghcr.io/de0ch/claude-portal
+  newTag: sha-7cbacc7f5806

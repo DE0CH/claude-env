@@ -1,0 +1,80 @@
+# Builds the SESSION image (selfhost/session-image — what every Claude session machine boots)
+# on every change, pushes it to the public GHCR package ghcr.io/de0ch/claude-sessions, and pins
+# the new ref into selfhost/k8s/config/portal-config.yaml (the portal-config ConfigMap); Flux
+# applies it within a minute and the next session boots from it. Nothing runs inside the portal,
+# so a portal rollout can never lose a build. CI holds no secrets (GITHUB_TOKEN only): Fly pulls
+# the image anonymously, which is why the package must be PUBLIC — the pin step checks that and
+# fails loudly (without pinning) while it isn't.
+name: session-image
+on:
+  push:
+    branches: [main]
+    paths:
+      - selfhost/session-image/**
+      - .github/workflows/session-image.yml
+  workflow_dispatch:
+concurrency:
+  group: session-image
+  cancel-in-progress: false
+permissions:
+  contents: write
+  packages: write
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      IMAGE: ghcr.io/de0ch/claude-sessions
+    steps:
+      - uses: actions/checkout@v4
+      - name: free disk (the image is several GB; runners ship with ~14 GB free)
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL /usr/local/.ghcup
+          sudo docker image prune -af >/dev/null 2>&1 || true
+          df -h / | tail -1
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: meta
+        run: echo "tag=sha-${GITHUB_SHA::12}" >> "$GITHUB_OUTPUT"
+      - uses: docker/build-push-action@v6
+        with:
+          context: selfhost/session-image
+          file: selfhost/session-image/Dockerfile
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:${{ steps.meta.outputs.tag }}
+            ${{ env.IMAGE }}:latest
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+          cache-from: type=gha,scope=session-image
+          cache-to: type=gha,mode=max,scope=session-image
+      - name: pin ref for the portal (only if the package is publicly pullable)
+        run: |
+          set -e
+          REF="$IMAGE:${{ steps.meta.outputs.tag }}"
+          # Fly pulls with no credentials, so the ref is only usable if anonymous pulls work.
+          tok=$(curl -fsSL "https://ghcr.io/token?scope=repository:de0ch/claude-sessions:pull" | jq -r .token)
+          if ! curl -fsS -o /dev/null -H "Authorization: Bearer $tok" \
+               -H "Accept: application/vnd.oci.image.index.v1+json, application/vnd.oci.image.manifest.v1+json, application/vnd.docker.distribution.manifest.list.v2+json, application/vnd.docker.distribution.manifest.v2+json" \
+               "https://ghcr.io/v2/de0ch/claude-sessions/manifests/${{ steps.meta.outputs.tag }}"; then
+            echo "::error::$REF is not anonymously pullable — the GHCR package is private. Make it PUBLIC once at"
+            echo "::error::https://github.com/users/DE0CH/packages/container/claude-sessions/settings (Danger zone → Change visibility), then re-run this workflow."
+            exit 1
+          fi
+          git config user.name "session-image bot"; git config user.email "actions@users.noreply.github.com"
+          # Pin AFTER syncing to the latest main and retry on push races (two workflows commit
+          # pins concurrently; "commit then rebase" conflicts on the pinned line — seen 2026-09-13).
+          for attempt in 1 2 3 4 5; do
+            git fetch -q origin main && git reset -q --hard origin/main
+            f=selfhost/k8s/config/portal-config.yaml
+            jq --indent 2 --arg ref "$REF" '.data.sessionImage = $ref' "$f" > "$f.tmp" && mv "$f.tmp" "$f"
+            git add "$f"
+            if git diff --cached --quiet; then echo "already pinned"; exit 0; fi
+            git commit -q -m "portal: session image $REF [skip ci]"
+            if git push -q origin HEAD:main; then echo "pinned $REF"; exit 0; fi
+            echo "push rejected (attempt $attempt); retrying"; sleep $((attempt * 5))
+          done
+          echo "::error::could not push the pin after 5 attempts"; exit 1

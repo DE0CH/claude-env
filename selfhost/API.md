@@ -65,7 +65,7 @@ All bodies are JSON; errors are `{"error": "..."}` with a 4xx/5xx status.
 |---|---|---|
 | POST | `/api/credentials` | `{credentials: <contents of ~/.claude/.credentials.json>, account?: <{oauthAccount,userID}>}` — stored only if its `expiresAt` is later than the stored pair's (`{stored:true\|false}`). Sessions call this automatically (`push-claude-credentials`) |
 | POST | `/api/credentials/refresh` | refresh the stored pair now via the OAuth refresh token → `{ok, refreshed, expiresAt}`; **409 `{needLogin:true}`** if rejected |
-| POST | `/api/auth/start` | begin Re-login: runs `claude auth login` on the controller → `{url}` |
+| POST | `/api/auth/start` | begin Re-login: runs `claude auth login` in the auth-broker pod (relayed) → `{url}` |
 | POST | `/api/auth/code` | `{code}` pasted from the browser → stores the new credentials |
 | GET | `/api/auth/status` | `{inProgress, url, startedAt}` |
 
@@ -73,5 +73,3 @@ All bodies are JSON; errors are `{"error": "..."}` with a 4xx/5xx status.
 
 | method | path | notes |
 |---|---|---|
-| POST | `/api/image/rebuild` | build `selfhost/session-image` on Fly's remote builder (from the portal's own checkout of `main`) |
-| GET | `/api/image/build` | `{running, ok, image, startedAt, log}`; `ok:null,image:null` = job record lost (portal pod restarted mid-build) |

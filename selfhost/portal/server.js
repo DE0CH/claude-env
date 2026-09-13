@@ -6,8 +6,7 @@ const express = require("express");
 const store = require("./lib/store");
 const fly = require("./lib/fly");
 const tty = require("./lib/tty");
-const auth = require("./lib/auth");
-const imagebuild = require("./lib/imagebuild");
+const authclient = require("./lib/authclient"); // Re-login runs in the auth broker (auth-broker.js)
 const archive = require("./lib/archive");
 const github = require("./lib/github");
 const oauth = require("./lib/oauth");
@@ -70,7 +69,6 @@ async function ensureFreshCredentials({ force = false } = {}) {
       throw e; // transient (network) with a still-valid access token: caller may proceed
     }
     await store.setClaudeCredentials(r.credentials, creds.account);
-    auth.seedHome({ credentials: r.credentials, account: creds.account });
     refreshFail = null;
     console.log(`[creds] refreshed via ${r.via}; access token now valid until ${new Date(r.expiresAt).toISOString()}`);
     return { refreshed: true, expiresAt: r.expiresAt };
@@ -165,19 +163,17 @@ app.get("/api/state", async (req, res) => {
     } else { flyError = "FLY_API_TOKEN not set"; }
     let credsInfo = null;
     try { const c = JSON.parse(creds.credentials || "{}").claudeAiOauth || {}; credsInfo = { expiresAt: c.expiresAt || null, subscriptionType: c.subscriptionType || "", scopes: c.scopes || [], ...credsStatus(creds.credentials) }; } catch {}
-    const build = imagebuild.status();
     res.json({
       version: VERSION,
       environments,
       repos: cfg.repos || [],
       sessions,
       sessionImage: cfg.sessionImage || null,
-      imageBuild: { running: build.running, ok: build.ok, image: build.image, startedAt: build.startedAt },
       flyApp: process.env.FLY_APP || "de0ch-claude-sessions",
       flyError,
       hasCreds: !!creds.credentials,
       creds: credsInfo,
-      auth: auth.status(),
+      auth: await authclient.status(),
     });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -214,7 +210,6 @@ app.post("/api/credentials", async (req, res) => {
     if (Number(o.expiresAt) <= curExp) return res.json({ stored: false, reason: "not newer than the stored credentials", expiresAt: curExp });
     const acct = account ? (typeof account === "string" ? account : JSON.stringify(account)) : cur.account;
     await store.setClaudeCredentials(c, acct);
-    auth.seedHome({ credentials: c, account: acct });
     refreshFail = null;
     console.log(`[creds] stored newer credentials (valid until ${new Date(Number(o.expiresAt)).toISOString()})`);
     res.json({ stored: true, expiresAt: Number(o.expiresAt) });
@@ -253,25 +248,24 @@ app.delete("/api/repos/:name", async (req, res) => {
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// ---- session image (built on Fly's remote builder from the repo checkout) -----
-app.post("/api/image/rebuild", async (req, res) => {
-  try { res.json(await imagebuild.start(store)); } catch (e) { res.status(500).json({ error: e.message }); }
-});
-app.get("/api/image/build", (req, res) => res.json(imagebuild.status()));
-
-// ---- Claude auth (re-login through the real CLI) ----------------------------
+// ---- Claude auth (re-login through the real CLI, in the auth broker) ------------
+// The broker (auth-broker.js, its own Deployment) holds the `claude auth login` PTY; the
+// portal only relays and stores the resulting pair, so a portal rollout can't lose a login.
 app.post("/api/auth/start", async (req, res) => {
-  try { auth.seedHome(await store.getClaudeCredentials()); res.json(await auth.start()); }
+  try { res.json(await authclient.start(await store.getClaudeCredentials())); }
   catch (e) { res.status(500).json({ error: e.message }); }
 });
 app.post("/api/auth/code", async (req, res) => {
   try {
     const { code } = req.body || {};
     if (!code) return res.status(400).json({ error: "code required" });
-    res.json(await auth.submit(code, (creds, account) => store.setClaudeCredentials(creds, account)));
+    const r = await authclient.submit(code);
+    if (!r.credentials) throw new Error("auth broker returned no credentials");
+    await store.setClaudeCredentials(r.credentials, r.account || "{}");
+    res.json({ ok: true, output: r.output });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
-app.get("/api/auth/status", (req, res) => res.json(auth.status()));
+app.get("/api/auth/status", async (req, res) => res.json(await authclient.status()));
 
 // ---- sessions -------------------------------------------------------------
 // Machine size presets (Fly on-demand prices, 2026-09): the dashboard offers these; anything

@@ -1,6 +1,9 @@
 # Session image — one Claude Code remote-control session runs from this on Fly.
 # Each Fly Machine boots this, gets an environment's secrets + repos injected,
 # and runs `claude --remote-control` so it shows up in the Claude phone app.
+# Built by .github/workflows/session-image.yml on every change here (context = this dir),
+# pushed to the PUBLIC package ghcr.io/de0ch/claude-sessions and pinned into
+# selfhost/k8s/config/portal-config.yaml; Fly pulls it anonymously. Push = rebuild.
 FROM ubuntu:24.04
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
