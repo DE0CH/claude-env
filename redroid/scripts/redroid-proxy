@@ -1,0 +1,33 @@
+#!/bin/bash
+# Toggle redroid container egress through a SOCKS5 proxy (TCP). Default OFF = box datacenter IP.
+# Usage: redroid-proxy on <host> <port> <user> <pass> | off | status
+CID=redroid; RPORT=12345
+CIP=$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' $CID 2>/dev/null)
+case "$1" in
+  on)
+    H=$2;P=$3;U=$4;PW=$5
+    cat >/etc/redsocks.conf <<CFG
+base { log_debug=off; log_info=on; log="syslog:daemon"; daemon=on; redirector=iptables; }
+redsocks { local_ip=0.0.0.0; local_port=$RPORT; ip=$H; port=$P; type=socks5; login="$U"; password="$PW"; }
+CFG
+    pkill redsocks 2>/dev/null; sleep 1; redsocks -c /etc/redsocks.conf
+    iptables -t nat -N REDROID_RS 2>/dev/null || iptables -t nat -F REDROID_RS
+    HIP=$(getent hosts "$H" | awk '{print $1; exit}'); [ -n "$HIP" ] && iptables -t nat -A REDROID_RS -d "$HIP" -j RETURN
+    for n in 0.0.0.0/8 10.0.0.0/8 127.0.0.0/8 169.254.0.0/16 172.16.0.0/12 192.168.0.0/16 100.64.0.0/10; do iptables -t nat -A REDROID_RS -d $n -j RETURN; done
+    iptables -t nat -A REDROID_RS -p tcp -j REDIRECT --to-ports $RPORT
+    iptables -t nat -D PREROUTING -s "$CIP" -p tcp -j REDROID_RS 2>/dev/null
+    iptables -t nat -A PREROUTING -s "$CIP" -p tcp -j REDROID_RS
+    echo "proxy ON: $H:$P  (container $CIP)"
+    ;;
+  off)
+    iptables -t nat -D PREROUTING -s "$CIP" -p tcp -j REDROID_RS 2>/dev/null
+    iptables -t nat -F REDROID_RS 2>/dev/null
+    pkill redsocks 2>/dev/null
+    echo "proxy OFF (datacenter IP)"
+    ;;
+  status)
+    pgrep redsocks >/dev/null && echo "redsocks: running" || echo "redsocks: stopped"
+    iptables -t nat -S PREROUTING 2>/dev/null | grep -q REDROID_RS && echo "redirect: ACTIVE" || echo "redirect: none (datacenter IP)"
+    ;;
+  *) echo "usage: redroid-proxy on <host> <port> <user> <pass> | off | status";;
+esac

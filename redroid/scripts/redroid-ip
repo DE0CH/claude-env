@@ -1,0 +1,4 @@
+#!/bin/bash
+# Print redroid's current outbound IP. Uses pushed static curl with --resolve (Android has no /etc/resolv.conf for musl).
+adb -s localhost:5555 shell "/data/local/tmp/curl -s --max-time 15 --resolve ip-api.com:80:208.95.112.1 'http://ip-api.com/line?fields=query,country,isp'" 2>/dev/null | tr '\n' ' '
+echo
