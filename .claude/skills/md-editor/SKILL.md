@@ -20,7 +20,8 @@ Then discord him the per-session URL the agent logs
 (`https://tunnel.deyaochen.com/t/<CLAUDE_CODE_SESSION_ID>/`). The page at `/` IS the
 editor; there is no `/drop`. First open per device needs the Cloudflare Access PIN.
 
-- `ws` must be installed globally for the agent (`npm i -g ws`) — fresh pods lack it.
+- `ws` must be installed globally for the agent — preinstalled in the self-hosted session
+  image; Claude-on-the-web pods lack it (`npm i -g ws`).
 - The server creates the file if missing. Seed it with a heading first so the editor
   isn't blank.
 

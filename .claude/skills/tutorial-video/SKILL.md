@@ -105,10 +105,12 @@ removed". Use the **headless shell** binary instead:
 
 ```bash
 npx remotion render src/index.ts <CompId> out/video.mp4 --codec=h264 \
-  --browser-executable=/opt/pw-browsers/chromium_headless_shell-1194/chrome-linux/headless_shell
+  --browser-executable=/opt/pw-browsers/headless_shell
 ```
 
-(Glob the version dir — `1194` changes with Playwright bumps.) Remotion bundles
+(`/opt/pw-browsers/headless_shell` is a stable symlink in the self-hosted session image;
+on a Claude-on-the-web pod glob `/opt/pw-browsers/chromium_headless_shell-*/chrome-linux/headless_shell`
+instead — the revision number changes with Playwright bumps.) Remotion bundles
 its own Rust compositor, so no ffmpeg is needed for the render itself.
 Throughput observed: ~8800 frames 1080p ≈ minutes-scale; run it with
 `run_in_background`, never a foreground wait. Smoke-test first:

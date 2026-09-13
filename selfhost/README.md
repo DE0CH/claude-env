@@ -45,9 +45,14 @@ phone ─ Claude app (chat)            dashboard  https://tunnel.deyaochen.com/t
   `claude --remote-control` in a 120×40 tmux window. Sessions get `kubectl` + a kubeconfig for
   the controller cluster when the environment carries `KUBE_SERVER`/`KUBE_TOKEN`/`KUBE_CA`.
   The image preinstalls the tools the repo's workflows lean on — git, node 22, python3,
-  `ssh`/`rsync`, `flyctl`, `sops`+`age`, `vercel`, `yt-dlp`, `ffmpeg`, `jq`, `ripgrep`, and
-  common Python libs (requests/bs4/lxml/pymupdf); anything else is a per-session `apt`/`pip`
-  install away (isolated microVM, passwordless sudo).
+  `ssh`/`rsync`, `flyctl`, `sops`+`age`, `vercel`, `yt-dlp`, `ffmpeg`, `jq`, `ripgrep`,
+  common Python libs (requests/bs4/lxml/pymupdf/edge-tts), and **Playwright 1.62 (Node global
+  + Python) with Chromium** under `/opt/pw-browsers` (`NODE_PATH` preset; stable symlinks
+  `/opt/pw-browsers/chromium` and `/opt/pw-browsers/headless_shell`; CJK fonts). Git is
+  preconfigured as `claude <claude@selfhost>` with a credential helper that reads
+  `$GITHUB_TOKEN`, so `git push` just works. Anything else is a per-session `apt`/`pip`
+  install away (isolated microVM, passwordless sudo) — and if it might be useful again it
+  goes into the Dockerfile too (CLAUDE.md rule).
 - **Pods can drive the control plane** two ways: the portal API through the tunnel with the
   CF Access service token (`CF-Access-Client-Id/Secret` headers, already in every session's
   env), or `kubectl` against `https://<box-ip>:6443` with the admin token.

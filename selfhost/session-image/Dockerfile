@@ -28,6 +28,30 @@ RUN npm install -g vercel
 # requests/bs4/lxml are ubiquitous; pymupdf is the preferred PDF parser (lessons/36).
 RUN pip3 install --no-cache-dir --break-system-packages \
       requests beautifulsoup4 lxml pymupdf
+# Browser tooling. Playwright for Node is GLOBAL because every scripts/*.js and skill does
+# `require('playwright')` via NODE_PATH; the Python package is pinned to the same version so
+# both share ONE Chromium build under /opt/pw-browsers (the path the skills reference).
+# `--with-deps` pulls Chromium's system libs; CJK fonts so Chinese pages render in
+# screenshots; `ws` for the md-editor/tunnel helpers; edge-tts for tutorial-video voice-over.
+# Stable symlinks (/opt/pw-browsers/chromium, /opt/pw-browsers/headless_shell) hide the
+# revision-numbered dirs, and the build FAILS if either binary isn't where we expect.
+ENV PLAYWRIGHT_BROWSERS_PATH=/opt/pw-browsers NODE_PATH=/usr/lib/node_modules
+RUN npm install -g playwright@1.62.0 ws \
+ && playwright install --with-deps chromium \
+ && pip3 install --no-cache-dir --break-system-packages playwright==1.62.0 edge-tts \
+ && apt-get update && apt-get install -y --no-install-recommends fonts-noto-cjk fonts-noto-color-emoji \
+ && rm -rf /var/lib/apt/lists/* \
+ && ln -s "$(find /opt/pw-browsers -path '*/chromium-*' -type f -name chrome | head -1)" /opt/pw-browsers/chromium \
+ && ln -s "$(find /opt/pw-browsers -path '*/chromium_headless_shell-*' -type f -name headless_shell | head -1)" /opt/pw-browsers/headless_shell \
+ && test -x /opt/pw-browsers/chromium && test -x /opt/pw-browsers/headless_shell \
+ && ln -s /opt/pw-browsers/chromium /usr/local/bin/chromium \
+ && chmod -R a+rX /opt/pw-browsers
+# Git identity + GitHub auth for every session: commits as `claude <claude@selfhost>`; pushes
+# read $GITHUB_TOKEN from the environment at call time (the entrypoint strips the token out of
+# the cloned remote's URL, so nothing sensitive ever lands in .git/config).
+RUN git config --system user.name claude \
+ && git config --system user.email claude@selfhost \
+ && git config --system credential.https://github.com.helper '!f() { echo username=x-access-token; echo "password=$GITHUB_TOKEN"; }; f'
 # Non-root user with passwordless sudo. claude refuses --dangerously-skip-permissions
 # as root, and per-session tool installs want sudo.
 RUN useradd -m -s /bin/bash claude \

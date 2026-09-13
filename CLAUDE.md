@@ -50,6 +50,13 @@ is to surface it, and only use a workaround if I explicitly approve one.
 When a new tool is required, for example by me asking you to add a new tool, edit claude.md,
 or add a new skill, install its dependencies the proper way (brew/apt/pip) and notify me.
 
+**Bake useful tooling into the session image (Deyao, 2026-09-13).** Whenever a session
+installs a tool — apt/pip/npm package, a binary, a config that had to be set by hand —
+that might be useful again, add it to `selfhost/session-image/Dockerfile` in the same
+task and push. The session microVM is ephemeral; the image is what persists, so a
+per-session install that isn't in the build script is lost. It takes effect at the next
+image rebuild (dashboard → Settings → Rebuild).
+
 If claude-in-chrome is avaliable and it's running on mac, use it and normal tools.
 
 **Browserbase is gone (Deyao, 2026-09-13: no credits, not renewing) — never use it.** For
