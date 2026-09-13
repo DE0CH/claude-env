@@ -142,6 +142,15 @@
 </dialog>
 
 <!-- xterm.js + fit addon (UMD builds; cdnjs does not host the 5.x JS, only the CSS) -->
+<script>
+  // iOS Safari ignores user-scalable=no in a normal tab (honoured only when added to the Home Screen),
+  // so block pinch-zoom by hand: cancel multi-finger touchmove (scale != 1) and the non-standard gesture events.
+  (function(){
+    var opts={passive:false};
+    document.addEventListener('touchmove',function(e){if(e.scale!==undefined&&e.scale!==1||e.touches.length>1)e.preventDefault();},opts);
+    ['gesturestart','gesturechange','gestureend'].forEach(function(n){document.addEventListener(n,function(e){e.preventDefault();},opts);});
+  })();
+</script>
 <script src="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/lib/xterm.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0.10.0/lib/addon-fit.js"></script>
 <script>
