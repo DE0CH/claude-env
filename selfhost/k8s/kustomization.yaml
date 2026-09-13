@@ -8,7 +8,6 @@ resources:
 - config
 - portal
 - tunnel
-- headlamp
 images:
 - name: ghcr.io/de0ch/claude-portal
   newName: ghcr.io/de0ch/claude-portal

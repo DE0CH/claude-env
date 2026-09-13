@@ -1,6 +1,5 @@
-# cf-tunnel agents (cf-tunnel/agent.js, shipped inside the portal image) exposing
-#   https://tunnel.deyaochen.com/t/portal/     -> portal
-#   https://tunnel.deyaochen.com/t/headlamp/   -> Headlamp (k8s UI)
+# cf-tunnel agent (cf-tunnel/agent.js, shipped inside the portal image) exposing
+#   https://tunnel.deyaochen.com/t/portal/  -> portal
 # behind Cloudflare Access (Deyao's email, or the service token sessions carry).
 apiVersion: apps/v1
 kind: Deployment
@@ -28,44 +27,6 @@ spec:
               value: portal
             - name: TUNNEL_TARGET
               value: http://portal.claude.svc.cluster.local:80
-          envFrom:
-            - secretRef:
-                name: portal-secrets
-          resources:
-            requests:
-              cpu: 10m
-              memory: 48Mi
-            limits:
-              memory: 256Mi
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: tunnel-headlamp
-  namespace: claude
-spec:
-  replicas: 1
-  strategy:
-    type: Recreate
-  selector:
-    matchLabels:
-      app: tunnel-headlamp
-  template:
-    metadata:
-      labels:
-        app: tunnel-headlamp
-    spec:
-      containers:
-        - name: agent
-          image: ghcr.io/de0ch/claude-portal
-          command: ["node", "/app/cf-tunnel/agent.js"]
-          env:
-            - name: TUNNEL_ID
-              value: headlamp
-            # the worker strips /t/headlamp before forwarding; Headlamp serves under that
-            # base path (Helm value config.baseURL), so put it back on the target
-            - name: TUNNEL_TARGET
-              value: http://headlamp.headlamp.svc.cluster.local:80/t/headlamp
           envFrom:
             - secretRef:
                 name: portal-secrets

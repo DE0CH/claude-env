@@ -1,6 +1,6 @@
 ---
 name: selfhost-k8s
-description: Operate Deyao's self-hosted Claude control plane — a single-node k3s cluster on Hetzner reconciled by Flux from selfhost/k8s in this repo, with SOPS/age-encrypted Secrets, the portal dashboard, Headlamp, and Fly-hosted sessions. Use whenever a task touches the portal/dashboard, environments (session secret sets), the session image, Flux/k3s/Headlamp on the controller, adding or rotating a secret, or "the controller is broken". Covers kubectl access from a session pod, the portal API via the CF Access service token, sops editing, the GHA→GHCR image flow and its private-package gotcha, and rebuilding the box.
+description: Operate Deyao's self-hosted Claude control plane — a single-node k3s cluster on Hetzner reconciled by Flux from selfhost/k8s in this repo, with SOPS/age-encrypted Secrets, the portal dashboard, and Fly-hosted sessions. Use whenever a task touches the portal/dashboard, environments (session secret sets), the session image, Flux/k3s on the controller, adding or rotating a secret, or "the controller is broken". Covers kubectl access from a session pod, the portal API via the CF Access service token, sops editing, the GHA→GHCR image flow and its private-package gotcha, and rebuilding the box.
 ---
 
 # selfhost-k8s — operating the controller cluster
@@ -39,8 +39,6 @@ curl -sS -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" -H "CF-Access-Client-Sec
 # same base for POST /api/sessions {environment,repos,label,permissionMode}, /api/environments,
 # /api/repos, /api/image/rebuild, /api/auth/start|code, /api/sessions/<id>/tty (SSE) …
 ```
-Headlamp (k8s web UI): `https://tunnel.deyaochen.com/t/headlamp/`, login token =
-`kubectl -n headlamp get secret headlamp-admin-token -o jsonpath='{.data.token}'` (base64 on the wire).
 
 ## Everyday operations
 
@@ -74,7 +72,6 @@ Headlamp (k8s web UI): `https://tunnel.deyaochen.com/t/headlamp/`, login token =
   command). Put the kill in its own tool call or kill by PID.
 - `flux install` + a public `GitRepository` needs no git credentials; the sops secret key must be
   named `age.agekey`. `--tls-san <public-ip>` on k3s or the API cert won't match from outside.
-- Headlamp under a sub-path: Helm value `config.baseURL: /t/headlamp` (assets get the prefix).
 - cf-tunnel worker strips `/t/<id>` before forwarding; absolute links still work via the
   `cf_tunnel` cookie. Two agents = two Deployments with different `TUNNEL_ID`s.
 - The terminal panel is a tmux mirror (`capture-pane -p -e` at 1 Hz over the Machines exec API,

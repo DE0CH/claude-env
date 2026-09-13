@@ -74,7 +74,9 @@
   .fab{position:fixed;right:max(1rem,env(safe-area-inset-right));bottom:max(1rem,env(safe-area-inset-bottom));z-index:6}
   .fab button{font-size:1rem;font-weight:700;color:#fff;background:linear-gradient(135deg,var(--accent),var(--accent2));border:none;border-radius:999px;padding:.9rem 1.3rem;box-shadow:0 6px 20px rgba(124,58,237,.4)}
   /* terminal: full screen, dark always */
-  dialog.term{top:0;bottom:0;left:0;right:0;transform:none;width:100%;max-width:100%;max-height:100dvh;height:100dvh;border-radius:0;padding:0;background:#0b0d11;color:#eee;display:flex;flex-direction:column}
+  /* [open] matters: a bare display:flex would override the UA's display:none for a CLOSED dialog */
+  dialog.term{top:0;bottom:0;left:0;right:0;transform:none;width:100%;max-width:100%;max-height:100dvh;height:100dvh;border-radius:0;padding:0;background:#0b0d11;color:#eee}
+  dialog.term[open]{display:flex;flex-direction:column}
   .term .bar{display:flex;align-items:center;gap:.5rem;padding:.5rem .7rem;padding-top:max(.5rem,env(safe-area-inset-top));border-bottom:1px solid #222;font-size:.85rem;background:#11141a}
   .term .bar .title{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
   .term .bar button,.term .keys button{font-size:.8rem;font-weight:700;color:#eee;background:#1f2430;border:1px solid #2c3242;border-radius:8px;padding:.4rem .6rem;-webkit-tap-highlight-color:transparent}
@@ -278,7 +280,7 @@ function renderSettings(){
     </div>
     <div class="card"><h3>Controller</h3>
       <div class="meta">portal v${esc(STATE.version||'?')} · Fly app ${esc(STATE.flyApp||'')}</div>
-      <div class="hint">Everything here is reconciled by Flux from the claude-env repo (selfhost/k8s). Edits made in this dashboard are committed back to git (secrets encrypted with sops) and applied immediately. k8s UI: <a class="link" href="/t/headlamp/" target="_blank">Headlamp</a>.</div>
+      <div class="hint">Everything here is reconciled by Flux from the claude-env repo (selfhost/k8s). Edits made in this dashboard are committed back to git (secrets encrypted with sops) and applied immediately.</div>
     </div>`;
   if(b.running)settle(st=>!(st.imageBuild||{}).running,900000);
 }

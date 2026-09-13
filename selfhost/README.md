@@ -13,7 +13,6 @@ and the permission classifier:
 
 ```
 phone ─ Claude app (chat)            dashboard  https://tunnel.deyaochen.com/t/portal/
-                                     k8s UI     https://tunnel.deyaochen.com/t/headlamp/
                                                │ Cloudflare Access (your email / service token)
    Hetzner box = single-node k3s CLUSTER       │ tunnel agents (Deployments) ─┐
         Flux ← git (this repo, ./selfhost/k8s) ─ portal (Deployment) ← SOPS secrets
@@ -24,7 +23,7 @@ phone ─ Claude app (chat)            dashboard  https://tunnel.deyaochen.com/t
 ```
 
 - **Everything on the cluster comes from git.** `selfhost/k8s/` is reconciled by Flux every
-  minute: namespaces, the portal + two cf-tunnel agents, Headlamp (HelmRelease), the
+  minute: the namespace, the portal + its cf-tunnel agent, the
   `portal-config` ConfigMap (repo list, session image ref) and the **SOPS-encrypted Secrets**
   (`selfhost/k8s/secrets/*.sops.yaml`: `portal-secrets`, `claude-credentials`, one
   `env-<name>` per environment). The cluster decrypts them with the age key in
@@ -78,7 +77,6 @@ kubectl --server https://<ip>:6443 --token "$(cat k8s_admin_token)" --insecure-s
 ```
 
 Destroy: `selfhost/cluster/destroy.sh` (Fly sessions are separate — destroy them first).
-Headlamp login token: `kubectl -n headlamp get secret headlamp-admin-token -o jsonpath='{.data.token}' | base64 -d`.
 
 ## Dashboard behavior (as specified)
 

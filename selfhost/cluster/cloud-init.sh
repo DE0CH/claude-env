@@ -45,7 +45,7 @@ for i in $(seq 1 60); do
 done
 phone_home "flux kustomization selfhost Ready=$R"
 phone_home "pods: $(kubectl get pods -A --no-headers 2>/dev/null | awk '{print $2"="$4}' | tr '\n' ' ')"
-phone_home "api: https://$PUBLIC_IP:6443  dashboard: https://tunnel.deyaochen.com/t/portal/  headlamp: https://tunnel.deyaochen.com/t/headlamp/"
+phone_home "api: https://$PUBLIC_IP:6443  dashboard: https://tunnel.deyaochen.com/t/portal/"
 phone_home "bootstrap COMPLETE $(date -u +%FT%TZ)"
 shred -u /var/lib/cloud/instance/user-data.txt* 2>/dev/null || true
 rm -f /var/lib/cloud/instance/user-data.txt* 2>/dev/null || true

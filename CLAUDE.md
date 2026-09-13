@@ -545,7 +545,7 @@ A DIY replica of Claude cloud code, built to escape the 443-only network + permi
 classifier. See `selfhost/README.md` (v2, 2026-09-13). Architecture: one Hetzner box (cx23)
 running a **single-node k3s cluster** that reconciles itself from this repo with **Flux**
 (`selfhost/k8s/`): the mobile **dashboard** at `https://tunnel.deyaochen.com/t/portal/`,
-**Headlamp** (k8s UI) at `/t/headlamp/`, two cf-tunnel agents, and **SOPS-encrypted Secrets**
+a cf-tunnel agent, and **SOPS-encrypted Secrets**
 (`selfhost/k8s/secrets/*.sops.yaml`, age key in `flux-system/sops-age`). Each **session** is a
 **Fly.io Machine** (app `de0ch-claude-sessions`) booting a prebuilt image that injects an
 environment's secrets + repos and runs `claude --remote-control` (default model
