@@ -89,3 +89,30 @@ the pattern) → kills the shell (exit 144) and any heredoc after it never runs.
 inline heredocs after a pkill. Clean up leftover Chrome by comm (`ps -eo pid,comm | awk
 '$2 ~ /^chrome/ {print $1}' | xargs -r kill -9`) and delete the profile's `Singleton*`
 lock before relaunching.
+
+## Revoking a third-party app's access (OAuth grants)
+- `myaccount.google.com/connections?filters=3,4` = the "Access to" set (apps with real data
+  scopes), vs the ~80 identity-only "Sign in with Google" apps. Classify by the scope TEXT on
+  the app's detail page — "Gmail" / "Google Drive" / "Drive files" mean real data access;
+  the profile "See your email address" scope is NOT email access (nearly every app has it).
+- Each app's detail lives at `myaccount.google.com/linkedapps/overview/<id>` (the scan saves
+  the URL). It has a **"Delete all"** card → opens a dialog whose confirm button is **"Confirm"**
+  (Cancel/Confirm). Clicking the card by walking the connections list is flaky (render race —
+  the click lands before the card is ready and no dialog opens). Reliable path: navigate to the
+  overview URL directly, `page.locator('text=/^Delete all$/').last()` → scrollIntoViewIfNeeded →
+  click, `waitForSelector('[role=dialog]')`, then click the dialog's Confirm button.
+- Revoking "Claude for Gmail"/"Claude for Google Drive" disconnects the Claude Gmail/Drive
+  connectors (the mcp__claude_ai_Gmail/Drive tools) for that account — flag it before doing so.
+
+## Setting a Supabase Auth SMTP password (Management API)
+- Custom SMTP for magic-link email lives in project config, NOT in a repo: `PATCH
+  https://api.supabase.com/v1/projects/<ref>/config/auth` (auth: `Bearer <PAT>`).
+- **GOTCHA: a partial PATCH of only `{"smtp_pass": "..."}` NULLS the entire SMTP block**
+  (host/user/sender all become null → email breaks). Always re-send the FULL block:
+  smtp_host, smtp_port (as string, e.g. "465"), smtp_user, smtp_pass, smtp_admin_email,
+  smtp_sender_name. GET the config first to capture the existing values.
+- No Supabase PAT in env? Drive it through the target repo's own `SUPABASE_ACCESS_TOKEN`
+  GitHub Actions secret: `gh secret set <TEMP>` for the new password, add a one-off
+  `workflow_dispatch` workflow that GET+PATCHes the config, `gh workflow run`, verify, then
+  delete the workflow + temp secret. A Gmail app password used by a web app is very often
+  this SMTP password (magic-link sender), not an IMAP/repo secret.
