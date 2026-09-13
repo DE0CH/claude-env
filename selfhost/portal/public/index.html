@@ -36,6 +36,8 @@
   button.ghost{background:none;color:var(--accent);border:1.5px solid var(--border)}
   button.danger{background:none;color:var(--err);border:1.5px solid var(--border)}
   button:disabled{opacity:.55;cursor:default}
+  /* post-layout-shift cooldown: destructive buttons are inert + faded for 250ms */
+  button.btn.cool{opacity:.3;pointer-events:none;transition:opacity .15s}
   button.btn:active:not(:disabled){transform:scale(.97)}
   .spinner{width:12px;height:12px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;display:inline-block;animation:spin .7s linear infinite;flex:none}
   @keyframes spin{to{transform:rotate(360deg)}}
@@ -98,10 +100,21 @@ let TAB='sessions';
 // the card's real state only changes when the server reports it.
 const PENDING=new Map();
 function pend(key,label){label?PENDING.set(key,label):PENDING.delete(key);render();}
-function pbtn(key,cls,onclick,label){
+function pbtn(key,cls,onclick,label,cool){
   const p=PENDING.get(key);
-  return p?`<button class="btn ${cls}" disabled><span class="spinner"></span>${esc(p)}</button>`
-          :`<button class="btn ${cls}" onclick="${onclick}">${esc(label)}</button>`;
+  if(p)return `<button class="btn ${cls}" disabled><span class="spinner"></span>${esc(p)}</button>`;
+  if(cool)return `<button class="btn ${cls} cool" disabled>${esc(label)}</button>`;
+  return `<button class="btn ${cls}" onclick="${onclick}">${esc(label)}</button>`;
+}
+// ---- layout-shift guard: when a list's items change (e.g. one removed), the
+// remaining destructive buttons move under the finger. Keep them inert + faded
+// for 250ms after any composition change, then re-render them live.
+const LAST_KEYS={},COOL_UNTIL={};
+function coolAfterShift(view,keys){
+  if(LAST_KEYS[view]!==undefined&&LAST_KEYS[view]!==keys){COOL_UNTIL[view]=Date.now()+250;setTimeout(render,270);}
+  else if(LAST_KEYS[view]===undefined){LAST_KEYS[view]=keys;}
+  LAST_KEYS[view]=keys;
+  return Date.now()<(COOL_UNTIL[view]||0);
 }
 
 async function api(method,path,body){
@@ -157,6 +170,7 @@ function sessionPill(m){
 function renderSessions(){
   const s=STATE.sessions||[];
   const v=$('#view-sessions');
+  const cool=coolAfterShift('sessions',s.map(m=>m.id).join('|'));
   if(!s.length){v.innerHTML='<div class="empty">No sessions running.<br>Tap “New session”.</div>';return;}
   v.innerHTML=s.map(m=>{
     const title=(m.liveName&&m.nameSource&&m.nameSource!=='derived')?m.liveName:(m.label||m.name);
@@ -169,7 +183,7 @@ function renderSessions(){
     <div class="spacer"></div>
     <div class="row">
       ${pbtn('rename:'+m.id,'ghost sm',`renameSession('${m.id}','${esc(title).replace(/'/g,'')}')`,'Rename')}
-      ${pbtn('destroy:'+m.id,'danger sm',`destroy('${m.id}')`,'Destroy')}
+      ${pbtn('destroy:'+m.id,'danger sm',`destroy('${m.id}')`,'Destroy',cool)}
     </div>
     <div class="hint">Open the Claude app to chat with this session.</div>
   </div>`}).join('');
@@ -177,21 +191,23 @@ function renderSessions(){
 function renderEnvs(){
   const e=STATE.environments||{};
   const v=$('#view-envs');
+  const cool=coolAfterShift('envs',Object.keys(e).join('|'));
   const cards=Object.entries(e).map(([n,d])=>`<div class="card${PENDING.has('env:'+n)?' pending':''}">
     <div class="row" style="justify-content:space-between"><h3>${esc(n)}</h3><span class="meta">${(d.keys||[]).length} keys</span></div>
     <div class="meta">${(d.keys||[]).map(esc).join(', ')||'—'}</div>
     <div class="spacer"></div>
     <div class="row"><button class="btn ghost sm" onclick="editEnv('${esc(n)}')">Edit secrets</button>
-      ${pbtn('env:'+n,'danger sm',`delEnv('${esc(n)}')`,'Delete')}</div>
+      ${pbtn('env:'+n,'danger sm',`delEnv('${esc(n)}')`,'Delete',cool)}</div>
   </div>`).join('');
   v.innerHTML=cards+`<button class="btn" onclick="editEnv('')">+ Add environment</button>`;
 }
 function renderRepos(){
   const r=STATE.repos||[];
   const v=$('#view-repos');
+  const cool=coolAfterShift('repos',r.map(x=>x.name).join('|'));
   const cards=r.map(x=>`<div class="card${PENDING.has('repo:'+x.name)?' pending':''}">
     <div class="row" style="justify-content:space-between"><h3>${esc(x.name)}</h3>
-      ${pbtn('repo:'+x.name,'ghost sm',`delRepo('${esc(x.name)}')`,'Remove from list')}</div>
+      ${pbtn('repo:'+x.name,'ghost sm',`delRepo('${esc(x.name)}')`,'Remove from list',cool)}</div>
     <div class="meta">${esc(x.url)}</div></div>`).join('');
   const addKey=PENDING.get('repo:add');
   v.innerHTML=(cards||'<div class="empty">No repos yet.</div>')+`
