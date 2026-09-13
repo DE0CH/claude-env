@@ -7,6 +7,6 @@
   },
   "data": {
     "repos.json": "[{\"name\":\"claude-env\",\"url\":\"https://github.com/de0ch/claude-env.git\"}]",
-    "sessionImage": "registry.fly.io/de0ch-claude-sessions:deployment-01M2DJN6923GQJYBGG08A7HMAW"
+    "sessionImage": "registry.fly.io/de0ch-claude-sessions:deployment-01M2DK1YV5MGEZ2CA8J5A05ZXR"
   }
 }
