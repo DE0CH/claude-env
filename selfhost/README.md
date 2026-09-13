@@ -1,0 +1,62 @@
+# selfhost — DIY Claude cloud code (your own environments, repos & sessions)
+
+A self-hosted clone of Claude cloud code's phone flow, escaping the 443-only network
+and the permission classifier:
+
+- pick an **environment** (a named set of secrets),
+- pick one or more **repos**,
+- **start a session** — which runs in its own isolated container (install tools freely),
+- chat with it from the **Claude phone app** (each session runs `claude --remote-control`).
+
+## Architecture
+
+```
+phone ─ Claude app (chat)          ─ dashboard  https://tunnel.deyaochen.com/t/portal/
+                                              │ (Cloudflare Access, your email only)
+   Hetzner CONTROLLER box (stateless, cx23)   │  portal + cf-tunnel agent (systemd)
+        │ Fly Machines API
+        ▼
+   Fly.io ── session machine A (env X, repos…)  claude --remote-control
+          ── session machine B (env Z, repos…)  claude --remote-control   ← isolated microVMs
+```
+
+- **Controller** holds no precious state. All portal state (environments + secrets, repo
+  list, session image ref) lives **encrypted in Hetzner S3** (`lib/store.js`, AES-256-GCM,
+  key = `PORTAL_ENC_KEY`). Nuke the box → `controller/create.sh` rebuilds it → portal
+  reloads everything from S3.
+- **Sessions** are Fly Machines from one prebuilt image (`session-image/`). The portal
+  injects the environment's secrets, the repos, and the Claude OAuth creds, then boots
+  `claude --remote-control` with a unique machineID so each shows as its own target.
+
+## Secrets it needs (in `~/.secrets` on the controller)
+
+| var | for |
+|---|---|
+| `HETZNER_API` | create/destroy the controller box |
+| `HETZNER_S3_*` | encrypted config store (already present) |
+| `CF_ACCESS_CLIENT_ID/SECRET` | cf-tunnel agent (already present) |
+| `FLY_API_TOKEN` | create/destroy session machines + build the image |
+| `PORTAL_ENC_KEY` | 64-hex key encrypting the S3 config (generate once) |
+| Claude OAuth | `~/.claude/.credentials.json` (bundled at provision) |
+
+## Bring-up
+
+```bash
+# 1. provision the controller (from a box that has ~/.secrets + ~/.claude creds)
+selfhost/controller/create.sh
+#    -> cloud-init installs node+flyctl, restores secrets, builds the session image
+#       on Fly, starts the portal, exposes it at tunnel.deyaochen.com/t/portal/
+# 2. open the dashboard on your phone, add environments + repos, Start a session
+# 3. open the Claude app -> the session appears as a remote-control target
+```
+
+Manual image (re)build: `selfhost/deploy-session-image.sh`.
+Destroy controller: `selfhost/controller/destroy.sh` (Fly sessions are separate — stop
+them in the dashboard first).
+
+## Known limitations (v1)
+
+- **Shared OAuth refresh token across sessions.** Each session gets a copy of the same
+  Claude credentials. If Anthropic rotates refresh tokens, many long concurrent sessions
+  could churn auth. Fine for a handful of sessions; a central token broker is the v2 fix.
+- Sessions don't auto-stop on idle yet — stop/destroy them from the dashboard.

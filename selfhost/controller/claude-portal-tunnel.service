@@ -1,0 +1,15 @@
+[Unit]
+Description=cf-tunnel agent exposing the portal at tunnel.deyaochen.com/t/portal/
+After=network-online.target claude-portal.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=deyao
+WorkingDirectory=/home/deyao/claude-env/cf-tunnel
+ExecStart=/bin/bash -lc 'set -a; . $HOME/.secrets; set +a; export TUNNEL_ID=portal TUNNEL_TARGET=http://127.0.0.1:8080; exec node agent.js'
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

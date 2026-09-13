@@ -1,0 +1,16 @@
+[Unit]
+Description=Claude self-host portal (dashboard + Fly orchestration)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=deyao
+WorkingDirectory=/home/deyao/claude-env/selfhost/portal
+# Load all API keys/tokens (FLY_API_TOKEN, PORTAL_ENC_KEY, HETZNER_S3_*, ...) from ~/.secrets
+ExecStart=/bin/bash -lc 'set -a; . $HOME/.secrets; set +a; export PORT=8080; exec node server.js'
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

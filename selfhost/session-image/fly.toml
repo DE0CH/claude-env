@@ -1,0 +1,14 @@
+# Fly app that HOLDS the session image. Machines are created on demand by the portal
+# via the Machines API — this app runs no long-lived service of its own.
+# Build/push the image with:  ../deploy-session-image.sh
+app = "de0ch-claude-sessions"
+primary_region = "arn"   # Stockholm — close to the Helsinki controller
+
+[build]
+  dockerfile = "Dockerfile"
+
+# Default guest for on-demand session machines (the portal can override per session).
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory = "1024mb"

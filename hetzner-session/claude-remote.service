@@ -1,0 +1,21 @@
+[Unit]
+Description=Claude Code remote-control host (always-on, phone-attachable)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=deyao
+Group=deyao
+WorkingDirectory=/home/deyao/claude-env
+ExecStart=/home/deyao/claude-env/hetzner-session/claude-remote-supervisor.sh
+# Clean shutdown: tear down the tmux session (kills the host + any spawned sessions).
+ExecStop=/usr/bin/tmux kill-session -t deyao
+Restart=always
+RestartSec=5
+# tmux servers/panes must survive the ExecStart process being reaped.
+KillMode=process
+TimeoutStopSec=15
+
+[Install]
+WantedBy=multi-user.target
