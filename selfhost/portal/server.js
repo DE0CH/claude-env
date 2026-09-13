@@ -296,7 +296,7 @@ app.post("/api/sessions", async (req, res) => {
     catch (e) { if (e.needLogin) return res.status(409).json({ error: e.message, needLogin: true }); console.error(`[creds] ${e.message}`); }
     const creds = await store.getClaudeCredentials();
     if (!creds.credentials) return res.status(409).json({ error: "no Claude credentials — Re-login from Settings", needLogin: true });
-    const { environment, repos = [], label, permissionMode, size } = req.body || {};
+    const { environment, repos = [], label, permissionMode, size, prompt } = req.body || {};
     const env = cfg.environments[environment];
     if (environment && !env) return res.status(400).json({ error: `unknown environment '${environment}'` });
     const sizeKey = size && SIZES[size] ? size : DEFAULT_SIZE;
@@ -318,6 +318,11 @@ app.post("/api/sessions", async (req, res) => {
       ? path.basename(repoUrls[0]).replace(/\.git$/, "")
       : (environment || "session");
     const userLabel = String(label || "").replace(/["\\\r\n\t]/g, "").trim().slice(0, 60);
+    // Optional first prompt: pasted into the remote-control host's input once it is up (the
+    // supervisor in the session image does it — see session-supervisor.sh), so the session
+    // starts working right away instead of waiting for the first message from the app. Any
+    // text, newlines included; capped so it fits comfortably in the machine env.
+    const firstPrompt = String(prompt || "").replace(/\r\n?/g, "\n").trim().slice(0, 16000);
 
     const machineEnv = {
       CLAUDE_CREDENTIALS: creds.credentials,
@@ -326,6 +331,7 @@ app.post("/api/sessions", async (req, res) => {
       SESSION_REPOS: repoUrls.join(","),
       SESSION_LABEL: userLabel, // blank => the Claude session names itself
       SESSION_PERMISSION_MODE: permMode,
+      SESSION_PROMPT: firstPrompt, // blank => nothing is typed; the app sends the first message
       PORTAL_URL: PUBLIC_URL, // the session pushes refreshed Claude credentials back here
     };
     const name = `s-${slug(userLabel || base)}-${rand()}`;
@@ -341,9 +347,10 @@ app.post("/api/sessions", async (req, res) => {
         label: userLabel,
         permissionMode: permMode,
         size: sizeKey,
+        hasPrompt: firstPrompt ? "1" : "",
       },
     });
-    res.json({ ok: true, id: machine.id, name, label: userLabel, state: machine.state, size: sizeKey });
+    res.json({ ok: true, id: machine.id, name, label: userLabel, state: machine.state, size: sizeKey, hasPrompt: !!firstPrompt });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 // Pre-destroy check: uncommitted / unpushed work in each repo inside the session.

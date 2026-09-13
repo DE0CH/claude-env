@@ -105,6 +105,11 @@ Destroy: `selfhost/cluster/destroy.sh` (Fly sessions are separate — destroy th
   dashboard shows the app's AI-generated conversation title (read from the session transcript's
   `ai-title` records) — so both always match. No renaming from the dashboard.
 - **Permission mode** per session: Auto (default) or Dangerously skip permissions.
+- **First prompt**: optional at start. Given → the session image's supervisor waits for the
+  remote-control host to come up, pastes it into the input (tmux bracketed paste, so newlines
+  survive) and presses Enter — once per machine, never re-sent on a host restart/reboot. The
+  CLI's positional `claude … "<prompt>"` is silently ignored under `--remote-control`, hence
+  the paste. Blank → the first message comes from the Claude app as before.
 - **Machine size** per session: Small (2 shared vCPU / 2 GB, ~$0.016/h), **Medium (4/4 GB, default, ~$0.033/h)**, Large
   (8/8 GB), XLarge (8/16 GB), Perf (2 dedicated / 4 GB). Presets live in `server.js` (`SIZES`); anything
   else is rejected. 1 GB was too small: `claude` alone is ~400 MB and Chromium got OOM-killed.

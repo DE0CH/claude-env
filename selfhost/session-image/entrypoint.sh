@@ -7,6 +7,7 @@
 #   SESSION_REPOS           comma-separated git URLs to clone into ~/workspace
 #   SESSION_LABEL           session title; blank => the Claude session names itself
 #   SESSION_PERMISSION_MODE auto | bypass
+#   SESSION_PROMPT          [optional] first prompt, pasted into the host once it is up (supervisor)
 #   SESSION_MODEL           model id (default claude-opus-4-8, see session-supervisor.sh)
 #   SESSION_RESUME_ID       [optional] resume this Claude session id instead of starting fresh;
 #   SESSION_RESUME_PATH     its transcript .jsonl, as a WebDAV path on the Storage Box

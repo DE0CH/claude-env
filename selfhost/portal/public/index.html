@@ -495,6 +495,7 @@ function newSession(){
     <label>Machine size</label>
     ${Object.entries(SIZES.sizes||{}).map(([k,v])=>`<label class="choice"><input type="radio" name="ns-size" value="${esc(k)}" ${k===SIZES.default?'checked':''}><span class="t">${esc(k[0].toUpperCase()+k.slice(1))}<small>${esc(v.label)}</small></span></label>`).join('')}
     <label>Session title (optional)</label><input id="ns-title" type="text" name="session-topic" autocomplete="off" autocorrect="off" autocapitalize="sentences" spellcheck="false" placeholder="e.g. refactor billing module">
+    <label>First prompt (optional)</label><textarea id="ns-prompt" name="session-first-prompt" autocomplete="off" autocapitalize="sentences" spellcheck="true" style="font-family:inherit;font-size:1rem;min-height:6rem" placeholder="Typed into the session as its first message once Claude is up — leave blank to start it yourself from the app."></textarea>
     <div class="hint">Shows as the session title in the Claude app too. Leave blank and the Claude session names itself.</div>
     <div class="actions">
       <button class="btn ghost" onclick="closeDlg()">Cancel</button>
@@ -504,11 +505,12 @@ async function startSession(btn){
   const env=(document.querySelector('#dlg-body input[name=ns-env]:checked')||{}).value||'';
   const repos=[...document.querySelectorAll('#dlg-body input[name=ns-repo]:checked')].map(c=>c.value);
   const label=$('#ns-title').value.trim();
+  const prompt=$('#ns-prompt').value.trim();
   const permissionMode=(document.querySelector('#dlg-body input[name=ns-perm]:checked')||{}).value||'auto';
   const size=(document.querySelector('#dlg-body input[name=ns-size]:checked')||{}).value||SIZES.default;
   const restore=dlgBusy(btn,'Starting…');
   try{
-    const r=await api('POST','api/sessions',{environment:env,repos,label,permissionMode,size});
+    const r=await api('POST','api/sessions',{environment:env,repos,label,permissionMode,size,prompt});
     closeDlg();
     await refresh(false);                                 // card appears in its REAL state (creating…)
     settle(st=>{const m=(st.sessions||[]).find(x=>x.id===r.id);return !!(m&&m.state==='started'&&m.status);}); // fast-poll until claude is actually up

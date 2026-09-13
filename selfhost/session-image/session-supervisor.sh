@@ -61,7 +61,35 @@ start() {
   echo "[supervisor] started remote-control host in $WD (name: ${SESSION_LABEL:-auto}, model: $SESSION_MODEL, perm: ${SESSION_PERMISSION_MODE:-auto}, resume: ${SESSION_RESUME_ID:-none})"
 }
 
+# First prompt (optional, SESSION_PROMPT from the machine env): once the remote-control host
+# is up, paste it into the input and press Enter, so the session starts working immediately.
+# Pasted through a tmux buffer in bracketed-paste mode (`paste-buffer -p`) so multi-line
+# prompts stay one message instead of submitting at the first newline. Exactly once per
+# machine (marker file), so a host restart or a machine reboot never re-sends it.
+# NOTE: `claude --remote-control … "<prompt>"` (the positional prompt) is silently ignored
+# by the CLI in remote-control mode (verified 2.1.270) — hence the paste.
+send_first_prompt() {
+  local marker="$HOME/.claude/.first-prompt-sent" f="$HOME/.claude/first-prompt.txt" i
+  [ -n "${SESSION_PROMPT:-}" ] || return 0
+  [ -e "$marker" ] && return 0
+  (umask 077; printf '%s' "$SESSION_PROMPT" > "$f")
+  for i in $(seq 1 90); do   # up to ~3 min for the host to come up
+    if tmux capture-pane -p -t "$SESSION" 2>/dev/null | grep -Eq 'remote-control is active|/rc active'; then
+      sleep 3   # let the input box settle
+      tmux load-buffer -b firstprompt "$f" \
+        && tmux paste-buffer -p -d -b firstprompt -t "$SESSION" \
+        && sleep 1 && tmux send-keys -t "$SESSION" Enter \
+        && { touch "$marker"; echo "[supervisor] first prompt sent ($(wc -c < "$f") bytes)"; return 0; }
+      echo "[supervisor] first prompt paste failed; retrying"; sleep 2
+    else
+      sleep 2
+    fi
+  done
+  echo "[supervisor] first prompt NOT sent: host never became ready"
+}
+
 start
+send_first_prompt &
 # Credentials write-back: claude rotates the OAuth refresh token when it refreshes; push the
 # new pair to the portal so sessions created later don't inherit a dead one (see the script).
 if [ -x /usr/local/bin/push-claude-credentials ]; then
