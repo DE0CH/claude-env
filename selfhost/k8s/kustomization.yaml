@@ -15,7 +15,7 @@ resources:
 images:
 - name: claude-portal
   newName: ghcr.io/de0ch/claude-portal
-  newTag: sha-6d4e77849242
+  newTag: sha-e00cf1eb213d
 - name: claude-tunnel-agent
   newName: ghcr.io/de0ch/claude-portal
   newTag: sha-3f6e62f88e8d
