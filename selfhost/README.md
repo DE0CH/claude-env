@@ -41,7 +41,7 @@ phone ─ Claude app (chat)          ─ dashboard  https://tunnel.deyaochen.com
 | Claude OAuth | `~/.claude/.credentials.json` (bundled at provision) |
 
 These live as a plain `~/.secrets` (mode 600) on the controller — that file is their home.
-`FLY_API_TOKEN` and `PORTAL_ENC_KEY` are additionally kept in the `default` environment. When
+All three are additionally kept in the `default` environment (sessions can push). When
 rebuilding the controller from a different machine, copy the controller's `~/.secrets` over
 first, since `create.sh` bundles the `~/.secrets` of the machine it runs on.
 
