@@ -227,6 +227,26 @@ app.post("/api/sessions", async (req, res) => {
     res.json({ ok: true, id: machine.id, name, label: friendly, state: machine.state });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
+// Pre-destroy check: uncommitted / unpushed work in each repo inside the session.
+app.get("/api/sessions/:id/changes", async (req, res) => {
+  try {
+    const id = req.params.id;
+    const m = await fly.getMachine(id);
+    if (m.state !== "started") return res.json({ checked: false, reason: `session is ${m.state}`, repos: [] });
+    const script = 'cd ~/workspace 2>/dev/null || exit 0; for d in */; do d=${d%/}; [ -d "$d/.git" ] || continue; '
+      + 'u=$(git -C "$d" status --porcelain 2>/dev/null | wc -l); '
+      + 'if git -C "$d" rev-parse --abbrev-ref @{u} >/dev/null 2>&1; then p=$(git -C "$d" rev-list @{u}..HEAD --count 2>/dev/null || echo 0); else p=-1; fi; '
+      + 'echo "$d $u $p"; done';
+    const r = await fly.exec(id, ["/usr/bin/sudo", "-u", "claude", "-H", "/bin/bash", "-lc", script], 20);
+    const repos = String(r.stdout || "").split("\n").filter((l) => l.trim()).map((l) => {
+      const [name, u, p] = l.trim().split(/\s+/);
+      return { name, uncommitted: parseInt(u, 10) || 0, unpushed: parseInt(p, 10) };
+    });
+    const reg = await readRegistry(id);
+    res.json({ checked: true, repos, status: (reg && reg.status) || "" });
+  } catch (e) { res.json({ checked: false, reason: e.message, repos: [] }); }
+});
+
 // Rename a session everywhere: drive `/rename` inside the running claude (so the
 // Claude app shows it) and keep the Fly metadata label in sync (shown when stopped).
 app.post("/api/sessions/:id/rename", async (req, res) => {

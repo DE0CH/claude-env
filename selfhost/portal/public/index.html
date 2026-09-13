@@ -134,9 +134,8 @@ function renderSessions(){
     <div class="meta">${esc(m.name)} · ${esc(m.region)}</div>
     <div class="spacer"></div>
     <div class="row">
-      ${m.state==='started'?`<button class="btn ghost sm" onclick="act('${m.id}','stop')">Stop</button>`:`<button class="btn ghost sm" onclick="act('${m.id}','start')">Start</button>`}
       <button class="btn ghost sm" onclick="renameSession('${m.id}','${esc(title).replace(/'/g,'')}')">Rename</button>
-      <button class="btn danger sm" onclick="destroy('${m.id}')">Destroy</button>
+      <button class="btn danger sm" id="destroy-${m.id}" onclick="destroy('${m.id}')">Destroy</button>
     </div>
     <div class="hint">Open the Claude app to chat with this session.</div>
   </div>`}).join('');
@@ -203,9 +202,26 @@ async function renameSession(id,current){
   if(!name||name===current)return;
   try{await api('POST',`api/sessions/${id}/rename`,{name});setTimeout(refresh,1500);refresh();}catch(e){alert('Rename failed: '+e.message);}
 }
-async function act(id,what){try{await api('POST',`api/sessions/${id}/${what}`);setTimeout(refresh,1200);}catch(e){alert(e.message);}}
 async function destroy(id){
-  if(!confirm('Destroy this session\'s container?\n\nAnything inside it that was not pushed is lost. Your repos on GitHub are not affected.'))return;
+  const btn=document.getElementById('destroy-'+id);
+  if(btn){btn.disabled=true;btn.textContent='Checking…';}
+  let msg='Destroy this session?\n\n';
+  try{
+    const c=await api('GET',`api/sessions/${id}/changes`);
+    if(c.checked){
+      const dirty=(c.repos||[]).filter(r=>r.uncommitted>0||r.unpushed>0||r.unpushed===-1);
+      if(c.status==='busy')msg+='⚠️ Claude is still WORKING in this session.\n\n';
+      if(dirty.length){
+        msg+='⚠️ Unsaved work will be LOST:\n'+dirty.map(r=>'• '+r.name+': '
+          +(r.uncommitted>0?r.uncommitted+' uncommitted file(s)':'')
+          +(r.uncommitted>0&&(r.unpushed>0||r.unpushed===-1)?', ':'')
+          +(r.unpushed>0?r.unpushed+' unpushed commit(s)':r.unpushed===-1?'branch has no upstream (nothing pushed)':'')).join('\n')+'\n';
+      }else if(c.status!=='busy'){msg+='✓ No uncommitted or unpushed changes found.\n';}
+    }else{msg+='⚠️ Could not check for unsaved changes ('+(c.reason||'unknown')+').\n';}
+  }catch(e){msg+='⚠️ Could not check for unsaved changes.\n';}
+  msg+='\nThe container and everything in it will be deleted. Your repos on GitHub are not affected.';
+  if(btn){btn.disabled=false;btn.textContent='Destroy';}
+  if(!confirm(msg))return;
   try{await api('DELETE','api/sessions/'+id);refresh();}catch(e){alert(e.message);}
 }
 
