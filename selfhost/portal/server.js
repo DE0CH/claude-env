@@ -156,14 +156,22 @@ app.post("/api/sessions", async (req, res) => {
       .map((n) => (cfg.repos || []).find((r) => r.name === n || r.url === n))
       .filter(Boolean).map((r) => r.url);
 
+    // One friendly name used everywhere: dashboard card, Fly machine, AND the Remote
+    // Control session name in the Claude app (passed as `claude --remote-control <name>`).
+    const base = repoUrls.length
+      ? path.basename(repoUrls[0]).replace(/\.git$/, "")
+      : (environment || "session");
+    const friendly = String(label || `${base}-${rand(4)}`)
+      .replace(/["\\\r\n\t]/g, "").trim().slice(0, 60) || `session-${rand(4)}`;
+
     const machineEnv = {
       CLAUDE_CREDENTIALS: claudeCreds(),
       CLAUDE_ACCOUNT: claudeAccount(),
       SESSION_SECRETS_ENV: secretsEnv,
       SESSION_REPOS: repoUrls.join(","),
-      SESSION_LABEL: label || environment || "session",
+      SESSION_LABEL: friendly,
     };
-    const name = `s-${slug(label || environment || repoUrls[0] || "session")}-${rand()}`;
+    const name = `s-${slug(friendly)}-${rand()}`;
     const machine = await fly.createMachine({
       name,
       image: cfg.sessionImage,
@@ -173,10 +181,10 @@ app.post("/api/sessions", async (req, res) => {
         role: "claude-session",
         environment: environment || "",
         repos: repoUrls.join(" "),
-        label: label || "",
+        label: friendly,
       },
     });
-    res.json({ ok: true, id: machine.id, name, state: machine.state });
+    res.json({ ok: true, id: machine.id, name, label: friendly, state: machine.state });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 app.post("/api/sessions/:id/stop", async (req, res) => {

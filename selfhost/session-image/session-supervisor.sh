@@ -32,9 +32,17 @@ PY
 start() {
   trust_dirs
   tmux kill-session -t "$SESSION" 2>/dev/null || true
-  tmux new-session -d -s "$SESSION" -c "$WD" \
-    "claude --remote-control --dangerously-skip-permissions"
-  echo "[supervisor] started remote-control host in $WD"
+  # Name the Remote Control session after the portal's label so the Claude app shows the
+  # same name as the dashboard (instead of the auto "<hostname>-random-words").
+  # SESSION_LABEL is in the machine env; the inner shell expands it (single quotes here).
+  export SESSION_LABEL="${SESSION_LABEL:-}"
+  if [ -n "$SESSION_LABEL" ]; then
+    CMD='claude --remote-control "$SESSION_LABEL" --dangerously-skip-permissions'
+  else
+    CMD='claude --remote-control --dangerously-skip-permissions'
+  fi
+  tmux new-session -d -s "$SESSION" -c "$WD" "$CMD"
+  echo "[supervisor] started remote-control host in $WD (name: ${SESSION_LABEL:-auto})"
 }
 
 start

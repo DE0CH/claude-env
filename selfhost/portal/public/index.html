@@ -40,8 +40,25 @@
   .banner.err{background:rgba(220,38,38,.12);color:var(--err)}
   .banner.warn{background:rgba(217,119,6,.12);color:var(--warn)}
   .empty{color:var(--muted);text-align:center;padding:2rem 1rem}
-  dialog{border:none;border-radius:16px;padding:1.2rem;width:min(92vw,460px);background:var(--card);color:var(--text)}
+  /* Mobile-first bottom sheet (iOS Safari pins default <dialog> to the top). */
+  dialog{position:fixed;left:0;right:0;bottom:0;top:auto;margin:0;width:100%;max-width:100%;
+    max-height:88dvh;overflow:auto;border:none;border-radius:20px 20px 0 0;
+    padding:1.1rem 1.1rem calc(1.1rem + env(safe-area-inset-bottom));
+    background:var(--card);color:var(--text);box-shadow:0 -10px 40px rgba(0,0,0,.35)}
   dialog::backdrop{background:rgba(0,0,0,.5)}
+  dialog h3{font-size:1.15rem;margin-bottom:.3rem}
+  .grab{width:40px;height:4px;border-radius:2px;background:var(--border);margin:0 auto .8rem}
+  label.choice{display:flex;align-items:center;gap:.75rem;padding:.85rem .95rem;border:1.5px solid var(--border);
+    border-radius:12px;margin:.4rem 0;font-size:1rem;cursor:pointer;user-select:none;-webkit-tap-highlight-color:transparent;
+    text-transform:none;letter-spacing:0;font-weight:500;color:var(--text)}
+  .choice:has(input:checked){border-color:var(--accent);background:rgba(124,58,237,.08)}
+  .choice input{width:22px;height:22px;margin:0;flex:none;accent-color:var(--accent)}
+  .choice .t{flex:1;min-width:0;word-break:break-word}
+  .choice small{display:block;color:var(--muted);font-size:.78rem}
+  .actions{display:flex;gap:.6rem;justify-content:flex-end;margin-top:1rem;position:sticky;bottom:0;background:var(--card);padding-top:.6rem}
+  .actions .btn{padding:.8rem 1.2rem;font-size:1rem}
+  @media(min-width:720px){dialog{left:50%;right:auto;top:50%;bottom:auto;transform:translate(-50%,-50%);
+    width:min(92vw,480px);border-radius:16px;max-height:85vh;padding:1.3rem}.grab{display:none}}
   .fab{position:fixed;right:max(1rem,env(safe-area-inset-right));bottom:max(1rem,env(safe-area-inset-bottom));z-index:6}
   .fab button{font-size:1rem;font-weight:700;color:#fff;background:linear-gradient(135deg,var(--accent),var(--accent2));border:none;border-radius:999px;padding:.9rem 1.3rem;box-shadow:0 6px 20px rgba(124,58,237,.4)}
   .spacer{height:.6rem}
@@ -109,7 +126,7 @@ function renderSessions(){
       <h3>${esc(m.label||m.name)}</h3>
       <span class="pill ${esc(m.state)}">${esc(m.state)}</span>
     </div>
-    <div class="meta">${m.environment?('env: '+esc(m.environment)):''}${m.repos?(' · '+esc(m.repos)):''}</div>
+    <div class="meta">${m.environment?('env: '+esc(m.environment)):''}${m.repos?(' · '+esc(m.repos.split(' ').map(u=>u.split('/').pop().replace(/\.git$/,'')).join(', '))):''}</div>
     <div class="meta">${esc(m.name)} · ${esc(m.region)}</div>
     <div class="spacer"></div>
     <div class="row">
@@ -147,26 +164,31 @@ function renderRepos(){
       <div class="hint">Private repos: add a GITHUB_TOKEN key to the environment you'll use.</div></div>`;
 }
 
-function dlg(html){$('#dlg-body').innerHTML=html;$('#dlg').showModal();}
+function dlg(html){$('#dlg-body').innerHTML='<div class="grab"></div>'+html;$('#dlg').showModal();}
 function closeDlg(){$('#dlg').close();}
+// tap on the dimmed backdrop (outside the sheet) closes it
+$('#dlg').addEventListener('click',e=>{const r=e.currentTarget.getBoundingClientRect();
+  if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)closeDlg();});
 
 function newSession(){
   const envs=Object.keys(STATE.environments||{});
   const repos=STATE.repos||[];
   dlg(`<h3>New session</h3>
     <label>Environment</label>
-    <select id="ns-env">${envs.length?envs.map(n=>`<option>${esc(n)}</option>`).join(''):'<option value="">(none)</option>'}</select>
+    ${envs.length?envs.map((n,i)=>`<label class="choice"><input type="radio" name="ns-env" value="${esc(n)}" ${i===0?'checked':''}><span class="t">${esc(n)}<small>${(STATE.environments[n].keys||[]).length} keys</small></span></label>`).join('')
+      :'<div class="meta">No environments yet — add one in the Environments tab.</div>'}
     <label>Repos</label>
-    <div class="checks">${repos.length?repos.map(r=>`<label><input type="checkbox" value="${esc(r.name)}"> ${esc(r.name)}</label>`).join(''):'<span class="meta">no repos — add some in the Repos tab</span>'}</div>
-    <label>Label (optional)</label><input id="ns-label" placeholder="what this session is for">
-    <div class="spacer"></div>
-    <div class="row" style="justify-content:flex-end">
-      <button class="btn ghost sm" onclick="closeDlg()">Cancel</button>
-      <button class="btn sm" onclick="startSession()">Start</button></div>`);
+    ${repos.length?repos.map(r=>`<label class="choice"><input type="checkbox" name="ns-repo" value="${esc(r.name)}"><span class="t">${esc(r.name)}<small>${esc(r.url)}</small></span></label>`).join('')
+      :'<div class="meta">No repos yet — add some in the Repos tab.</div>'}
+    <label>Name (optional)</label><input id="ns-label" placeholder="e.g. fix login bug">
+    <div class="hint">This exact name shows in the Claude app too. Leave blank for an auto-generated one.</div>
+    <div class="actions">
+      <button class="btn ghost" onclick="closeDlg()">Cancel</button>
+      <button class="btn" onclick="startSession()">Start</button></div>`);
 }
 async function startSession(){
-  const env=$('#ns-env').value;
-  const repos=[...document.querySelectorAll('#dlg-body input[type=checkbox]:checked')].map(c=>c.value);
+  const env=(document.querySelector('#dlg-body input[name=ns-env]:checked')||{}).value||'';
+  const repos=[...document.querySelectorAll('#dlg-body input[name=ns-repo]:checked')].map(c=>c.value);
   const label=$('#ns-label').value.trim();
   try{await api('POST','api/sessions',{environment:env,repos,label});closeDlg();setTimeout(refresh,1500);refresh();}
   catch(e){alert('Start failed: '+e.message);}
@@ -183,10 +205,9 @@ async function editEnv(name){
     <label>Secrets (KEY=VALUE, one per line)</label>
     <textarea id="ev-secrets" placeholder="LOBSTER_TOKEN=...\nSERPAPI_KEY=...">${esc(text)}</textarea>
     <div class="hint">Saved encrypted. Blank value on an existing key deletes it.</div>
-    <div class="spacer"></div>
-    <div class="row" style="justify-content:flex-end">
-      <button class="btn ghost sm" onclick="closeDlg()">Cancel</button>
-      <button class="btn sm" onclick="saveEnv()">Save</button></div>`);
+    <div class="actions">
+      <button class="btn ghost" onclick="closeDlg()">Cancel</button>
+      <button class="btn" onclick="saveEnv()">Save</button></div>`);
 }
 async function saveEnv(){
   const name=$('#ev-name').value.trim();
