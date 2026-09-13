@@ -91,7 +91,8 @@ Destroy: `selfhost/cluster/destroy.sh` (Fly sessions are separate — destroy th
 
 - **Names**: optional at start. Given → passed as `claude --remote-control <name> --name <name>`
   so the Claude app and dashboard match; blank → the Claude session names itself and the
-  dashboard mirrors whatever it (or you, in the app) calls it. No renaming from the dashboard.
+  dashboard shows the app's AI-generated conversation title (read from the session transcript's
+  `ai-title` records) — so both always match. No renaming from the dashboard.
 - **Permission mode** per session: Auto (default) or Dangerously skip permissions.
 - **Secret values are write-only**: the dashboard lists key names and lets you set a new value, delete
   a key, or add keys; values are never sent to the browser (there is no reveal endpoint).

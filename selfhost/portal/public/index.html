@@ -219,9 +219,9 @@ function renderSessions(){
   const cool=coolAfterShift('sessions',s.map(m=>m.id).sort().join('|'));
   if(!s.length){v.innerHTML='<div class="empty">No sessions running.<br>Tap “New session”.</div>';return;}
   v.innerHTML=s.map(m=>{
-    // name: whatever claude inside reports (mirrors renames made in the Claude app);
-    // until it has booted, the creation name.
-    const title=(m.liveName&&m.nameSource&&m.nameSource!=='derived')?m.liveName:(m.label||m.liveName||m.name);
+    // title = what the Claude app shows: a name you pinned/renamed wins; otherwise the
+    // app's AI-generated conversation title; until it has booted, the creation name.
+    const title=(m.liveName&&m.nameSource&&m.nameSource!=='derived')?m.liveName:(m.aiTitle||m.label||m.liveName||m.name);
     const busy=PENDING.has('destroy:'+m.id);
     const repos=m.repos?m.repos.split(' ').map(u=>u.split('/').pop().replace(/\.git$/,'')).join(', '):'';
     const perm=m.permissionMode==='bypass'?' · <span class="pill bad" style="text-transform:none">skip perms</span>':(m.permissionMode?' · auto':'');

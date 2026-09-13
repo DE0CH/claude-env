@@ -35,8 +35,11 @@ function rand(n = 5) { return Math.random().toString(36).slice(2, 2 + n); }
 
 // ---- live session registry (inside each machine) ---------------------------
 // claude keeps ~/.claude/sessions/<pid>.json with the live display name and
-// busy/idle status. Read it via Fly exec so the dashboard reflects the current
-// name/state on refresh. Cached briefly; failures just fall back to metadata.
+// busy/idle status, and appends {"type":"ai-title","aiTitle":…} records to the session's
+// transcript when the Claude app titles the conversation. Read both via one Fly exec so
+// the dashboard shows the same title as the app. Cached briefly; failures fall back to metadata.
+const REG_CMD = 'for f in /home/claude/.claude/sessions/*.json; do cat "$f" 2>/dev/null; echo; done; echo __TITLES__; '
+  + 'for f in /home/claude/.claude/projects/*/*.jsonl; do t=$(grep -h \'"type":"ai-title"\' "$f" 2>/dev/null | tail -1); [ -n "$t" ] && echo "$t"; done; true';
 const regCache = new Map();
 async function readRegistry(machineId) {
   const c = regCache.get(machineId);
@@ -44,19 +47,20 @@ async function readRegistry(machineId) {
   let data = null;
   try {
     const r = await Promise.race([
-      fly.exec(machineId, ["bash", "-lc", "cat /home/claude/.claude/sessions/*.json 2>/dev/null"], 10),
+      fly.exec(machineId, ["bash", "-lc", REG_CMD], 10),
       new Promise((_, rej) => setTimeout(() => rej(new Error("exec timeout")), 12000)),
     ]);
-    const entries = String(r.stdout || "").split("\n")
-      .filter((l) => l.trim().startsWith("{"))
-      .map((l) => { try { return JSON.parse(l); } catch { return null; } })
-      .filter(Boolean)
-      .sort((a, b) => (a.startedAt || 0) - (b.startedAt || 0));
+    const [regPart, titlePart = ""] = String(r.stdout || "").split("__TITLES__");
+    const parse = (s) => s.split("\n").filter((l) => l.trim().startsWith("{"))
+      .map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean);
+    const entries = parse(regPart).sort((a, b) => (a.startedAt || 0) - (b.startedAt || 0));
+    const titles = Object.fromEntries(parse(titlePart).filter((t) => t.type === "ai-title" && t.aiTitle).map((t) => [t.sessionId, t.aiTitle]));
     const host = entries.find((e) => e.bridgeSessionId) || entries[0] || null;
     if (host) {
       data = {
         liveName: host.name || "",
         nameSource: host.nameSource || "",
+        aiTitle: titles[host.sessionId] || "",
         status: host.status || "",
         bridgeSessionId: host.bridgeSessionId || "",
         sessionsInside: entries.length,
