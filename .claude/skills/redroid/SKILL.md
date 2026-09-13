@@ -31,7 +31,10 @@ Debug health shows an empty boot flag.
 
 ## Manage it from the portal (dashboard)
 The portal has an **Android** tab (self-hosted controller, `selfhost/portal`):
-- **Start / Stop** — power the Hetzner VM on/off without deleting it. NOTE: a stopped VM
+- **Start / Stop** — power the Hetzner VM on/off without deleting it. Stop = ACPI shutdown
+  (~25 s), with a server-side fallback to hard `poweroff` if the box is still running 60 s
+  later (the guest ignores ACPI while it is still booting). The button stays "Stopping…" /
+  "Starting…" until Hetzner reports the new state (never optimistic). NOTE: a stopped VM
   still bills (Hetzner charges powered-off servers); only Release stops the monthly cost.
 - **Release** — deletes the VM (irreversible; rebuild with `redroid/provision.sh`).
 - **Debug (view-only)** — a live screenshot + health (boot flag, container up/down, exit IP,

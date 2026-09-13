@@ -453,9 +453,26 @@ app.post("/api/redroid/start", async (req, res) => {
   try { const token = await hzToken(); const s = await hetzner.find(token); if (!s) throw new Error("box not found");
     res.json(await hetzner.action(s.id, "poweron", token)); } catch (e) { res.status(500).json({ error: e.message }); }
 });
+// Graceful ACPI shutdown first. Hetzner reports the action "success" as soon as the signal is
+// sent; if the guest ignores it (e.g. Stop clicked while it is still booting) the box would
+// stay running forever, so fall back to a hard poweroff if it is still running after ~60s.
+const STOP_FALLBACK_MS = 60000;
+let stopWatch = null;
 app.post("/api/redroid/stop", async (req, res) => {
   try { const token = await hzToken(); const s = await hetzner.find(token); if (!s) throw new Error("box not found");
-    res.json(await hetzner.action(s.id, "shutdown", token)); } catch (e) { res.status(500).json({ error: e.message }); }
+    const r = await hetzner.action(s.id, "shutdown", token);
+    if (stopWatch) clearTimeout(stopWatch);
+    stopWatch = setTimeout(async () => {
+      stopWatch = null;
+      try {
+        const cur = await hetzner.find(token);
+        if (cur && cur.id === s.id && cur.status === "running") {
+          console.log(`redroid: still running ${STOP_FALLBACK_MS / 1000}s after shutdown -> poweroff`);
+          await hetzner.action(s.id, "poweroff", token);
+        }
+      } catch (e) { console.log("redroid stop fallback failed:", e.message); }
+    }, STOP_FALLBACK_MS);
+    res.json(r); } catch (e) { res.status(500).json({ error: e.message }); }
 });
 app.delete("/api/redroid", async (req, res) => {
   try { const token = await hzToken(); const s = await hetzner.find(token); if (!s) throw new Error("box not found");
