@@ -14,7 +14,7 @@ export function Sheet({ open, onClose, title, left, right, snap, children, onClo
     <Drawer.Portal>
       <Drawer.Overlay className="sheet-overlay" />
       <Drawer.Content className={`sheet${snap ? " snap" : ""}${className ? " " + className : ""}`} aria-describedby={undefined}>
-        <Drawer.Handle className="handle" />
+        <div className="handle-wrap"><Drawer.Handle className="handle" /></div>
         {title !== undefined ? (
           <div className="head">
             <div className="side">{left}</div>

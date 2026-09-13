@@ -129,7 +129,7 @@ async function run(viewport, tag) {
   const top1 = (await page.locator(".sheet.snap").boundingBox()).y;
   ok(`${tag}: sheet opens part-way (snap point)`, top1 > viewport.height * 0.25, `top ${Math.round(top1)}px of ${viewport.height}`);
   await shot("5-newsession-snap");
-  let hb = await page.locator(".sheet.snap .handle").boundingBox();
+  let hb = await page.locator(".sheet.snap .handle-wrap").boundingBox();
   await drag(page, touch, hb.x + hb.width / 2, hb.y + hb.height / 2, 10);
   await sleep(700);
   const top2 = (await page.locator(".sheet.snap").boundingBox()).y;
@@ -137,7 +137,7 @@ async function run(viewport, tag) {
   ok(`${tag}: header actions visible`, await page.locator('.sheet .head button:has-text("Start")').isVisible());
   await shot("6-newsession-full");
   // a flick down (vaul dismisses a snap-point sheet on velocity, or from the lowest snap point)
-  hb = await page.locator(".sheet.snap .handle").boundingBox();
+  hb = await page.locator(".sheet.snap .handle-wrap").boundingBox();
   await drag(page, touch, hb.x + hb.width / 2, hb.y + hb.height / 2, hb.y + 420, 5);
   await sleep(800);
   ok(`${tag}: handle flick down dismisses`, (await page.locator(".sheet").count()) === 0);
