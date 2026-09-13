@@ -19,6 +19,9 @@ chmod a+r /etc/apt/keyrings/docker.asc
 echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable" > /etc/apt/sources.list.d/docker.list
 apt-get update
 apt-get install -y docker-ce docker-ce-cli containerd.io
+# redsocks is driven by /usr/local/bin/redroid-proxy, never by its Debian unit (which would
+# otherwise auto-start at boot with a stale config and make `status` lie)
+systemctl disable --now redsocks || true
 
 # ---- kernel modules: binder (redroid) + NAT redirect (proxy toggle) ----
 modprobe binder_linux devices="binder,hwbinder,vndbinder" || true
@@ -84,5 +87,21 @@ RIP
 for i in $(seq 1 40); do [ "$(adb connect localhost:5555 >/dev/null 2>&1; adb -s localhost:5555 shell getprop sys.boot_completed 2>/dev/null | tr -d '\r')" = "1" ] && break; sleep 3; done
 curl -sL https://github.com/moparisthebest/static-curl/releases/latest/download/curl-amd64 -o /root/curl-and
 adb -s localhost:5555 push /root/curl-and /data/local/tmp/curl && adb -s localhost:5555 shell chmod 755 /data/local/tmp/curl
+# host adb must `connect` to the device after every boot (the portal/sessions address it as
+# localhost:5555; without this the device only shows up as emulator-5554)
+cat > /etc/systemd/system/redroid-adb-connect.service <<'UNIT'
+[Unit]
+Description=Connect host adb to the redroid container after boot
+After=docker.service
+Requires=docker.service
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/bash -c "for i in $(seq 1 60); do /usr/bin/adb connect localhost:5555 2>/dev/null | grep -q connected && exit 0; sleep 3; done; exit 1"
+[Install]
+WantedBy=multi-user.target
+UNIT
+systemctl daemon-reload && systemctl enable redroid-adb-connect.service
+
 touch /root/redroid-setup-done
 echo "SETUP DONE"

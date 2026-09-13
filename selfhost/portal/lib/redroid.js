@@ -41,7 +41,11 @@ async function run(ip, remoteCmd, { binary = false, timeout = 20000 } = {}) {
 }
 
 // One SSH round-trip that emits KEY=VALUE lines the portal parses. View-only.
+// `adb connect` first: idempotent, and after a VM reboot the host adb has not attached
+// to localhost:5555 yet (the device would only be visible as emulator-5554).
+const ADB_CONNECT = "adb connect localhost:5555 >/dev/null 2>&1";
 const HEALTH_CMD = [
+  ADB_CONNECT,
   'echo boot=$(adb -s localhost:5555 shell getprop sys.boot_completed 2>/dev/null | tr -d "\\r")',
   'echo model=$(adb -s localhost:5555 shell getprop ro.product.model 2>/dev/null | tr -d "\\r")',
   'echo android=$(adb -s localhost:5555 shell getprop ro.build.version.release 2>/dev/null | tr -d "\\r")',
@@ -66,7 +70,7 @@ async function health(ip) {
 
 // Fresh screenshot of the Android screen as PNG bytes.
 async function screenshot(ip) {
-  return run(ip, "adb -s localhost:5555 exec-out screencap -p", { binary: true, timeout: 20000 });
+  return run(ip, ADB_CONNECT + "; adb -s localhost:5555 exec-out screencap -p", { binary: true, timeout: 20000 });
 }
 
 module.exports = { token, health, screenshot };

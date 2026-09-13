@@ -24,8 +24,10 @@ account, so use x86). This session box confirmed: no `/dev/kvm`, no vmx/svm.
 
 ## Architecture
 One `redroid` container (adb on 127.0.0.1:5555, `--restart unless-stopped` → reboot-safe) plus
-host-side helpers (`redroid-proxy`, `redroid-ip`). Everything else talks to it through
-`adb` on the box, over SSH.
+host-side helpers (`redroid-proxy`, `redroid-ip`) and `redroid-adb-connect.service` (host
+`adb connect localhost:5555` after boot). Everything else talks to it through `adb` on the
+box, over SSH. Android takes ~1-2 min to boot after a VM start; until then the portal's
+Debug health shows an empty boot flag.
 
 ## Manage it from the portal (dashboard)
 The portal has an **Android** tab (self-hosted controller, `selfhost/portal`):
@@ -67,6 +69,8 @@ redroid-proxy off
 redsocks + iptables REDIRECT of the container's TCP (needs `xt_REDIRECT` module — loaded &
 persisted). TCP only; DNS is not proxied (fine for IP-reputation, minor DNS leak). Validated:
 OFF=Hetzner, ON=proxy exit IP. Get proxies via the `evomi` / `iproyal` skills.
+**Not reboot-persistent:** after a Stop/Start the proxy is OFF again (iptables rules gone; the
+Debian `redsocks` unit is disabled on purpose so it doesn't auto-start with a stale config).
 
 ## Rebuild from scratch
 `redroid/provision.sh [type] [location]` — creates an SSH key and an x86 Ubuntu 24.04 server
@@ -84,6 +88,9 @@ curl -X DELETE -H "Authorization: Bearer $HETZNER_API" https://api.hetzner.cloud
 ```
 
 ## Gotchas
+- After a VM reboot, host adb only sees the device as `emulator-5554` until `adb connect
+  localhost:5555` runs (the boot unit does it; the portal also prefixes every command with it).
+  If `adb -s localhost:5555 …` says "device not found", run `adb connect localhost:5555`.
 - SSH heredocs with nested `adb shell` drop mid-session → run adb commands as **separate,
   atomic** SSH invocations, not one big heredoc.
 - redroid Android has **no curl/wget**; toybox has `nc`. Use the pushed static curl.
