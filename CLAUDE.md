@@ -502,7 +502,9 @@ record/chronicle (`~/artifacts/record.md`), screenshots, downloaded or generated
 files, reports, support-chat transcripts — must be **placed or symlinked under
 `~/artifacts/`** (that directory is the mark the uploader looks for; subfolders are
 fine). Anything elsewhere on the machine is lost with it. If an artefact can't be
-copied there (e.g. a remote recording), list its location/URL in `record.md`.
+copied there (e.g. a remote recording), list its location/URL in `record.md`. When the task is
+done and the session should go away, use the **`retire-session` skill** (`/retire-session`): it
+pushes everything, checks the records, and calls the portal's archive+destroy for this machine.
 
 **In the other runtimes (Mac, Claude-on-the-web pod)** there is no portal, so upload
 at the end of the task yourself, as before:
