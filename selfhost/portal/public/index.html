@@ -219,7 +219,7 @@ function renderRepos(){
   v.innerHTML=(cards||'<div class="empty">No repos yet.</div>')+`
     <div class="card"><label>Add repo (git URL)</label>
       <input id="repo-url" type="url" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="https://github.com/owner/repo.git" ${addKey?'disabled':''}>
-      <label>Name (optional)</label><input id="repo-title" type="text" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="auto from URL" ${addKey?'disabled':''}>
+      <label>Alias (optional)</label><input id="repo-title" type="text" name="repo-alias" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="auto from URL" ${addKey?'disabled':''}>
       <div class="spacer"></div>${pbtn('repo:add','',`addRepo()`,'Add repo')}
       <div class="hint">Private repos: add a GITHUB_TOKEN key to the environment you'll use.</div></div>`;
 }
@@ -242,8 +242,8 @@ function newSession(){
     <label>Repos</label>
     ${repos.length?repos.map(r=>`<label class="choice"><input type="checkbox" name="ns-repo" value="${esc(r.name)}"><span class="t">${esc(r.name)}<small>${esc(r.url)}</small></span></label>`).join('')
       :'<div class="meta">No repos yet — add some in the Repos tab.</div>'}
-    <label>Name (optional)</label><input id="ns-title" type="text" autocomplete="off" autocorrect="off" autocapitalize="sentences" spellcheck="false" placeholder="e.g. refactor billing module">
-    <div class="hint">This exact name shows in the Claude app too. Leave blank for an auto-generated one.</div>
+    <label>Session title (optional)</label><input id="ns-title" type="text" name="session-topic" autocomplete="off" autocorrect="off" autocapitalize="sentences" spellcheck="false" placeholder="e.g. refactor billing module">
+    <div class="hint">Shows as the session title in the Claude app too. Leave blank for an auto-generated one.</div>
     <div class="actions">
       <button class="btn ghost" onclick="closeDlg()">Cancel</button>
       <button class="btn" id="ns-start" onclick="startSession(this)">Start</button></div>`);
@@ -292,7 +292,7 @@ async function editEnv(name){
   if(name){try{const r=await api('GET',`api/environments/${encodeURIComponent(name)}/secrets`);secrets=r.secrets||{};}catch(e){}}
   const text=Object.entries(secrets).map(([k,v])=>`${k}=${v}`).join('\n');
   dlg(`<h3>${name?'Edit ':'New '}environment</h3>
-    <label>Name</label><input id="ev-title" type="text" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" value="${esc(name)}" ${name?'readonly':''} placeholder="e.g. default">
+    <label>Environment id</label><input id="ev-title" type="text" name="env-id" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" value="${esc(name)}" ${name?'readonly':''} placeholder="e.g. default">
     <label>Secrets (KEY=VALUE, one per line)</label>
     <textarea id="ev-secrets" placeholder="LOBSTER_TOKEN=...\nSERPAPI_KEY=...">${esc(text)}</textarea>
     <div class="hint">Saved on the controller. Blank value on an existing key deletes it.</div>
