@@ -90,12 +90,15 @@ SIP="$(echo "$RESP" | python3 -c "import sys,json;s=json.load(sys.stdin).get('se
 [ -n "$SID" ] || { echo "FATAL: create failed:"; echo "$RESP" | head -c 800; exit 1; }
 echo ">> id=$SID ip=$SIP — waiting for bootstrap"
 
-DEADLINE=$(( $(date +%s)+720 )); LAST=""
+DEADLINE=$(( $(date +%s)+720 )); LAST_N=0
 while [ "$(date +%s)" -lt "$DEADLINE" ]; do
   sleep 15
-  CUR="$(curl -fsS "$STATUS_GET_URL" 2>/dev/null||true)"
-  [ -n "$CUR" ] && [ "$CUR" != "$LAST" ] && { diff <(printf '%s' "$LAST") <(printf '%s' "$CUR") | grep '^>' | sed 's/^> /   /'; LAST="$CUR"; }
-  echo "$CUR" | grep -q "bootstrap COMPLETE" && break
+  CUR="$(curl -fsS "$STATUS_GET_URL" 2>/dev/null || true)"
+  if [ -n "$CUR" ]; then
+    N=$(printf '%s\n' "$CUR" | wc -l)
+    if [ "$N" -gt "$LAST_N" ]; then printf '%s\n' "$CUR" | tail -n +$((LAST_N+1)) | sed 's/^/   /'; LAST_N=$N; fi
+    printf '%s\n' "$CUR" | grep -q "bootstrap COMPLETE" && break
+  fi
 done
 python3 - "$S3_KEY" <<'PY' 2>/dev/null||true
 import boto3,os,sys

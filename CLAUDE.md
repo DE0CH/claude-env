@@ -548,6 +548,28 @@ git push origin HEAD:main
 Rebasing (not merging) keeps `main` linear — resolve any conflicts during the rebase, then
 push. This is the standard recovery whenever remote `main` has moved ahead of you.
 
+## Self-hosted Claude cloud (`selfhost/`)
+
+A DIY replica of Claude cloud code, built to escape the 443-only network + permission
+classifier. See `selfhost/README.md`. Architecture: a tiny **stateless Hetzner controller**
+(cx23) runs a mobile **dashboard** at `https://tunnel.deyaochen.com/t/portal/` (Cloudflare
+Access, my email only) + a cf-tunnel agent, both under systemd. Each **session** is a
+**Fly.io Machine** (app `de0ch-claude-sessions`) booting a prebuilt image that injects an
+environment's secrets + repos and runs `claude --remote-control` — so it shows up in the
+Claude phone app. Isolated microVM per session (install tools freely). Portal state
+(environments = named secret sets, repos, session image ref) lives **encrypted in Hetzner
+S3** (`selfhost/portal/lib/store.js`); nuke the controller and `selfhost/controller/create.sh`
+rebuilds it identically.
+
+- Commands (run where `~/.secrets` + `~/.claude` creds live): `selfhost/controller/create.sh`
+  / `destroy.sh`; `selfhost/deploy-session-image.sh` to (re)build the session image on Fly.
+- **New env vars this needs (persist in the environment config):** `FLY_API_TOKEN` (Fly org
+  token, mints/kills session machines) and `PORTAL_ENC_KEY` (64-hex; encrypts the S3 config —
+  **if lost, all saved environments are unreadable**). Fly login: `flyctl auth login --email/--password`.
+- Cost: controller ~€6.59/mo fixed; Fly sessions ~1–2¢/session-hour, ~free when stopped.
+  Stop/destroy sessions from the dashboard when done (no idle auto-stop yet).
+- Known v1 limit: sessions share the Claude OAuth refresh token (fine for a few concurrent).
+
 ## Other files
 
 @lobster.md
