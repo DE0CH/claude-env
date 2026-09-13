@@ -26,7 +26,8 @@ function secrets() {
   } catch {}
   return env;
 }
-const headers = BASE.includes("tunnel.deyaochen.com")
+const LIVE = BASE.includes("tunnel.deyaochen.com"); // real sessions behind it — no keystrokes
+const headers = LIVE
   ? (() => { const s = { ...secrets(), ...process.env }; return { "CF-Access-Client-Id": s.CF_ACCESS_CLIENT_ID || "", "CF-Access-Client-Secret": s.CF_ACCESS_CLIENT_SECRET || "" }; })()
   : {};
 
@@ -93,15 +94,19 @@ async function run(viewport, tag) {
     await shot("3-terminal-short");
     await page.setViewportSize(viewport);
     await sleep(600);
-    // key chip + input row
-    await page.click('.term .keys button:has-text("Esc")');
-    await page.fill("#term-in", "hello"); await page.press("#term-in", "Enter");
-    ok(`${tag}: input row cleared after send`, (await page.inputValue("#term-in")) === "");
+    // key chip + input row — only against the mock: on the live portal this would type into a REAL session
+    if (!LIVE) {
+      await page.click('.term .keys button:has-text("Esc")');
+      await page.fill("#term-in", "hello"); await page.press("#term-in", "Enter");
+      ok(`${tag}: input row cleared after send`, (await page.inputValue("#term-in")) === "");
+    }
     // drag the handle down → dismiss
     const hb = await page.locator(".term .thandle").boundingBox();
     await drag(page, touch, hb.x + hb.width / 2, hb.y + hb.height / 2, hb.y + viewport.height * 0.7);
     await sleep(700);
     ok(`${tag}: terminal dismissed by dragging its handle`, (await page.locator(".term").count()) === 0);
+    // put the live session's tmux back to its boot size (the test just refitted it to this viewport)
+    if (LIVE) await page.evaluate((id) => fetch(`api/sessions/${id}/tty/resize`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ cols: 120, rows: 40 }) }), live.id);
   } else console.log(`skip  ${tag}: no live session to open a terminal on`);
 
   // action menu
