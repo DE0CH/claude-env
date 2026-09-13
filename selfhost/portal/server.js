@@ -285,8 +285,8 @@ app.get("/api/sizes", (req, res) => res.json({ sizes: SIZES, default: DEFAULT_SI
 // SESSION_MODEL -> `claude --model <id>`); anything else is rejected so a typo can't
 // silently pick a wrong/unavailable model.
 const MODELS = {
-  "claude-opus-4-8":  { label: "Opus 4.8 — most capable" },
-  "claude-fable-5-1": { label: "Fable 5.1 — fast" },
+  "claude-opus-4-8":  { label: "Opus 4.8 — faster, cheaper" },
+  "claude-fable-5-1": { label: "Fable 5.1 — most capable" },
 };
 const DEFAULT_MODEL = "claude-opus-4-8";
 app.get("/api/models", (req, res) => res.json({ models: MODELS, default: DEFAULT_MODEL }));
