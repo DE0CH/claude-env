@@ -62,6 +62,12 @@ start() {
 }
 
 start
+# Credentials write-back: claude rotates the OAuth refresh token when it refreshes; push the
+# new pair to the portal so sessions created later don't inherit a dead one (see the script).
+if [ -x /usr/local/bin/push-claude-credentials ]; then
+  nohup /usr/local/bin/push-claude-credentials >/dev/null 2>&1 &
+  echo "[supervisor] credentials write-back running (-> ${PORTAL_URL:-portal default})"
+fi
 while true; do
   if ! pgrep -u "$(id -u)" -f 'claude --remote-control' >/dev/null 2>&1; then
     echo "[supervisor] host gone; restarting"

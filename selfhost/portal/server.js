@@ -10,11 +10,13 @@ const auth = require("./lib/auth");
 const imagebuild = require("./lib/imagebuild");
 const archive = require("./lib/archive");
 const github = require("./lib/github");
+const oauth = require("./lib/oauth");
 
 const PORT = process.env.PORT || 8080;
 const HOST = process.env.HOST || "127.0.0.1";
 const ALLOWED_EMAIL = process.env.PORTAL_ALLOWED_EMAIL || "chendeyao000@gmail.com";
 const VERSION = process.env.PORTAL_VERSION || require("./package.json").version;
+const PUBLIC_URL = (process.env.PORTAL_PUBLIC_URL || "https://tunnel.deyaochen.com/t/portal").replace(/\/$/, "");
 
 const app = express();
 app.use(express.json({ limit: "2mb" }));
@@ -34,6 +36,50 @@ function slug(s) {
   return (s || "session").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 24) || "session";
 }
 function rand(n = 5) { return Math.random().toString(36).slice(2, 2 + n); }
+
+// ---- Claude credentials: keep the stored OAuth pair usable ------------------------
+// Sessions get a COPY of the stored ~/.claude/.credentials.json. Claude rotates the refresh
+// token whenever it refreshes, which invalidates the stored one — so (1) sessions push their
+// refreshed copy back (POST /api/credentials, newest expiresAt wins), and (2) before a session
+// is created the portal refreshes the stored pair itself if the access token is expired or
+// about to be. If that refresh is rejected, the only way out is a Re-login (Settings).
+const FRESH_MARGIN_MS = 30 * 60 * 1000;   // refresh when less than this is left
+const REFRESH_RETRY_MS = 5 * 60 * 1000;   // after a rejected refresh, don't hammer the endpoint
+let refreshLock = null;
+let refreshFail = null; // { at, error, expiresAt } — for the creds that failed
+function needLogin(msg) { const e = new Error(msg); e.needLogin = true; return e; }
+async function ensureFreshCredentials({ force = false } = {}) {
+  if (refreshLock) return refreshLock;
+  refreshLock = (async () => {
+    const creds = await store.getClaudeCredentials();
+    if (!creds.credentials) throw needLogin("no Claude credentials — Re-login from Settings");
+    const exp = oauth.expiresAt(creds.credentials);
+    const left = exp - Date.now();
+    if (!force && left > FRESH_MARGIN_MS) return { refreshed: false, expiresAt: exp };
+    if (!force && refreshFail && refreshFail.expiresAt === exp && Date.now() - refreshFail.at < REFRESH_RETRY_MS) {
+      throw needLogin(`Claude login expired and the token refresh was rejected (${refreshFail.error}) — Re-login from Settings`);
+    }
+    let r;
+    try { r = await oauth.refresh(creds.credentials); }
+    catch (e) {
+      refreshFail = { at: Date.now(), error: e.message, expiresAt: exp };
+      console.error(`[creds] refresh failed: ${e.message}`);
+      if (e.rejected || left < 0) throw needLogin(`Claude login expired and the token refresh was rejected (${e.message}) — Re-login from Settings`);
+      throw e; // transient (network) with a still-valid access token: caller may proceed
+    }
+    await store.setClaudeCredentials(r.credentials, creds.account);
+    auth.seedHome({ credentials: r.credentials, account: creds.account });
+    refreshFail = null;
+    console.log(`[creds] refreshed via ${r.via}; access token now valid until ${new Date(r.expiresAt).toISOString()}`);
+    return { refreshed: true, expiresAt: r.expiresAt };
+  })();
+  try { return await refreshLock; } finally { refreshLock = null; }
+}
+function credsStatus(credentials) {
+  const exp = oauth.expiresAt(credentials);
+  const stale = !!refreshFail && refreshFail.expiresAt === exp && exp < Date.now();
+  return { expiresAt: exp || null, expired: !!exp && exp < Date.now(), stale, error: stale ? refreshFail.error : null };
+}
 
 // ---- live session registry (inside each machine) ---------------------------
 // claude keeps ~/.claude/sessions/<pid>.json with the live display name and
@@ -116,7 +162,7 @@ app.get("/api/state", async (req, res) => {
       } catch (e) { flyError = e.message; }
     } else { flyError = "FLY_API_TOKEN not set"; }
     let credsInfo = null;
-    try { const c = JSON.parse(creds.credentials || "{}").claudeAiOauth || {}; credsInfo = { expiresAt: c.expiresAt || null, subscriptionType: c.subscriptionType || "", scopes: c.scopes || [] }; } catch {}
+    try { const c = JSON.parse(creds.credentials || "{}").claudeAiOauth || {}; credsInfo = { expiresAt: c.expiresAt || null, subscriptionType: c.subscriptionType || "", scopes: c.scopes || [], ...credsStatus(creds.credentials) }; } catch {}
     const build = imagebuild.status();
     res.json({
       version: VERSION,
@@ -150,6 +196,33 @@ app.delete("/api/environments/:name", async (req, res) => {
 });
 // Secret VALUES are never sent to the browser: the dashboard only sees key names
 // (in /api/state) and writes updates/deletions through POST /api/environments.
+
+// ---- Claude credentials API ----------------------------------------------------
+// Write-back from sessions (and any tool with the Access service token): store a newer
+// credentials.json. Only a pair with a LATER expiresAt than the stored one is accepted, so a
+// stale copy can never overwrite a fresh one. Token values are never echoed back.
+app.post("/api/credentials", async (req, res) => {
+  try {
+    const { credentials, account } = req.body || {};
+    const c = typeof credentials === "string" ? credentials : JSON.stringify(credentials || {});
+    let o; try { o = JSON.parse(c).claudeAiOauth; } catch {}
+    if (!o || !o.accessToken || !o.refreshToken || !o.expiresAt) return res.status(400).json({ error: "credentials must be a ~/.claude/.credentials.json object with claudeAiOauth.{accessToken,refreshToken,expiresAt}" });
+    const cur = await store.getClaudeCredentials();
+    const curExp = oauth.expiresAt(cur.credentials);
+    if (Number(o.expiresAt) <= curExp) return res.json({ stored: false, reason: "not newer than the stored credentials", expiresAt: curExp });
+    const acct = account ? (typeof account === "string" ? account : JSON.stringify(account)) : cur.account;
+    await store.setClaudeCredentials(c, acct);
+    auth.seedHome({ credentials: c, account: acct });
+    refreshFail = null;
+    console.log(`[creds] stored newer credentials (valid until ${new Date(Number(o.expiresAt)).toISOString()})`);
+    res.json({ stored: true, expiresAt: Number(o.expiresAt) });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
+// Refresh the stored pair now (Settings -> Refresh token). 409 + needLogin when rejected.
+app.post("/api/credentials/refresh", async (req, res) => {
+  try { res.json({ ok: true, ...(await ensureFreshCredentials({ force: true })) }); }
+  catch (e) { res.status(e.needLogin ? 409 : 502).json({ error: e.message, needLogin: !!e.needLogin }); }
+});
 
 // ---- repos ----------------------------------------------------------------
 app.post("/api/repos", async (req, res) => {
@@ -216,8 +289,11 @@ app.post("/api/sessions", async (req, res) => {
     if (!process.env.FLY_API_TOKEN) return res.status(400).json({ error: "FLY_API_TOKEN not set on the portal" });
     const cfg = await store.get();
     if (!cfg.sessionImage) return res.status(400).json({ error: "no session image yet — rebuild it from Settings" });
+    // make sure the pair we inject actually works: refresh if expired/expiring, else 409 -> Re-login
+    try { await ensureFreshCredentials(); }
+    catch (e) { if (e.needLogin) return res.status(409).json({ error: e.message, needLogin: true }); console.error(`[creds] ${e.message}`); }
     const creds = await store.getClaudeCredentials();
-    if (!creds.credentials) return res.status(400).json({ error: "no Claude credentials — re-login from Settings" });
+    if (!creds.credentials) return res.status(409).json({ error: "no Claude credentials — Re-login from Settings", needLogin: true });
     const { environment, repos = [], label, permissionMode, size } = req.body || {};
     const env = cfg.environments[environment];
     if (environment && !env) return res.status(400).json({ error: `unknown environment '${environment}'` });
@@ -248,6 +324,7 @@ app.post("/api/sessions", async (req, res) => {
       SESSION_REPOS: repoUrls.join(","),
       SESSION_LABEL: userLabel, // blank => the Claude session names itself
       SESSION_PERMISSION_MODE: permMode,
+      PORTAL_URL: PUBLIC_URL, // the session pushes refreshed Claude credentials back here
     };
     const name = `s-${slug(userLabel || base)}-${rand()}`;
     const machine = await fly.createMachine({

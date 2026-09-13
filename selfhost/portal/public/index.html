@@ -210,6 +210,7 @@ setInterval(async()=>{
 function banners(){
   let h='';
   if(STATE.hasCreds===false)h+='<div class="banner err">No Claude credentials — sessions can\'t authenticate. Re-login from Settings.</div>';
+  else if((STATE.creds||{}).stale)h+='<div class="banner err">Claude login expired and the token refresh was rejected — new sessions can\'t sign in. Re-login from Settings.</div>';
   if(!STATE.sessionImage)h+='<div class="banner warn">No session image yet. Build one from Settings.</div>';
   if(STATE.flyError)h+='<div class="banner err">Fly: '+esc(STATE.flyError)+'</div>';
   $('#banners').innerHTML=h;
@@ -354,9 +355,10 @@ function renderSettings(){
   v.innerHTML=`
     <div class="card"><h3>Claude account</h3>
       <div class="meta">${STATE.hasCreds?`Signed in${c.subscriptionType?' · '+esc(c.subscriptionType):''}${exp?' · access token '+(exp>new Date()?'expires':'expired')+' '+ago(exp.toISOString()).replace(' ago','')+(exp>new Date()?' from now':' ago'):''}`:'Not signed in'}</div>
-      <div class="hint">Runs the real <code>claude auth login</code> on the controller: you open the link, sign in, and paste the code back here. New sessions use the refreshed credentials; running ones keep their copy.</div>
+      ${c.stale?`<div class="meta" style="color:var(--err)">Token refresh rejected: ${esc(c.error||'')}</div>`:''}
+      <div class="hint">Runs the real <code>claude auth login</code> on the controller: you open the link, sign in, and paste the code back here. New sessions use the stored credentials; the portal refreshes them before each start and running sessions push their refreshed copy back.</div>
       <div class="spacer"></div>
-      ${pbtn('auth','sm','relogin()','Re-login')}
+      <div class="row">${pbtn('auth','sm','relogin()','Re-login')}${STATE.hasCreds?pbtn('credrefresh','ghost sm','refreshCreds()','Refresh token'):''}</div>
     </div>
     <div class="card"><h3>Session image</h3>
       <div class="meta">${STATE.sessionImage?esc(STATE.sessionImage):'none yet'}</div>
@@ -414,7 +416,13 @@ async function startSession(btn){
     closeDlg();
     await refresh(false);                                 // card appears in its REAL state (creating…)
     settle(st=>{const m=(st.sessions||[]).find(x=>x.id===r.id);return !!(m&&m.state==='started'&&m.status);}); // fast-poll until claude is actually up
-  }catch(e){restore();alert('Start failed: '+e.message);}
+  }catch(e){restore();alert('Start failed: '+e.message);if(/Re-login/.test(e.message)){closeDlg();tab('settings');}}
+}
+async function refreshCreds(){
+  pend('credrefresh','Refreshing…');
+  try{const r=await api('POST','api/credentials/refresh');alert(r.refreshed?'Token refreshed. Valid until '+new Date(r.expiresAt).toLocaleString():'Token was still fresh (valid until '+new Date(r.expiresAt).toLocaleString()+').');}
+  catch(e){alert(e.message);}
+  pend('credrefresh',null);await refresh(false);
 }
 
 async function destroy(id){

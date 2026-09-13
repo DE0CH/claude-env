@@ -60,6 +60,14 @@ phone ─ Claude app (chat)            dashboard  https://tunnel.deyaochen.com/t
   CF Access service token (`CF-Access-Client-Id/Secret` headers, already in every session's
   env), or `kubectl` against `https://<box-ip>:6443` with the admin token.
 
+## API
+
+The dashboard is a static page that only calls the portal's JSON API — every action it can do,
+any program can do. Reference: [`API.md`](API.md). Auth is Cloudflare Access: your Google login
+in the browser, or the Access **service token** (two headers, `CF-Access-Client-Id` /
+`CF-Access-Client-Secret`) for programs — it is stored in the `default` environment's secrets, so
+every session (and anything else you hand it to) can call the API.
+
 ## Secrets
 
 | where | what |
@@ -116,6 +124,10 @@ Destroy: `selfhost/cluster/destroy.sh` (Fly sessions are separate — destroy th
 
 ## Known limitations
 
-- Shared OAuth refresh token across sessions (fine for a handful; re-login refreshes all new ones).
+- Sessions share one Claude OAuth identity. Claude rotates the refresh token on every refresh, so
+  each session pushes its refreshed `~/.claude/.credentials.json` back to the portal
+  (`push-claude-credentials`, via `POST /api/credentials`; newest expiry wins) and the portal
+  refreshes the stored pair itself before starting a session. If that refresh is rejected the
+  dashboard says so and the only fix is Re-login (Settings). See `API.md`.
 - Sessions don't auto-destroy on idle (~1–2¢/hour while running).
 - The terminal mirror has ~1 s latency and no mouse/scrollback; it's for watching and nudging.

@@ -75,6 +75,7 @@ function connect() {
   };
   if (AGENT_SECRET) headers["x-agent-secret"] = AGENT_SECRET;
   const ws = new WebSocket(WORKER_URL, { headers });
+  current = ws;
   let pingTimer;
 
   ws.on("open", () => {
@@ -177,16 +178,32 @@ function connect() {
   });
 
   let retried = false;
-  const retry = (why) => {
+  const retry = (why, delay) => {
     if (retried) return;
     retried = true;
     clearInterval(pingTimer);
-    console.error(`[agent] ${why}; reconnecting in ${backoff}ms`);
-    setTimeout(connect, backoff);
-    backoff = Math.min(backoff * 2, 30_000);
+    const wait = delay || backoff;
+    console.error(`[agent] ${why}; reconnecting in ${wait}ms`);
+    setTimeout(connect, wait);
+    if (!delay) backoff = Math.min(backoff * 2, 30_000);
   };
-  ws.on("close", (code, reason) => retry(`closed (${code} ${reason})`));
+  // 1012 "replaced": another agent with our tunnel id took over (normally the successor pod
+  // during a redeploy). Reconnecting after 1 s would kick IT off and the two would swap every
+  // second, failing every in-flight request — so stand back for a while; if we are the one
+  // meant to live, the other side is gone by then.
+  ws.on("close", (code, reason) => retry(`closed (${code} ${reason})`, code === 1012 ? 20_000 + Math.floor(Math.random() * 5000) : 0));
   ws.on("error", (e) => { ws.terminate(); retry(`error (${e.message})`); });
 }
+
+let current = null; // the live socket, for the shutdown handler
+// Orderly shutdown (k8s SIGTERM on redeploy): close the socket so the Worker sees the agent
+// gone immediately instead of holding requests against a dead socket until they time out.
+let shuttingDown = false;
+for (const sig of ["SIGTERM", "SIGINT"]) process.on(sig, () => {
+  if (shuttingDown) return; shuttingDown = true;
+  console.error(`[agent] ${sig}: closing tunnel socket and exiting`);
+  try { if (current && current.readyState === WebSocket.OPEN) current.close(1001, "agent shutting down"); } catch {}
+  setTimeout(() => process.exit(0), 300);
+});
 
 connect();

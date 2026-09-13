@@ -11,13 +11,11 @@ metadata:
   namespace: claude
 spec:
   replicas: 1
-  # the Worker keeps one agent socket per tunnel id and lets a new connection take over, so
-  # a surge pod replaces the old one with only the socket-swap gap
+  # MUST be Recreate: the Worker keeps ONE agent socket per tunnel id and a newcomer takes
+  # over, so two agents alive at once replace each other every second and every in-flight
+  # request dies with a 502 (seen 2026-09-13 with RollingUpdate). One at a time, short grace.
   strategy:
-    type: RollingUpdate
-    rollingUpdate:
-      maxSurge: 1
-      maxUnavailable: 0
+    type: Recreate
   selector:
     matchLabels:
       app: tunnel-portal
@@ -26,6 +24,7 @@ spec:
       labels:
         app: tunnel-portal
     spec:
+      terminationGracePeriodSeconds: 5
       containers:
         - name: agent
           image: claude-tunnel-agent
