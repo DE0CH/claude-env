@@ -51,13 +51,32 @@ curl -sS -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" -H "CF-Access-Client-Sec
 | add/edit an environment's secrets | portal UI (Environments → Edit) or API `POST /api/environments {name, secrets:{K:V, K2:""(delete)}}` — it commits `env-<name>.sops.yaml` and applies |
 | add a portal-level secret by hand | write the Secret manifest (JSON is fine) at `selfhost/k8s/secrets/<x>.sops.yaml`, `sops --encrypt --in-place <path>` (rule matches by path; needs `.sops.yaml` at repo root → run from repo root), add to `secrets/kustomization.yaml`, push |
 | read a live secret value | `kubectl -n claude get secret env-default -o json` (values base64 on the wire; decode in code, never with the base64 CLI on artefacts) |
-| rebuild the session image | portal Settings → Rebuild (flyctl inside the pod) or `POST /api/image/rebuild`; from a pod with flyctl: `cd selfhost/session-image && flyctl deploy . --config fly.toml --app de0ch-claude-sessions --build-only --push` (the `--config` path is resolved relative to the deploy dir — pass `fly.toml`, not a repo-relative path) then `POST /api/…`/edit `config/portal-config.yaml` |
+| rebuild the session image | push the Dockerfile change to main FIRST (the portal builds from its own checkout), then `POST /api/image/rebuild` (= portal Settings → Rebuild; flyctl runs inside the portal pod and on success records the ref itself: commits `config/portal-config.yaml` + applies the ConfigMap). Poll `GET /api/image/build` from a background watcher until `running:false`; `ok:null, image:null` = the job record is gone = the portal pod restarted mid-build (see gotchas). Fallback from a session (flyctl is in the image): `flyctl deploy selfhost/session-image --config selfhost/session-image/fly.toml --app de0ch-claude-sessions --build-only --push` with `FLY_ACCESS_TOKEN=$FLY_API_TOKEN` (absolute paths; `--config` is resolved relative to the deploy dir), then record the ref by hand: edit `sessionImage` in `selfhost/k8s/config/portal-config.yaml`, commit+push, `kubectl -n claude apply -f` it. Boot-test the image before recording: `flyctl machine run <ref> --app de0ch-claude-sessions --region arn --detach --entrypoint /bin/bash -- -c "$(cat check.sh)"`, read `flyctl logs -i <id> --no-tail`, `flyctl machine destroy <id> --force` |
 | re-login Claude | portal Settings → Re-login (drives `claude auth login --claudeai` in a PTY; paste the code) |
 | debug Flux | `kubectl -n flux-system get gitrepository,kustomization,helmrelease -A`; `kubectl -n flux-system logs deploy/kustomize-controller --tail 50` |
 | debug the portal | `kubectl -n claude logs deploy/portal --tail 100`; `kubectl -n claude get events --sort-by=.lastTimestamp | tail` |
 | rebuild the box | `AGE_KEY_FILE=… K8S_ADMIN_TOKEN_FILE=… selfhost/cluster/create.sh <name>` (needs HETZNER_API + HETZNER_S3_* in env or ~/.secrets); it phones bootstrap status home via a presigned S3 log and prints it; then `destroy.sh <old-id>` |
 
 ## Gotchas (all hit on 2026-09-13)
+
+- **A portal rollout kills any in-flight session-image build and loses its status.** The
+  build is a flyctl child process of the portal pod with the job record in memory, and every
+  portal/cf-tunnel commit → GHA → Flux rollout replaces the pod. Before triggering, check the
+  newest `portal-image` GHA run is older than the running pod's image
+  (`kubectl -n claude get pods -l app=portal -o jsonpath='{.items[0].spec.containers[0].image}'`
+  vs `GET /repos/de0ch/claude-env/actions/runs?per_page=1`); if a rollout is pending, wait for
+  it. A killed build leaves nothing half-recorded (registry tag only appears after the push).
+- **Building from a session VM: the 1 GB default is tight.** flyctl itself is fine, but the
+  harness kills background tasks when the VM runs low (`claude` alone is ~360 MB RSS) — it
+  happened during the export/push phase. Prefer the portal path; if building from a session,
+  keep nothing else heavy running.
+- **`VAR=x curl … | sh` scopes VAR to curl, not sh.** `FLYCTL_INSTALL=/usr/local curl … | sh`
+  installed flyctl under `/root/.fly` (invisible to the `claude` user). Put the assignment on
+  the consumer side of the pipe and assert the binary path in the same `RUN`.
+- **Playwright ≥1.6x uses the Chrome-for-Testing layout on linux64**: `chromium-<rev>/chrome-linux64/chrome`
+  and `chromium_headless_shell-<rev>/chrome-headless-shell-linux64/chrome-headless-shell` (not
+  `headless_shell`). The image symlinks both to `/opt/pw-browsers/{chromium,headless_shell}`;
+  match binaries by basename with alternatives, never by a hard-coded revision dir.
 
 - **GHCR packages are private by default, even for a public repo, and there is no API to flip
   it.** First image push → Deyao clicks Package settings → Change visibility → Public. Until
