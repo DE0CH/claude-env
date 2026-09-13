@@ -11,7 +11,26 @@ export HOME=/home/claude
 # make the environment's secrets available to claude + every Bash tool it spawns
 [ -f "$HOME/.secrets" ] && { set -a; . "$HOME/.secrets"; set +a; }
 
+# Pre-accept the workspace trust dialog for the dirs claude may open, so the
+# interactive (tmux TTY) remote-control host doesn't block on "trust this folder?".
+trust_dirs() {
+  python3 - "$WD" <<'PY'
+import json,os,sys
+wd=sys.argv[1]; p=os.path.expanduser("~/.claude.json")
+try: d=json.load(open(p))
+except Exception: d={}
+proj=d.setdefault("projects",{})
+for path in {wd, os.path.expanduser("~/workspace"), os.path.expanduser("~")}:
+    e=proj.setdefault(path,{})
+    e["hasTrustDialogAccepted"]=True
+    e["hasCompletedProjectOnboarding"]=True
+    e.setdefault("allowedTools",[])
+json.dump(d,open(p,"w"))
+PY
+}
+
 start() {
+  trust_dirs
   tmux kill-session -t "$SESSION" 2>/dev/null || true
   tmux new-session -d -s "$SESSION" -c "$WD" \
     "claude --remote-control --dangerously-skip-permissions"
