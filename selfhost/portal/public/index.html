@@ -17,29 +17,35 @@
   .tabs{display:flex;gap:.4rem;margin-bottom:1rem}
   .tabs button{flex:1;padding:.6rem;border:1px solid var(--border);background:var(--card);color:var(--muted);border-radius:10px;font-weight:600;font-size:.9rem}
   .tabs button.on{color:#fff;background:linear-gradient(135deg,var(--accent),var(--accent2));border-color:transparent}
-  .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:1rem;margin-bottom:.8rem}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:1rem;margin-bottom:.8rem;transition:opacity .2s}
+  .card.pending{opacity:.75}
   .card h3{font-size:1rem;margin-bottom:.2rem;word-break:break-word}
   .row{display:flex;flex-wrap:wrap;gap:.4rem;align-items:center}
   .meta{color:var(--muted);font-size:.85rem;word-break:break-all}
-  .pill{font-size:.72rem;font-weight:700;padding:.15rem .5rem;border-radius:999px;text-transform:uppercase;letter-spacing:.03em}
-  .pill.started{background:rgba(22,163,74,.15);color:var(--ok)}
-  .pill.stopped,.pill.created{background:rgba(107,114,128,.18);color:var(--muted)}
-  .pill.starting,.pill.stopping{background:rgba(217,119,6,.15);color:var(--warn)}
+  .pill{font-size:.72rem;font-weight:700;padding:.15rem .5rem;border-radius:999px;text-transform:uppercase;letter-spacing:.03em;display:inline-flex;align-items:center;gap:.3rem}
+  .pill.ok{background:rgba(22,163,74,.15);color:var(--ok)}
+  .pill.dim{background:rgba(107,114,128,.18);color:var(--muted)}
+  .pill.wait{background:rgba(217,119,6,.15);color:var(--warn)}
+  .pill.bad{background:rgba(220,38,38,.12);color:var(--err)}
   label{display:block;font-size:.78rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin:.7rem 0 .3rem}
-  input,select,textarea{width:100%;font-size:1rem;padding:.7rem .8rem;border:1.5px solid var(--border);border-radius:10px;background:var(--input);color:var(--text);font-family:inherit}
+  input,textarea{width:100%;font-size:1rem;padding:.7rem .8rem;border:1.5px solid var(--border);border-radius:10px;background:var(--input);color:var(--text);font-family:inherit}
   textarea{min-height:8rem;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.9rem}
-  input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent)}
-  button.btn{font-size:.9rem;font-weight:700;color:#fff;background:linear-gradient(135deg,var(--accent),var(--accent2));border:none;border-radius:10px;padding:.6rem 1rem;cursor:pointer}
+  input:focus,textarea:focus{outline:none;border-color:var(--accent)}
+  button.btn{font-size:.9rem;font-weight:700;color:#fff;background:linear-gradient(135deg,var(--accent),var(--accent2));border:none;border-radius:10px;padding:.6rem 1rem;cursor:pointer;display:inline-flex;align-items:center;gap:.4rem;-webkit-tap-highlight-color:transparent}
   button.btn.sm{padding:.4rem .7rem;font-size:.82rem}
   button.ghost{background:none;color:var(--accent);border:1.5px solid var(--border)}
   button.danger{background:none;color:var(--err);border:1.5px solid var(--border)}
-  .checks{display:flex;flex-direction:column;gap:.4rem;margin:.3rem 0}
-  .checks label{display:flex;align-items:center;gap:.5rem;text-transform:none;letter-spacing:0;font-weight:500;color:var(--text);margin:0;font-size:.95rem}
-  .checks input{width:auto}
+  button:disabled{opacity:.55;cursor:default}
+  button.btn:active:not(:disabled){transform:scale(.97)}
+  .spinner{width:12px;height:12px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;display:inline-block;animation:spin .7s linear infinite;flex:none}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  #refreshBtn.spinning{animation:spin .8s linear infinite}
   .banner{border-radius:10px;padding:.6rem .8rem;font-size:.85rem;margin-bottom:.8rem}
   .banner.err{background:rgba(220,38,38,.12);color:var(--err)}
   .banner.warn{background:rgba(217,119,6,.12);color:var(--warn)}
   .empty{color:var(--muted);text-align:center;padding:2rem 1rem}
+  .hint{font-size:.78rem;color:var(--muted);margin-top:.3rem}
+  .spacer{height:.6rem}
   /* Mobile-first bottom sheet (iOS Safari pins default <dialog> to the top). */
   dialog{position:fixed;left:0;right:0;bottom:0;top:auto;margin:0;width:100%;max-width:100%;
     max-height:88dvh;overflow:auto;border:none;border-radius:20px 20px 0 0;
@@ -58,18 +64,15 @@
   .actions{display:flex;gap:.6rem;justify-content:flex-end;margin-top:1rem;position:sticky;bottom:0;background:var(--card);padding-top:.6rem}
   .actions .btn{padding:.8rem 1.2rem;font-size:1rem}
   @media(min-width:720px){dialog{left:50%;right:auto;top:50%;bottom:auto;transform:translate(-50%,-50%);
-    width:min(92vw,480px);border-radius:16px;max-height:85vh;padding:1.3rem}.grab{display:none}}
+    width:min(92vw,480px);border-radius:16px;max-height:85vh;padding:1.3rem}.grab{display:none}.wrap{padding:1.5rem}}
   .fab{position:fixed;right:max(1rem,env(safe-area-inset-right));bottom:max(1rem,env(safe-area-inset-bottom));z-index:6}
   .fab button{font-size:1rem;font-weight:700;color:#fff;background:linear-gradient(135deg,var(--accent),var(--accent2));border:none;border-radius:999px;padding:.9rem 1.3rem;box-shadow:0 6px 20px rgba(124,58,237,.4)}
-  .spacer{height:.6rem}
-  .hint{font-size:.78rem;color:var(--muted);margin-top:.3rem}
-  @media(min-width:720px){.wrap{padding:1.5rem}}
 </style>
 </head>
 <body>
 <header>
   <div class="logo">C</div><h1>Claude sessions</h1><div class="grow"></div>
-  <button class="btn ghost sm" onclick="refresh()">↻</button>
+  <button class="btn ghost sm" id="refreshBtn" onclick="refresh(true)">↻</button>
 </header>
 <div class="wrap">
   <div id="banners"></div>
@@ -83,13 +86,23 @@
   <div id="view-repos" hidden></div>
 </div>
 <div class="fab" id="fab"><button onclick="newSession()">+ New session</button></div>
-
 <dialog id="dlg"><div id="dlg-body"></div></dialog>
 
 <script>
 const $=s=>document.querySelector(s);
-let STATE={environments:{},repos:[],sessions:[],sessionImage:null,flyError:null};
+let STATE={environments:{},repos:[],sessions:[],sessionImage:null,flyError:null,hasCreds:true};
 let TAB='sessions';
+// ---- pending actions: UI acks immediately, real state arrives via polling --------
+// key -> label while an action is in flight. Renders consult this so a re-render
+// (e.g. from polling) never wipes a pending indicator. Nothing here is optimistic:
+// the card's real state only changes when the server reports it.
+const PENDING=new Map();
+function pend(key,label){label?PENDING.set(key,label):PENDING.delete(key);render();}
+function pbtn(key,cls,onclick,label){
+  const p=PENDING.get(key);
+  return p?`<button class="btn ${cls}" disabled><span class="spinner"></span>${esc(p)}</button>`
+          :`<button class="btn ${cls}" onclick="${onclick}">${esc(label)}</button>`;
+}
 
 async function api(method,path,body){
   const r=await fetch(path,{method,headers:body?{'Content-Type':'application/json'}:{},body:body?JSON.stringify(body):undefined});
@@ -97,45 +110,66 @@ async function api(method,path,body){
   if(!r.ok) throw new Error(j.error||('HTTP '+r.status));
   return j;
 }
-function esc(s){return (s||'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function tab(t){TAB=t;['sessions','envs','repos'].forEach(x=>{$('#view-'+x).hidden=x!==t;$('#t-'+x).classList.toggle('on',x===t);});$('#fab').style.display=t==='sessions'?'block':'none';render();}
 
-async function refresh(){
-  try{STATE=await api('GET','api/state');}catch(e){STATE.flyError='load failed: '+e.message;}
+// ---- polling: 15s idle, 2s while something is settling -----------------------
+let inflight=false, fastUntil=0;
+async function refresh(manual){
+  if(inflight)return; inflight=true;
+  if(manual)$('#refreshBtn').classList.add('spinning');
+  try{STATE=await api('GET','api/state');STATE.flyError=STATE.flyError||null;}
+  catch(e){STATE.flyError='load failed: '+e.message;}
+  finally{inflight=false;$('#refreshBtn').classList.remove('spinning');}
   render();
 }
+// poll fast until predicate(STATE) is true or maxMs elapses
+function settle(pred,maxMs=90000){fastUntil=Math.max(fastUntil,Date.now()+maxMs);SETTLERS.push({pred,until:Date.now()+maxMs});}
+const SETTLERS=[];
+setInterval(async()=>{
+  const fast=Date.now()<fastUntil;
+  const tick=Math.floor(Date.now()/1000);
+  if(fast||tick%15===0){await refresh(false);}
+  for(let i=SETTLERS.length-1;i>=0;i--){const s=SETTLERS[i];if(s.pred(STATE)||Date.now()>s.until)SETTLERS.splice(i,1);}
+  if(!SETTLERS.length)fastUntil=0;
+},2000);
+
+// ---- render ---------------------------------------------------------------
 function banners(){
   let h='';
-  if(!STATE.hasCreds) h+='<div class="banner err">Controller has no Claude credentials — sessions can\'t authenticate.</div>';
-  if(!STATE.sessionImage) h+='<div class="banner warn">No session image deployed yet. Run deploy-session-image.sh.</div>';
-  if(STATE.flyError) h+='<div class="banner err">Fly: '+esc(STATE.flyError)+'</div>';
+  if(STATE.hasCreds===false)h+='<div class="banner err">Controller has no Claude credentials — sessions can\'t authenticate.</div>';
+  if(!STATE.sessionImage)h+='<div class="banner warn">No session image deployed yet. Run deploy-session-image.sh.</div>';
+  if(STATE.flyError)h+='<div class="banner err">Fly: '+esc(STATE.flyError)+'</div>';
   $('#banners').innerHTML=h;
 }
-function render(){
-  banners();
-  if(TAB==='sessions') renderSessions();
-  if(TAB==='envs') renderEnvs();
-  if(TAB==='repos') renderRepos();
+function render(){banners();if(TAB==='sessions')renderSessions();if(TAB==='envs')renderEnvs();if(TAB==='repos')renderRepos();}
+
+function sessionPill(m){
+  // Real state only. Fly state first; then whether claude inside has actually come up.
+  if(m.state==='destroying'||m.state==='destroyed')return `<span class="pill bad"><span class="spinner"></span>${esc(m.state)}</span>`;
+  if(m.state==='created'||m.state==='starting')return `<span class="pill wait"><span class="spinner"></span>creating…</span>`;
+  if(m.state==='started'){
+    if(!m.status)return `<span class="pill wait"><span class="spinner"></span>booting…</span>`;
+    return m.status==='busy'?`<span class="pill wait">working</span>`:`<span class="pill ok">idle</span>`;
+  }
+  return `<span class="pill dim">${esc(m.state)}</span>`;
 }
 function renderSessions(){
   const s=STATE.sessions||[];
   const v=$('#view-sessions');
   if(!s.length){v.innerHTML='<div class="empty">No sessions running.<br>Tap “New session”.</div>';return;}
   v.innerHTML=s.map(m=>{
-    // live name from inside the session when it's a real (non-derived) name
     const title=(m.liveName&&m.nameSource&&m.nameSource!=='derived')?m.liveName:(m.label||m.name);
-    const live=m.state==='started'&&m.status?`<span class="pill ${m.status==='busy'?'starting':'started'}">${m.status==='busy'?'working':'idle'}</span>`:'';
-    return `<div class="card">
-    <div class="row" style="justify-content:space-between">
-      <h3>${esc(title)}</h3>
-      <span class="row">${live}<span class="pill ${esc(m.state)}">${esc(m.state)}</span></span>
-    </div>
-    <div class="meta">${m.environment?('env: '+esc(m.environment)):''}${m.repos?(' · '+esc(m.repos.split(' ').map(u=>u.split('/').pop().replace(/\.git$/,'')).join(', '))):''}</div>
+    const busy=PENDING.has('destroy:'+m.id)||PENDING.has('rename:'+m.id);
+    const repos=m.repos?m.repos.split(' ').map(u=>u.split('/').pop().replace(/\.git$/,'')).join(', '):'';
+    return `<div class="card${busy?' pending':''}">
+    <div class="row" style="justify-content:space-between"><h3>${esc(title)}</h3>${sessionPill(m)}</div>
+    <div class="meta">${m.environment?('env: '+esc(m.environment)):''}${repos?(' · '+esc(repos)):''}</div>
     <div class="meta">${esc(m.name)} · ${esc(m.region)}</div>
     <div class="spacer"></div>
     <div class="row">
-      <button class="btn ghost sm" onclick="renameSession('${m.id}','${esc(title).replace(/'/g,'')}')">Rename</button>
-      <button class="btn danger sm" id="destroy-${m.id}" onclick="destroy('${m.id}')">Destroy</button>
+      ${pbtn('rename:'+m.id,'ghost sm',`renameSession('${m.id}','${esc(title).replace(/'/g,'')}')`,'Rename')}
+      ${pbtn('destroy:'+m.id,'danger sm',`destroy('${m.id}')`,'Destroy')}
     </div>
     <div class="hint">Open the Claude app to chat with this session.</div>
   </div>`}).join('');
@@ -143,36 +177,38 @@ function renderSessions(){
 function renderEnvs(){
   const e=STATE.environments||{};
   const v=$('#view-envs');
-  const cards=Object.entries(e).map(([n,d])=>`<div class="card">
-    <div class="row" style="justify-content:space-between"><h3>${esc(n)}</h3>
-      <span class="meta">${(d.keys||[]).length} keys</span></div>
+  const cards=Object.entries(e).map(([n,d])=>`<div class="card${PENDING.has('env:'+n)?' pending':''}">
+    <div class="row" style="justify-content:space-between"><h3>${esc(n)}</h3><span class="meta">${(d.keys||[]).length} keys</span></div>
     <div class="meta">${(d.keys||[]).map(esc).join(', ')||'—'}</div>
     <div class="spacer"></div>
     <div class="row"><button class="btn ghost sm" onclick="editEnv('${esc(n)}')">Edit secrets</button>
-      <button class="btn danger sm" onclick="delEnv('${esc(n)}')">Delete</button></div>
+      ${pbtn('env:'+n,'danger sm',`delEnv('${esc(n)}')`,'Delete')}</div>
   </div>`).join('');
   v.innerHTML=cards+`<button class="btn" onclick="editEnv('')">+ Add environment</button>`;
 }
 function renderRepos(){
   const r=STATE.repos||[];
   const v=$('#view-repos');
-  const cards=r.map(x=>`<div class="card">
+  const cards=r.map(x=>`<div class="card${PENDING.has('repo:'+x.name)?' pending':''}">
     <div class="row" style="justify-content:space-between"><h3>${esc(x.name)}</h3>
-      <button class="btn ghost sm" onclick="delRepo('${esc(x.name)}')">Remove from list</button></div>
+      ${pbtn('repo:'+x.name,'ghost sm',`delRepo('${esc(x.name)}')`,'Remove from list')}</div>
     <div class="meta">${esc(x.url)}</div></div>`).join('');
+  const addKey=PENDING.get('repo:add');
   v.innerHTML=(cards||'<div class="empty">No repos yet.</div>')+`
     <div class="card"><label>Add repo (git URL)</label>
-      <input id="repo-url" placeholder="https://github.com/owner/name.git">
-      <label>Name (optional)</label><input id="repo-name" placeholder="auto from URL">
-      <div class="spacer"></div><button class="btn" onclick="addRepo()">Add repo</button>
+      <input id="repo-url" placeholder="https://github.com/owner/name.git" ${addKey?'disabled':''}>
+      <label>Name (optional)</label><input id="repo-name" placeholder="auto from URL" ${addKey?'disabled':''}>
+      <div class="spacer"></div>${pbtn('repo:add','',`addRepo()`,'Add repo')}
       <div class="hint">Private repos: add a GITHUB_TOKEN key to the environment you'll use.</div></div>`;
 }
 
+// ---- dialogs --------------------------------------------------------------
 function dlg(html){$('#dlg-body').innerHTML='<div class="grab"></div>'+html;$('#dlg').showModal();}
 function closeDlg(){$('#dlg').close();}
-// tap on the dimmed backdrop (outside the sheet) closes it
 $('#dlg').addEventListener('click',e=>{const r=e.currentTarget.getBoundingClientRect();
   if(e.clientX<r.left||e.clientX>r.right||e.clientY<r.top||e.clientY>r.bottom)closeDlg();});
+// flip a dialog button into a pending state; returns a restore fn
+function dlgBusy(btn,label){const html=btn.innerHTML;btn.disabled=true;btn.innerHTML=`<span class="spinner"></span>${esc(label)}`;return()=>{btn.disabled=false;btn.innerHTML=html;};}
 
 function newSession(){
   const envs=Object.keys(STATE.environments||{});
@@ -188,23 +224,34 @@ function newSession(){
     <div class="hint">This exact name shows in the Claude app too. Leave blank for an auto-generated one.</div>
     <div class="actions">
       <button class="btn ghost" onclick="closeDlg()">Cancel</button>
-      <button class="btn" onclick="startSession()">Start</button></div>`);
+      <button class="btn" id="ns-start" onclick="startSession(this)">Start</button></div>`);
 }
-async function startSession(){
+async function startSession(btn){
   const env=(document.querySelector('#dlg-body input[name=ns-env]:checked')||{}).value||'';
   const repos=[...document.querySelectorAll('#dlg-body input[name=ns-repo]:checked')].map(c=>c.value);
   const label=$('#ns-label').value.trim();
-  try{await api('POST','api/sessions',{environment:env,repos,label});closeDlg();setTimeout(refresh,1500);refresh();}
-  catch(e){alert('Start failed: '+e.message);}
+  const restore=dlgBusy(btn,'Starting…');
+  try{
+    const r=await api('POST','api/sessions',{environment:env,repos,label});
+    closeDlg();
+    await refresh(false);                                 // card appears in its REAL state (creating…)
+    settle(st=>{const m=(st.sessions||[]).find(x=>x.id===r.id);return !!(m&&m.state==='started'&&m.status);}); // fast-poll until claude is actually up
+  }catch(e){restore();alert('Start failed: '+e.message);}
 }
+
 async function renameSession(id,current){
   const name=(prompt('New session name (also updates the Claude app):',current)||'').trim();
   if(!name||name===current)return;
-  try{await api('POST',`api/sessions/${id}/rename`,{name});setTimeout(refresh,1500);refresh();}catch(e){alert('Rename failed: '+e.message);}
+  pend('rename:'+id,'Renaming…');
+  try{await api('POST',`api/sessions/${id}/rename`,{name});}
+  catch(e){alert('Rename failed: '+e.message);}
+  pend('rename:'+id,null);
+  await refresh(false);
+  settle(st=>{const m=(st.sessions||[]).find(x=>x.id===id);return !!(m&&m.liveName===name);},20000);
 }
+
 async function destroy(id){
-  const btn=document.getElementById('destroy-'+id);
-  if(btn){btn.disabled=true;btn.textContent='Checking…';}
+  pend('destroy:'+id,'Checking…');
   let msg='Destroy this session?\n\n';
   try{
     const c=await api('GET',`api/sessions/${id}/changes`);
@@ -220,9 +267,13 @@ async function destroy(id){
     }else{msg+='⚠️ Could not check for unsaved changes ('+(c.reason||'unknown')+').\n';}
   }catch(e){msg+='⚠️ Could not check for unsaved changes.\n';}
   msg+='\nThe container and everything in it will be deleted. Your repos on GitHub are not affected.';
-  if(btn){btn.disabled=false;btn.textContent='Destroy';}
+  pend('destroy:'+id,null);
   if(!confirm(msg))return;
-  try{await api('DELETE','api/sessions/'+id);refresh();}catch(e){alert(e.message);}
+  pend('destroy:'+id,'Destroying…');
+  try{await api('DELETE','api/sessions/'+id);}catch(e){alert(e.message);}
+  pend('destroy:'+id,null);
+  await refresh(false);                                   // card shows destroying/destroyed until Fly drops it
+  settle(st=>!(st.sessions||[]).some(x=>x.id===id),60000);
 }
 
 async function editEnv(name){
@@ -236,34 +287,38 @@ async function editEnv(name){
     <div class="hint">Saved encrypted. Blank value on an existing key deletes it.</div>
     <div class="actions">
       <button class="btn ghost" onclick="closeDlg()">Cancel</button>
-      <button class="btn" onclick="saveEnv()">Save</button></div>`);
+      <button class="btn" onclick="saveEnv(this)">Save</button></div>`);
 }
-async function saveEnv(){
+async function saveEnv(btn){
   const name=$('#ev-name').value.trim();
   if(!name){alert('name required');return;}
   const secrets={};
-  $('#ev-secrets').value.split('\n').forEach(line=>{
-    const i=line.indexOf('=');if(i<1)return;
-    secrets[line.slice(0,i).trim()]=line.slice(i+1);
-  });
-  try{await api('POST','api/environments',{name,secrets});closeDlg();refresh();}catch(e){alert(e.message);}
+  $('#ev-secrets').value.split('\n').forEach(line=>{const i=line.indexOf('=');if(i<1)return;secrets[line.slice(0,i).trim()]=line.slice(i+1);});
+  const restore=dlgBusy(btn,'Saving…');
+  try{await api('POST','api/environments',{name,secrets});closeDlg();await refresh(false);}
+  catch(e){restore();alert(e.message);}
 }
 async function delEnv(n){
   if(!confirm(`Delete environment "${n}" and its saved secret values?\n\nOnly this dashboard's copy is removed — nothing outside it is affected.`))return;
-  try{await api('DELETE','api/environments/'+encodeURIComponent(n));refresh();}catch(e){alert(e.message);}
+  pend('env:'+n,'Deleting…');
+  try{await api('DELETE','api/environments/'+encodeURIComponent(n));}catch(e){alert(e.message);}
+  pend('env:'+n,null);await refresh(false);
 }
 async function addRepo(){
   const url=$('#repo-url').value.trim(),name=$('#repo-name').value.trim();
   if(!url){alert('url required');return;}
-  try{await api('POST','api/repos',{url,name});refresh();}catch(e){alert(e.message);}
+  pend('repo:add','Adding…');
+  try{await api('POST','api/repos',{url,name});}catch(e){alert(e.message);}
+  pend('repo:add',null);await refresh(false);
 }
 async function delRepo(n){
   if(!confirm(`Remove "${n}" from this list?\n\nThis only forgets the entry on the dashboard — nothing on GitHub is deleted or changed.`))return;
-  try{await api('DELETE','api/repos/'+encodeURIComponent(n));refresh();}catch(e){alert(e.message);}
+  pend('repo:'+n,'Removing…');
+  try{await api('DELETE','api/repos/'+encodeURIComponent(n));}catch(e){alert(e.message);}
+  pend('repo:'+n,null);await refresh(false);
 }
 
-tab('sessions');refresh();
-setInterval(()=>{if(TAB==='sessions')refresh();},15000);
+tab('sessions');refresh(true);
 </script>
 </body>
 </html>
