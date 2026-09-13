@@ -12,4 +12,4 @@ resources:
 images:
 - name: ghcr.io/de0ch/claude-portal
   newName: ghcr.io/de0ch/claude-portal
-  newTag: sha-2498c8d3e69e
+  newTag: sha-691a7b8b7023
