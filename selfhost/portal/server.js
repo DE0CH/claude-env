@@ -38,8 +38,11 @@ function rand(n = 5) { return Math.random().toString(36).slice(2, 2 + n); }
 // busy/idle status, and appends {"type":"ai-title","aiTitle":…} records to the session's
 // transcript when the Claude app titles the conversation. Read both via one Fly exec so
 // the dashboard shows the same title as the app. Cached briefly; failures fall back to metadata.
+// __BG__: background tool jobs are child shells (`bash -c source …shell-snapshots…`) of the
+// claude pid — a session reporting "idle" with such children still has work running.
 const REG_CMD = 'for f in /home/claude/.claude/sessions/*.json; do cat "$f" 2>/dev/null; echo; done; echo __TITLES__; '
-  + 'for f in /home/claude/.claude/projects/*/*.jsonl; do t=$(grep -h \'"type":"ai-title"\' "$f" 2>/dev/null | tail -1); [ -n "$t" ] && echo "$t"; done; true';
+  + 'for f in /home/claude/.claude/projects/*/*.jsonl; do t=$(grep -h \'"type":"ai-title"\' "$f" 2>/dev/null | tail -1); [ -n "$t" ] && echo "$t"; done; '
+  + 'echo __BG__; for f in /home/claude/.claude/sessions/*.json; do p=$(grep -o \'"pid":[0-9]*\' "$f" | head -1 | cut -d: -f2); [ -n "$p" ] && echo "$p $(pgrep -c -P "$p" -f shell-snapshots 2>/dev/null || echo 0)"; done; true';
 const regCache = new Map();
 async function readRegistry(machineId) {
   const c = regCache.get(machineId);
@@ -50,11 +53,13 @@ async function readRegistry(machineId) {
       fly.exec(machineId, ["bash", "-lc", REG_CMD], 10),
       new Promise((_, rej) => setTimeout(() => rej(new Error("exec timeout")), 12000)),
     ]);
-    const [regPart, titlePart = ""] = String(r.stdout || "").split("__TITLES__");
+    const [regPart, rest = ""] = String(r.stdout || "").split("__TITLES__");
+    const [titlePart, bgPart = ""] = rest.split("__BG__");
     const parse = (s) => s.split("\n").filter((l) => l.trim().startsWith("{"))
       .map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean);
     const entries = parse(regPart).sort((a, b) => (a.startedAt || 0) - (b.startedAt || 0));
     const titles = Object.fromEntries(parse(titlePart).filter((t) => t.type === "ai-title" && t.aiTitle).map((t) => [t.sessionId, t.aiTitle]));
+    const bg = Object.fromEntries(bgPart.split("\n").map((l) => l.trim().split(/\s+/)).filter((a) => a.length === 2).map(([p, n]) => [p, parseInt(n, 10) || 0]));
     const host = entries.find((e) => e.bridgeSessionId) || entries[0] || null;
     if (host) {
       data = {
@@ -62,6 +67,7 @@ async function readRegistry(machineId) {
         nameSource: host.nameSource || "",
         aiTitle: titles[host.sessionId] || "",
         status: host.status || "",
+        bgTasks: bg[String(host.pid)] || 0,
         bridgeSessionId: host.bridgeSessionId || "",
         sessionsInside: entries.length,
       };
