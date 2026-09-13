@@ -2,14 +2,17 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>Claude sessions</title>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/xterm/5.5.0/xterm.min.css">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.css">
 <style>
   :root{--bg:#f4f5f7;--card:#fff;--text:#1a1d21;--muted:#6b7280;--accent:#7c3aed;--accent2:#5b21b6;--ok:#16a34a;--warn:#d97706;--err:#dc2626;--border:#e5e7eb;--input:#fbfbfc}
   @media (prefers-color-scheme:dark){:root{--bg:#0d0f13;--card:#171b21;--text:#eceef1;--muted:#9aa1ab;--accent:#a78bfa;--accent2:#7c3aed;--ok:#34d399;--warn:#fbbf24;--err:#f87171;--border:#2a2f37;--input:#12151a}}
   *{box-sizing:border-box;margin:0;padding:0}
+  html{touch-action:manipulation;-webkit-text-size-adjust:100%}
   body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--text);line-height:1.45;padding-bottom:5rem}
+  /* iOS Safari zooms into any focused field whose font is under 16px — keep every input at 16px */
+  input,textarea,select{font-size:16px !important}
   header{position:sticky;top:0;z-index:5;background:var(--card);border-bottom:1px solid var(--border);padding:.9rem 1rem;padding-top:max(.9rem,env(safe-area-inset-top));display:flex;align-items:center;gap:.6rem}
   header .logo{width:30px;height:30px;border-radius:8px;background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff;font-weight:800;display:flex;align-items:center;justify-content:center}
   header h1{font-size:1.05rem;font-weight:700}
@@ -55,7 +58,7 @@
   /* Mobile-first bottom sheet (iOS Safari pins default <dialog> to the top). */
   dialog{position:fixed;left:0;right:0;bottom:0;top:auto;margin:0;width:100%;max-width:100%;
     max-height:88dvh;overflow:auto;border:none;border-radius:20px 20px 0 0;
-    padding:1.1rem 1.1rem calc(1.1rem + env(safe-area-inset-bottom));
+    padding:1.1rem 1.1rem 0;  /* bottom inset is carried by the sticky .actions bar */
     background:var(--card);color:var(--text);box-shadow:0 -10px 40px rgba(0,0,0,.35)}
   dialog::backdrop{background:rgba(0,0,0,.5)}
   dialog h3{font-size:1.15rem;margin-bottom:.3rem}
@@ -67,10 +70,14 @@
   .choice input{width:22px;height:22px;margin:0;flex:none;accent-color:var(--accent)}
   .choice .t{flex:1;min-width:0;word-break:break-word}
   .choice small{display:block;color:var(--muted);font-size:.78rem}
-  .actions{display:flex;gap:.6rem;justify-content:flex-end;margin-top:1rem;position:sticky;bottom:0;background:var(--card);padding-top:.6rem}
+  /* sticky action bar: negative margins make it span the dialog's padding too, so scrolled
+     content can't show through beneath the buttons; padding restores the inset */
+  .actions{display:flex;gap:.6rem;justify-content:flex-end;position:sticky;bottom:0;background:var(--card);border-top:1px solid var(--border);
+    margin:1rem -1.1rem 0;padding:.7rem 1.1rem calc(1.1rem + env(safe-area-inset-bottom))}
   .actions .btn{padding:.8rem 1.2rem;font-size:1rem}
   @media(min-width:720px){dialog{left:50%;right:auto;top:50%;bottom:auto;transform:translate(-50%,-50%);
-    width:min(92vw,480px);border-radius:16px;max-height:85vh;padding:1.3rem}.grab{display:none}.wrap{padding:1.5rem}}
+    width:min(92vw,480px);border-radius:16px;max-height:85vh;padding:1.3rem 1.3rem 0}.grab{display:none}.wrap{padding:1.5rem}
+    .actions{margin:1rem -1.3rem 0;padding:.7rem 1.3rem 1.3rem}}
   .fab{position:fixed;right:max(1rem,env(safe-area-inset-right));bottom:max(1rem,env(safe-area-inset-bottom));z-index:6}
   .fab button{font-size:1rem;font-weight:700;color:#fff;background:linear-gradient(135deg,var(--accent),var(--accent2));border:none;border-radius:999px;padding:.9rem 1.3rem;box-shadow:0 6px 20px rgba(124,58,237,.4)}
   /* terminal: full screen, dark always */
@@ -121,11 +128,13 @@
   <div class="inrow"><input id="term-in" type="text" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false" placeholder="type, then Send (adds Enter)"><button onclick="tsend()">Send</button></div>
 </dialog>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xterm/5.5.0/xterm.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xterm-addon-fit/0.8.0/xterm-addon-fit.min.js"></script>
+<!-- xterm.js + fit addon (UMD builds; cdnjs does not host the 5.x JS, only the CSS) -->
+<script src="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/lib/xterm.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0.10.0/lib/addon-fit.js"></script>
 <script>
 const $=s=>document.querySelector(s);
 let STATE={environments:{},repos:[],sessions:[],sessionImage:null,flyError:null,hasCreds:true,imageBuild:{},auth:{}};
+window.getState=()=>STATE; // read hook for test/dashboard.test.js
 let TAB='sessions';
 // ---- pending actions: UI acks immediately, real state arrives via polling --------
 // key -> label while an action is in flight. Renders consult this so a re-render
@@ -301,7 +310,7 @@ function newSession(){
     ${envs.length?envs.map((n,i)=>`<label class="choice"><input type="radio" name="ns-env" value="${esc(n)}" ${i===0?'checked':''}><span class="t">${esc(n)}<small>${(STATE.environments[n].keys||[]).length} keys</small></span></label>`).join('')
       :'<div class="meta">No environments yet — add one in the Environments tab.</div>'}
     <label>Repos</label>
-    ${repos.length?repos.map(r=>`<label class="choice"><input type="checkbox" name="ns-repo" value="${esc(r.name)}"><span class="t">${esc(r.name)}<small>${esc(r.url)}</small></span></label>`).join('')
+    ${repos.length?repos.map(r=>`<label class="choice"><input type="checkbox" name="ns-repo" value="${esc(r.name)}" ${(r.name==='claude-env'||repos.length===1)?'checked':''}><span class="t">${esc(r.name)}<small>${esc(r.url)}</small></span></label>`).join('')
       :'<div class="meta">No repos yet — add some in the Repos tab.</div>'}
     <label>Permission mode</label>
     <label class="choice"><input type="radio" name="ns-perm" value="auto" checked><span class="t">Auto<small>Auto-approve safe actions; the permission classifier gates the rest.</small></span></label>
@@ -450,6 +459,7 @@ let TERM=null,TERMFIT=null,TERMSSE=null,TERMID=null;
 function openTerm(id,title){
   TERMID=id;$('#term-title').textContent=title;$('#term-status').textContent='connecting…';
   const d=$('#termdlg');d.showModal();
+  if(typeof Terminal==='undefined'||typeof FitAddon==='undefined'){$('#term-status').textContent='terminal library failed to load (xterm.js from cdn.jsdelivr.net) — check the network and reload';return;}
   if(!TERM){
     TERM=new Terminal({cursorBlink:true,fontSize:12,convertEol:false,scrollback:0,theme:{background:'#0b0d11'},allowProposedApi:true});
     TERMFIT=new FitAddon.FitAddon();TERM.loadAddon(TERMFIT);TERM.open($('#term'));
