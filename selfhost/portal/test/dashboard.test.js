@@ -69,6 +69,7 @@ async function run(viewport, tag) {
   await sleep(800);
   await shot("1-sessions");
   ok(`${tag}: no horizontal overflow`, await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));
+  ok(`${tag}: no vertical overflow with a short list`, await page.evaluate(() => document.documentElement.scrollHeight <= window.innerHeight + 1), await page.evaluate(() => `${document.documentElement.scrollHeight} vs ${window.innerHeight}`));
   const sessions = await page.evaluate(() => (window.getState().sessions || []).map((s) => ({ id: s.id, state: s.state, status: s.status })));
   ok(`${tag}: state loaded`, sessions.length >= 0, `${sessions.length} session(s)`);
   ok(`${tag}: one action row per card, no button wall`, await page.evaluate(() => [...document.querySelectorAll(".scard .actions")].every((r) => r.querySelectorAll("button").length <= 2)));
@@ -118,7 +119,8 @@ async function run(viewport, tag) {
     await more.click(); await sleep(600);
     ok(`${tag}: action sheet opens`, (await page.locator(".menu button.mi").count()) >= 1, `${await page.locator(".menu button.mi").count()} items`);
     await shot("4-menu");
-    await page.click(".menu .cancel"); await sleep(600);
+    await page.click(".menu .cancel");
+    await page.waitForFunction(() => !document.querySelector(".menu"), null, { timeout: 2000 }).catch(() => {});
     ok(`${tag}: action sheet closes`, (await page.locator(".menu").count()) === 0);
   }
 

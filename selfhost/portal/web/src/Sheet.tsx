@@ -1,42 +1,70 @@
-// Bottom sheets on react-modal-sheet (Framer Motion): iOS-style detents with the scroll/drag
-// hand-off done by the library — opens half, flick up on the handle OR the content expands to
-// full, at full the content scrolls, a drag down from scrollTop 0 brings it back to half, then
-// dismisses. Keyboard avoidance (avoidKeyboard) is built in. Chrome is Radix Themes.
-import type { ReactNode } from "react";
-import { Sheet as RMS } from "react-modal-sheet";
+// Our own bottom sheet (no library): iOS detents with the real iOS motion model — see
+// sheet/physics.ts (spring with bounce 0 / 0.5 s, velocity projection, rubber band) and
+// sheet/useSheet.ts (gesture hand-off, keyboard, animation loop). Chrome is Radix Themes.
+//
+// Hand-off rules (what iOS does): below the top detent the content never scrolls, so any drag
+// on it moves the sheet — a flick up expands. At the top detent the content scrolls; a drag
+// down while it is scrolled to the top brings the sheet down instead. Focusing a field snaps to
+// full so the keyboard and the scroller never fight. Panel is sized to the VISUAL viewport, so
+// the keyboard shrinks it and the focused field stays reachable.
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Button, Heading, Text, Flex, Box, Separator } from "@radix-ui/themes";
-import { usePortalContainer } from "./theme";
+import { useSheet } from "./sheet/useSheet";
 
-// snap points: 0 = closed, 0.62 = half (initial), 1 = full  → indices 0 / 1 / 2
-const SNAPS = [0, 0.62, 1], HALF = 1, FULL = 2;
-const box = { backgroundColor: "var(--color-panel-solid)", color: "var(--gray-12)", boxShadow: "none", borderTopLeftRadius: "var(--radius-6)", borderTopRightRadius: "var(--radius-6)", border: "1px solid var(--gray-a6)", borderBottom: "none", maxWidth: 600, margin: "0 auto", left: 0, right: 0 } as const;
+const SNAP = [0.62, 1], CONTENT = [1];
 
-export function Sheet({ open, onClose, title, left, right, snap, children, onClosed, className }: {
-  open: boolean; onClose: () => void; title?: string; left?: ReactNode; right?: ReactNode; snap?: boolean; children: ReactNode; onClosed?: () => void; className?: string;
-}) {
-  const mount = usePortalContainer();
+function useVisualViewport() {
+  const read = () => { const v = window.visualViewport; return v ? { top: Math.round(v.offsetTop), height: Math.round(v.height) } : { top: 0, height: window.innerHeight }; };
+  const [vv, setVv] = useState(read);
+  useEffect(() => {
+    const v = window.visualViewport; const on = () => setVv(read());
+    v?.addEventListener("resize", on); v?.addEventListener("scroll", on); window.addEventListener("resize", on);
+    return () => { v?.removeEventListener("resize", on); v?.removeEventListener("scroll", on); window.removeEventListener("resize", on); };
+  }, []);
+  return vv;
+}
+
+type SheetProps = { open: boolean; onClose: () => void; title?: string; left?: ReactNode; right?: ReactNode; snap?: boolean; children: ReactNode; onClosed?: () => void; className?: string };
+
+// Mounts the panel only while a sheet is open or animating closed; each open gets a fresh panel
+// (keyed), so a sheet component may stay mounted with open=false without leaving anything behind.
+export function Sheet(props: SheetProps) {
+  const [live, setLive] = useState(props.open);
+  const [epoch, setEpoch] = useState(0);
+  useEffect(() => { if (props.open && !live) { setLive(true); setEpoch((e) => e + 1); } }, [props.open]);
+  if (!live) return null;
+  return <SheetPanel key={epoch} {...props} onClosed={() => { setLive(false); props.onClosed?.(); }} />;
+}
+
+function SheetPanel({ open, onClose, title, left, right, snap, children, onClosed, className }: SheetProps) {
+  const panel = useRef<HTMLDivElement>(null), backdrop = useRef<HTMLDivElement>(null), scroller = useRef<HTMLDivElement>(null);
+  const vv = useVisualViewport();
+  const s = useSheet({ open, onClose, onClosed, detents: snap ? SNAP : CONTENT, initial: 0, panel, backdrop, scroller });
+  // nothing behind the sheet scrolls; Escape closes
+  useEffect(() => {
+    const prev = document.documentElement.style.overflow; document.documentElement.style.overflow = "hidden";
+    const key = (e: KeyboardEvent) => { if (e.key === "Escape") s.close(); };
+    window.addEventListener("keydown", key);
+    return () => { document.documentElement.style.overflow = prev; window.removeEventListener("keydown", key); };
+  }, []);
+  const scrollable = s.isFull && s.atRest;
   return (
-    <RMS isOpen={open} onClose={onClose} onCloseEnd={onClosed} mountPoint={mount}
-      {...(snap ? { snapPoints: SNAPS, initialSnap: HALF } : { detent: "content" as const })}>
-      <RMS.Container className={`sheet${snap ? " snap" : ""}${className ? " " + className : ""}`} style={box}>
-        <RMS.Header>
-          <div className="handle-wrap"><RMS.DragIndicator className="handle" /></div>
-          {title !== undefined && (
-            <div className="head">
-              <div className="side">{left}</div>
-              <Heading as="h2" size="3" className="ttl">{title}</Heading>
-              <div className="side r">{right}</div>
-            </div>
-          )}
-        </RMS.Header>
-        <RMS.Content className="body"
-          disableScroll={snap ? (s) => s.currentSnap !== FULL : false}
-          disableDrag={snap ? (s) => s.currentSnap === FULL && s.scrollPosition !== "top" : (s) => s.scrollPosition !== "top" && s.scrollPosition !== undefined}>
+    <div className="sheet-vp" style={{ top: vv.top, height: vv.height }}>
+      <div ref={backdrop} className="sheet-overlay" onClick={() => s.close()} />
+      <div ref={panel} role="dialog" aria-modal="true" aria-label={title || "Menu"} className={`sheet${snap ? " snap" : ""}${className ? " " + className : ""}`}>
+        <div className="handle-wrap"><div className="handle" /></div>
+        {title !== undefined && (
+          <div className="head">
+            <div className="side">{left}</div>
+            <Heading as="h2" size="3" className="ttl">{title}</Heading>
+            <div className="side r">{right}</div>
+          </div>
+        )}
+        <div ref={scroller} className="body" style={{ overflowY: scrollable ? "auto" : "hidden", touchAction: scrollable ? "pan-y" : "none" }}>
           <div className="body-in">{children}</div>
-        </RMS.Content>
-      </RMS.Container>
-      <RMS.Backdrop onTap={onClose} style={{ backgroundColor: "var(--color-overlay)" }} />
-    </RMS>
+        </div>
+      </div>
+    </div>
   );
 }
 

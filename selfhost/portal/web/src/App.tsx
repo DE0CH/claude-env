@@ -57,7 +57,7 @@ export function App() {
             </Flex>
           </Flex>
         </div>
-        <div className="wrap" style={{ paddingTop: 16 }}>
+        <div className="wrap main" style={{ paddingTop: 16 }}>
           <Banners />
           <Tabs.Root value={tab} onValueChange={(v) => setTab(v as Tab)}>
             <Tabs.List size="2" mb="3" className="tablist">{TABS.map(([k, l]) => <Tabs.Trigger key={k} value={k} data-tab={k}>{l}</Tabs.Trigger>)}</Tabs.List>

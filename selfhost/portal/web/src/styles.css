@@ -1,7 +1,8 @@
 /* Radix Themes does the component styling (imported in main.tsx, configured in theme.tsx). Only
    what it has no component for lives here: the vaul bottom sheets, the terminal, small states. */
 html{touch-action:manipulation;-webkit-text-size-adjust:100%}
-body{margin:0;padding-bottom:3rem}
+body{margin:0}
+.wrap.main{padding-bottom:calc(24px + env(safe-area-inset-bottom))}
 /* iOS Safari zooms into any focused field whose font is under 16px — keep every input at 16px */
 .rt-TextFieldInput,.rt-TextAreaInput{font-size:16px !important}
 /* post-layout-shift cooldown: destructive buttons are inert + faded for 250ms */
@@ -25,16 +26,24 @@ body{margin:0;padding-bottom:3rem}
 .dd .note{padding:10px 12px;color:var(--gray-11);font-size:var(--font-size-1)}
 .dd .note a{color:var(--accent-11)}
 
-/* ---- bottom sheets (react-modal-sheet; its container/backdrop get Radix tokens via style props) ----- */
-.sheet .body-in{padding:8px 16px calc(20px + env(safe-area-inset-bottom))}
-/* drag handle: the lib's indicator is the pill; the spacing lives on a wrapper */
-.handle-wrap{display:flex;justify-content:center;padding:10px 0 8px;cursor:grab;touch-action:none}
-.handle-wrap .react-modal-sheet-drag-indicator-container{height:auto}
-.react-modal-sheet-drag-indicator{background-color:var(--gray-8) !important} /* colour only (opaque: the lib's two tilting segments overlap at the join) */
-.sheet .head{display:flex;align-items:center;gap:8px;padding:6px 20px 14px;border-bottom:1px solid var(--gray-a5)}
+/* ---- bottom sheets (our own: src/sheet/*) ------------------------------------------------ */
+/* the viewport box tracks the VISUAL viewport (keyboard-aware); everything inside is positioned in it */
+.sheet-vp{position:fixed;left:0;right:0;z-index:1050;overflow:hidden}
+.sheet-overlay{position:absolute;inset:0;background:var(--color-overlay);opacity:0;will-change:opacity}
+.sheet{position:absolute;left:0;right:0;bottom:0;margin:0 auto;max-width:600px;display:flex;flex-direction:column;max-height:calc(100% - env(safe-area-inset-top) - 12px);
+  background:var(--color-panel-solid);color:var(--gray-12);border-radius:var(--radius-6) var(--radius-6) 0 0;border:1px solid var(--gray-a6);border-bottom:none;
+  transform:translate3d(0,100%,0);will-change:transform;backface-visibility:hidden;touch-action:none;outline:none}
+.sheet.snap{height:calc(100% - env(safe-area-inset-top) - 12px)}
+/* extra panel below the bottom edge so a rubber-band past the top never shows the page behind */
+.sheet::after{content:"";position:absolute;left:0;right:0;top:100%;height:200px;background:inherit}
+.handle-wrap{flex:none;display:flex;justify-content:center;padding:10px 0 8px;cursor:grab}
+.handle{width:36px;height:5px;border-radius:3px;background:var(--gray-8)}
+.sheet .head{flex:none;display:flex;align-items:center;gap:8px;padding:6px 20px 14px;border-bottom:1px solid var(--gray-a5)}
 .sheet .head .ttl{flex:1;text-align:center;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin:0}
 .sheet .head .side{flex:none;min-width:5rem;display:flex}
 .sheet .head .side.r{justify-content:flex-end}
+.sheet .body{flex:1;min-height:0;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+.sheet .body-in{padding:8px 16px calc(20px + env(safe-area-inset-bottom))}
 .evk{display:flex;gap:8px;align-items:center;margin:6px 0}
 .evk .rt-TextFieldRoot{flex:1;min-width:0}
 
@@ -54,5 +63,3 @@ body{margin:0;padding-bottom:3rem}
 .term .inrow{flex:none;display:flex;gap:6px;padding:6px 8px calc(8px + env(safe-area-inset-bottom));background:#161a22}
 .term.kb .inrow{padding-bottom:8px} /* keyboard open: no home-indicator inset to clear */
 .term .inrow .rt-TextFieldRoot{flex:1;min-width:0;font-family:var(--code-font-family)}
-/* the sheet moves by transform only (Framer Motion y) — compositor/GPU; promote the layer up front */
-.react-modal-sheet-container{will-change:transform;backface-visibility:hidden}

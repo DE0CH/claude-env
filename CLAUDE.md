@@ -609,9 +609,10 @@ up in the Claude phone app. Isolated microVM per session (install tools freely).
   rules (Deyao, 2026-09-13): a **commonly used component package used as shipped** — currently
   Radix Themes, configured only via its documented `<Theme>` props (never override a framework's
   CSS; Bootstrap-with-overrides was rejected); no purple, no gradients, no drop shadows, no
-  hand-rolled iOS look-alike chrome, soft rounded corners; sheets = react-modal-sheet with iOS
-  detents (half → full on flick up incl. over content, down to dismiss) — don't hand-roll
-  gestures; terminal = plain full-screen page; per-card actions = one primary button + a "More"
+  hand-rolled iOS look-alike chrome, soft rounded corners; sheets = our own implementation with
+  iOS detents and the real iOS physics (bounce-0 spring + velocity projection + rubber band,
+  `selfhost/portal/web/src/sheet/`) — off-the-shelf sheet libraries were tried and rejected, so
+  extend ours rather than swapping in another; terminal = plain full-screen page; per-card actions = one primary button + a "More"
   action sheet, never a wall of buttons; nothing optimistic — a toggle's spinner stays until the
   server reports the new state.
 - Known limit: sessions share the Claude OAuth refresh token (fine for a few concurrent).

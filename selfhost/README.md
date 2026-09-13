@@ -131,12 +131,20 @@ Destroy: `selfhost/cluster/destroy.sh` (Fly sessions are separate — destroy th
 - **Front-end** (`portal/web/`): Vite + React + TypeScript. Components are **Radix Themes**
   (`@radix-ui/themes`, used as shipped — configured only through `<Theme>` props in
   `web/src/theme.tsx`: radius large, blue accent, slate grays; colour mode follows the OS via a
-  `light`/`dark` class on `<html>`). Sheets are **react-modal-sheet** (Framer Motion) with iOS
-  detents: New session / env editor open at a half snap point, a flick up on the handle *or the
-  content* expands to full, at full the content scrolls, a drag down from scrollTop 0 goes back to
-  half and then dismisses (`disableScroll`/`disableDrag` callbacks on `Sheet.Content` — the
-  library's documented hand-off); keyboard avoidance is built in. Sheets mount inside the Theme
-  root (`mountPoint`) so they inherit the theme. Per-session actions beyond Terminal/Start live
+  `light`/`dark` class on `<html>`). Bottom sheets are **our own** (`web/src/sheet/`, no library —
+  vaul and react-modal-sheet were both tried and rejected) with iOS detents and the real iOS
+  motion model, documented in `sheet/physics.ts`: a bounce-0 spring of 0.5 s perceptual duration
+  (stiffness (2π/d)², critically damped, closed form) started with the gesture's release velocity;
+  the target detent is the one nearest to where the finger would have coasted (velocity projection
+  with UIScrollView's 0.998 deceleration rate); rubber-banding past the top with Apple's 0.55
+  formula. Hand-off (`sheet/useSheet.ts`): below the top detent the content never scrolls so any
+  drag moves the sheet (a flick up expands); at the top detent the content scrolls, and a drag down
+  while scrolled to the top brings the sheet down — decided on the FIRST move and vetoed to the
+  browser with a non-passive touchmove; moves/release are tracked on `window` for the rest of the
+  gesture. Focusing a field snaps to full so the keyboard never fights the scroller; the panel
+  lives in a box sized to the `visualViewport`, so the keyboard shrinks it. Motion is written to the
+  DOM per frame (transform + backdrop opacity), React only tracks the resting detent. Per-session
+  actions beyond Terminal/Start live
   behind a **More** action sheet (one row of at most two buttons per card). `npm run build` in
   `web/` writes `portal/public/` (git-ignored; the portal image builds it in a Docker stage).
   Actions are never optimistic: `pendUntil` keeps a button in its pending state until
