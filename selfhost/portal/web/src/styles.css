@@ -29,7 +29,7 @@ body{margin:0;padding-bottom:3rem}
 /* drag handle: the lib's indicator is the pill; the spacing lives on a wrapper */
 .handle-wrap{display:flex;justify-content:center;padding:10px 0 8px;cursor:grab;touch-action:none}
 .handle-wrap .react-modal-sheet-drag-indicator-container{height:auto}
-.react-modal-sheet-drag-indicator{background:var(--gray-a8) !important;width:36px !important;height:5px !important;border-radius:3px}
+.react-modal-sheet-drag-indicator{background-color:var(--gray-a8) !important} /* colour only: the lib draws two segments that tilt while dragging */
 .sheet .head{display:flex;align-items:center;gap:8px;padding:0 16px 10px;border-bottom:1px solid var(--gray-a5)}
 .sheet .head .ttl{flex:1;text-align:center;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin:0}
 .sheet .head .side{flex:none;min-width:5rem;display:flex}
