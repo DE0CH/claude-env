@@ -363,6 +363,31 @@ app.get("/api/sessions/:id/changes", async (req, res) => {
     res.json({ checked: true, repos, status: (reg && reg.status) || "" });
   } catch (e) { res.json({ checked: false, reason: e.message, repos: [] }); }
 });
+// Refresh login inside a RUNNING session: write the portal's (freshly refreshed) credentials
+// over the session's ~/.claude/.credentials.json, then type a prompt (default "continue") into
+// its terminal so the stuck claude ("Login expired · Please run /login") picks the new pair up
+// and carries on. This is the fix when another session rotated the shared refresh token first.
+// Body: {text?: string|false} — the prompt to send; false = write the file only.
+app.post("/api/sessions/:id/relogin", async (req, res) => {
+  try {
+    const id = req.params.id;
+    const m = await fly.getMachine(id);
+    if (m.state !== "started") return res.status(409).json({ error: `session is ${m.state}` });
+    try { await ensureFreshCredentials(); }
+    catch (e) { if (e.needLogin) return res.status(409).json({ error: e.message, needLogin: true }); console.error(`[creds] ${e.message}`); }
+    const creds = await store.getClaudeCredentials();
+    if (!creds.credentials) return res.status(409).json({ error: "no Claude credentials — Re-login from Settings", needLogin: true });
+    // atomic replace, 0600, owned by claude; the file content travels as an argv item (never a shell string)
+    const script = 'umask 077; d="$HOME/.claude"; mkdir -p "$d"; printf %s "$1" > "$d/.credentials.json.tmp" && mv -f "$d/.credentials.json.tmp" "$d/.credentials.json" && echo written';
+    const r = await fly.exec(id, ["/usr/bin/sudo", "-u", "claude", "-H", "/bin/bash", "-c", script, "_", creds.credentials], 15);
+    if (!/written/.test(String(r.stdout || ""))) throw new Error("could not write the credentials file: " + String(r.stderr || r.stdout || "").slice(0, 200));
+    const text = req.body && req.body.text === false ? null : String((req.body && req.body.text) || "continue").slice(0, 200);
+    let prompted = false;
+    if (text) { await tty.input(id, { text, keys: ["Enter"] }); prompted = true; }
+    console.log(`[creds] wrote credentials into session ${id}${prompted ? ` and sent "${text}"` : ""}`);
+    res.json({ ok: true, expiresAt: oauth.expiresAt(creds.credentials), prompted, text: prompted ? text : null });
+  } catch (e) { res.status(500).json({ error: e.message }); }
+});
 // live terminal (tmux mirror) — see lib/tty.js. The dashboard polls /frame (SSE doesn't
 // survive the cf-tunnel's WS relay); the SSE stream stays for direct/in-cluster clients.
 app.get("/api/sessions/:id/tty", (req, res) => { tty.stream(req.params.id, res); });

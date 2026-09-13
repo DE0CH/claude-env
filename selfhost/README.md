@@ -131,6 +131,9 @@ Destroy: `selfhost/cluster/destroy.sh` (Fly sessions are separate — destroy th
   dashboard says so and the only fix is Re-login (Settings). See `API.md`.
   Remaining limit: the refresh token is single-use, so with several long-running sessions the
   first one to refresh (≈8 h in) wins and the others can't refresh their own copy when theirs
-  expires — they'd need a re-start (new sessions always get the newest pair).
+  expires (their terminal shows "Login expired · Please run /login"). Fix: the session card's
+  **Refresh login** button (`POST /api/sessions/:id/relogin`) writes the portal's current pair
+  into the session and types `continue` so it carries on. A stop/start of the machine re-seeds
+  the pair the machine was CREATED with (from its env), so press Refresh login after a restart too.
 - Sessions don't auto-destroy on idle (~1–2¢/hour while running).
 - The terminal mirror has ~1 s latency and no mouse/scrollback; it's for watching and nudging.

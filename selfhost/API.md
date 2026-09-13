@@ -37,6 +37,7 @@ All bodies are JSON; errors are `{"error": "..."}` with a 4xx/5xx status.
 | POST | `/api/sessions` | `{environment, repos:[name…], label?, permissionMode: "auto"\|"bypass", size?}` → `{ok,id,name,label,state,size}`. Refreshes the stored Claude credentials first; **409 `{needLogin:true}`** when the login is dead (Re-login in Settings) |
 | GET | `/api/sessions/:id/changes` | pre-destroy check: uncommitted/unpushed work per repo inside the session |
 | DELETE | `/api/sessions/:id` | archives transcripts + `~/artifacts` to the Storage Box, then deletes the machine (`?force=1` = destroy even if the archive failed) |
+| POST | `/api/sessions/:id/relogin` | fix a session stuck on "Login expired · Please run /login": refreshes the stored pair if needed, writes it over the session's `~/.claude/.credentials.json`, then types `continue` + Enter into its terminal. Body `{text?}` overrides the prompt (`false` = write only). **409 `{needLogin:true}`** when the stored login itself is dead |
 | POST | `/api/sessions/:id/stop`, `/start` | stop / start the Fly machine |
 | GET | `/api/sessions/:id/tty` | SSE stream of the session's tmux screen (`event: frame`) |
 | GET | `/api/sessions/:id/tty/frame` | one snapshot `{screen,x,y,cols,rows}` |

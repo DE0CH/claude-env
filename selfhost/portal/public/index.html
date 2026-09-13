@@ -241,7 +241,7 @@ function renderSessions(){
     // title = what the Claude app shows: a name you pinned/renamed wins; otherwise the
     // app's AI-generated conversation title; until it has booted, the creation name.
     const title=(m.liveName&&m.nameSource&&m.nameSource!=='derived')?m.liveName:(m.aiTitle||m.label||m.liveName||m.name);
-    const busy=PENDING.has('destroy:'+m.id);
+    const busy=PENDING.has('destroy:'+m.id)||PENDING.has('relogin:'+m.id);
     const repos=m.repos?m.repos.split(' ').map(u=>u.split('/').pop().replace(/\.git$/,'')).join(', '):'';
     const perm=m.permissionMode==='bypass'?' · <span class="pill bad" style="text-transform:none">skip perms</span>':(m.permissionMode?' · auto':'');
     return `<div class="card${busy?' pending':''}">
@@ -251,6 +251,7 @@ function renderSessions(){
     <div class="spacer"></div>
     <div class="row">
       ${m.state==='started'?`<button class="btn ghost sm" onclick="openTerm('${m.id}','${esc(title)}')">Terminal</button>`:''}
+      ${m.state==='started'?pbtn('relogin:'+m.id,'ghost sm',`reloginSession('${m.id}')`,'Refresh login'):''}
       ${pbtn('destroy:'+m.id,'danger sm',`destroy('${m.id}')`,'Destroy',cool)}
     </div>
     <div class="hint">Open the Claude app to chat with this session.</div>
@@ -417,6 +418,14 @@ async function startSession(btn){
     await refresh(false);                                 // card appears in its REAL state (creating…)
     settle(st=>{const m=(st.sessions||[]).find(x=>x.id===r.id);return !!(m&&m.state==='started'&&m.status);}); // fast-poll until claude is actually up
   }catch(e){restore();alert('Start failed: '+e.message);if(/Re-login/.test(e.message)){closeDlg();tab('settings');}}
+}
+// Session says "Login expired · Please run /login" (another session rotated the shared refresh
+// token): write the portal's current pair into the session and type "continue" so it resumes.
+async function reloginSession(id){
+  pend('relogin:'+id,'Refreshing…');
+  try{const r=await api('POST','api/sessions/'+id+'/relogin',{text:'continue'});alert('Fresh credentials written into the session'+(r.prompted?' and “'+r.text+'” sent':'')+'. Valid until '+new Date(r.expiresAt).toLocaleString()+'.');}
+  catch(e){alert('Refresh login failed: '+e.message);if(/Re-login/.test(e.message))tab('settings');}
+  pend('relogin:'+id,null);await refresh(false);
 }
 async function refreshCreds(){
   pend('credrefresh','Refreshing…');
