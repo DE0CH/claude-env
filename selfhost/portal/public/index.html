@@ -41,7 +41,8 @@
   button.btn:active:not(:disabled){transform:scale(.97)}
   .spinner{width:12px;height:12px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;display:inline-block;animation:spin .7s linear infinite;flex:none}
   @keyframes spin{to{transform:rotate(360deg)}}
-  #refreshBtn.spinning{animation:spin .8s linear infinite}
+  #refreshBtn .ico{display:inline-block;line-height:1}
+  #refreshBtn.spinning .ico{animation:spin .8s linear infinite}
   .banner{border-radius:10px;padding:.6rem .8rem;font-size:.85rem;margin-bottom:.8rem}
   .banner.err{background:rgba(220,38,38,.12);color:var(--err)}
   .banner.warn{background:rgba(217,119,6,.12);color:var(--warn)}
@@ -74,7 +75,7 @@
 <body>
 <header>
   <div class="logo">C</div><h1>Claude sessions</h1><div class="grow"></div>
-  <button class="btn ghost sm" id="refreshBtn" onclick="refresh(true)">↻</button>
+  <button class="btn ghost sm" id="refreshBtn" onclick="refresh(true)" aria-label="Refresh"><span class="ico">↻</span></button>
 </header>
 <div class="wrap">
   <div id="banners"></div>
@@ -177,8 +178,10 @@ function renderSessions(){
   const cool=coolAfterShift('sessions',s.map(m=>m.id).sort().join('|'));
   if(!s.length){v.innerHTML='<div class="empty">No sessions running.<br>Tap “New session”.</div>';return;}
   v.innerHTML=s.map(m=>{
+    // name: whatever claude inside reports (mirrors renames made in the Claude app);
+    // until it has booted, the creation name.
     const title=(m.liveName&&m.nameSource&&m.nameSource!=='derived')?m.liveName:(m.label||m.name);
-    const busy=PENDING.has('destroy:'+m.id)||PENDING.has('rename:'+m.id);
+    const busy=PENDING.has('destroy:'+m.id);
     const repos=m.repos?m.repos.split(' ').map(u=>u.split('/').pop().replace(/\.git$/,'')).join(', '):'';
     return `<div class="card${busy?' pending':''}">
     <div class="row" style="justify-content:space-between"><h3>${esc(title)}</h3>${sessionPill(m)}</div>
@@ -186,7 +189,6 @@ function renderSessions(){
     <div class="meta">${esc(REGION[m.region]||m.region||'')}${m.created?' · created '+ago(m.created):''}</div>
     <div class="spacer"></div>
     <div class="row">
-      ${pbtn('rename:'+m.id,'ghost sm',`renameSession('${m.id}','${esc(title).replace(/'/g,'')}')`,'Rename')}
       ${pbtn('destroy:'+m.id,'danger sm',`destroy('${m.id}')`,'Destroy',cool)}
     </div>
     <div class="hint">Open the Claude app to chat with this session.</div>
@@ -257,17 +259,6 @@ async function startSession(btn){
     await refresh(false);                                 // card appears in its REAL state (creating…)
     settle(st=>{const m=(st.sessions||[]).find(x=>x.id===r.id);return !!(m&&m.state==='started'&&m.status);}); // fast-poll until claude is actually up
   }catch(e){restore();alert('Start failed: '+e.message);}
-}
-
-async function renameSession(id,current){
-  const name=(prompt('New session name (also updates the Claude app):',current)||'').trim();
-  if(!name||name===current)return;
-  pend('rename:'+id,'Renaming…');
-  try{await api('POST',`api/sessions/${id}/rename`,{name});}
-  catch(e){alert('Rename failed: '+e.message);}
-  pend('rename:'+id,null);
-  await refresh(false);
-  settle(st=>{const m=(st.sessions||[]).find(x=>x.id===id);return !!(m&&m.liveName===name);},20000);
 }
 
 async function destroy(id){

@@ -37,7 +37,9 @@ start() {
   # SESSION_LABEL is in the machine env; the inner shell expands it (single quotes here).
   export SESSION_LABEL="${SESSION_LABEL:-}"
   if [ -n "$SESSION_LABEL" ]; then
-    CMD='claude --remote-control "$SESSION_LABEL" --dangerously-skip-permissions'
+    # --remote-control <name> names it in the Claude app; --name sets the local display
+    # name (the session registry the dashboard reads), so both start identical.
+    CMD='claude --remote-control "$SESSION_LABEL" --name "$SESSION_LABEL" --dangerously-skip-permissions'
   else
     CMD='claude --remote-control --dangerously-skip-permissions'
   fi

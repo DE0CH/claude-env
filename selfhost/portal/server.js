@@ -249,27 +249,6 @@ app.get("/api/sessions/:id/changes", async (req, res) => {
   } catch (e) { res.json({ checked: false, reason: e.message, repos: [] }); }
 });
 
-// Rename a session everywhere: drive `/rename` inside the running claude (so the
-// Claude app shows it) and keep the Fly metadata label in sync (shown when stopped).
-app.post("/api/sessions/:id/rename", async (req, res) => {
-  try {
-    const name = String((req.body || {}).name || "").replace(/["'\\\r\n\t]/g, "").trim().slice(0, 60);
-    if (!name) return res.status(400).json({ error: "name required" });
-    const id = req.params.id;
-    let inside = "skipped";
-    try {
-      const m = await fly.getMachine(id);
-      if (m.state === "started") {
-        const r = await fly.exec(id, ["/usr/bin/sudo", "-u", "claude", "-H", "/bin/bash", "-lc",
-          `tmux send-keys -t claude '/rename ${name}' Enter`], 15);
-        inside = r.exit_code === 0 ? "ok" : `exit ${r.exit_code}`;
-      }
-    } catch (e) { inside = e.message; }
-    await fly.setMetadata(id, "label", name);
-    regCache.delete(id);
-    res.json({ ok: true, name, inside });
-  } catch (e) { res.status(500).json({ error: e.message }); }
-});
 app.post("/api/sessions/:id/stop", async (req, res) => {
   try { res.json(await fly.stopMachine(req.params.id)); } catch (e) { res.status(500).json({ error: e.message }); }
 });
