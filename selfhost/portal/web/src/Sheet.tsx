@@ -1,5 +1,6 @@
 // Our own bottom sheet (no library): iOS detents with the real iOS motion model — see
-// sheet/physics.ts (spring with bounce 0 / 0.5 s, velocity projection, rubber band) and
+// sheet/physics.ts (spring with bounce 0 / 0.5 s, velocity projection, rubber band, an
+// accelerating no-ease-out dismiss) and
 // sheet/useSheet.ts (gesture hand-off, keyboard, animation loop). Chrome is Radix Themes.
 //
 // Hand-off rules (what iOS does): below the top detent the content never scrolls, so any drag

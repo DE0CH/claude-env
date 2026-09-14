@@ -12,11 +12,16 @@
 //    reverse-engineered by the Ionic Framework for its iOS modal and adopted by vaul. Its start
 //    is very steep (initial slope 2.25× linear), which is why 500 ms reads as quick — a spring
 //    from rest starts with zero velocity and the same half second felt sluggish.
+//  • DISMISS is the one motion with no ease-out (Deyao: a tapering exit reads as slow): the sheet
+//    leaves the screen at constant acceleration, starting from the release velocity (or, from
+//    rest, half the average speed so a tap never shows a dead start) and only ever getting
+//    faster — off screen within 280 ms, sooner when the flick was already fast enough.
 
 export const DURATION = 0.5;                     // s, perceptual duration of the spring
 export const OMEGA = (2 * Math.PI) / DURATION;   // rad/s; critically damped ⇒ ζ = 1
 const DECEL = 0.998;                             // UIScrollView.DecelerationRate.normal
-export const REVEAL_MS = 500;                    // iOS sheet present/dismiss
+export const REVEAL_MS = 500;                    // iOS sheet present
+export const DISMISS_MS = 280;                   // dismiss: accelerate off screen, no ease-out
 const [X1, Y1, X2, Y2] = [0.32, 0.72, 0, 1];     // its easing (Ionic ios.enter/leave)
 const bz = (a: number, b: number, s: number) => 3 * (1 - s) ** 2 * s * a + 3 * (1 - s) * s ** 2 * b + s ** 3;
 const bzd = (a: number, b: number, s: number) => 3 * (1 - s) ** 2 * a + 6 * (1 - s) * s * (b - a) + 3 * s ** 2 * (1 - b);
@@ -44,11 +49,22 @@ export const rubberBand = (x: number, dim: number, c = 0.55) => (1 - 1 / ((x * c
  */
 export class Spring {
   private t0 = 0; private d0 = 0; private v0 = 0; private timed = false; target = 0; running = false;
-  start(from: number, to: number, v0: number, now: number) {
-    this.target = to; this.d0 = from - to; this.v0 = v0; this.t0 = now; this.running = true; this.timed = v0 === 0;
+  private exit = false; private a = 0; private T = 0;    // dismiss: x = from + v0·t + ½·a·t², t ≤ T
+  start(from: number, to: number, v0: number, now: number, dismiss = false) {
+    this.target = to; this.d0 = from - to; this.v0 = v0; this.t0 = now; this.running = true; this.timed = v0 === 0; this.exit = dismiss;
+    if (dismiss) {
+      const d = Math.max(0, to - from), T = DISMISS_MS / 1000;
+      const v = Math.max(v0, 0.5 * d / T);                                    // never a dead start
+      if (v * T >= d) { this.T = v > 0 ? d / v : 0; this.a = 0; } else { this.T = T; this.a = (2 * (d - v * T)) / (T * T); }
+      this.v0 = v;
+    }
   }
   /** position + velocity at time `now` (ms) */
   at(now: number): { x: number; v: number; done: boolean } {
+    if (this.exit) {
+      const t = Math.max(0, (now - this.t0) / 1000), done = t >= this.T;
+      return { x: done ? this.target : this.target + this.d0 + this.v0 * t + 0.5 * this.a * t * t, v: done ? 0 : this.v0 + this.a * t, done };
+    }
     if (this.timed) {
       const f = (now - this.t0) / REVEAL_MS, { p, slope } = reveal(f), done = f >= 1;
       return { x: done ? this.target : this.target + this.d0 * (1 - p), v: done ? 0 : (-this.d0 * slope) / (REVEAL_MS / 1000), done };

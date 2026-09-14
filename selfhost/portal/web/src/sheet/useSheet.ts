@@ -32,9 +32,9 @@ export function useSheet(opts: {
     if (backdrop.current) backdrop.current.style.opacity = String(Math.max(0, Math.min(1, 1 - st.y / h)));
   };
   const stopAnim = () => { if (st.raf) cancelAnimationFrame(st.raf); st.raf = 0; st.spring.running = false; };
-  const animateTo = (target: number, v0: number, then?: () => void) => {
+  const animateTo = (target: number, v0: number, then?: () => void, dismiss = false) => {
     stopAnim();
-    st.spring.start(st.y, target, v0, performance.now());
+    st.spring.start(st.y, target, v0, performance.now(), dismiss);
     const step = (now: number) => {
       const { x, v, done } = st.spring.at(now);
       st.y = x; st.v = v; paint();
@@ -44,7 +44,7 @@ export function useSheet(opts: {
     st.raf = requestAnimationFrame(step);
   };
   const snapTo = (i: number, v0 = 0) => {
-    if (i < 0) { if (st.closing) return; st.closing = true; animateTo(posOf(-1), v0, () => onClosed?.()); onClose(); return; }
+    if (i < 0) { if (st.closing) return; st.closing = true; animateTo(posOf(-1), v0, () => onClosed?.(), true); onClose(); return; }
     setDetent(i); animateTo(posOf(i), v0);
   };
   /** nearest detent (or closed) to where the finger would have coasted */
@@ -63,7 +63,7 @@ export function useSheet(opts: {
     if (!panel.current || st.mounted) return;
     st.mounted = true; st.y = posOf(-1); paint(); snapTo(initial);
   });
-  useEffect(() => { if (!open && !st.closing) { st.closing = true; animateTo(posOf(-1), st.v, () => onClosed?.()); } }, [open]);
+  useEffect(() => { if (!open && !st.closing) { st.closing = true; animateTo(posOf(-1), st.v, () => onClosed?.(), true); } }, [open]);
   useEffect(() => () => stopAnim(), []);
   // viewport resize (rotation, keyboard): keep the current detent, re-derive px
   useEffect(() => {

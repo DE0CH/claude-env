@@ -620,8 +620,9 @@ and simply end your turn — no `/retire-session` needed.
   CSS; Bootstrap-with-overrides was rejected); no purple, no gradients, no drop shadows, no
   hand-rolled iOS look-alike chrome, soft rounded corners; sheets = our own implementation with
   iOS detents and the real iOS physics (gesture releases: bounce-0 spring + velocity projection +
-  rubber band; programmatic open/close: the iOS presentation curve, 500 ms
-  cubic-bezier(0.32,0.72,0,1) — `selfhost/portal/web/src/sheet/`) — off-the-shelf sheet libraries were tried and rejected, so
+  rubber band; programmatic open: the iOS presentation curve, 500 ms
+  cubic-bezier(0.32,0.72,0,1); dismiss: NO ease-out ever — accelerates off screen in ≤280 ms from
+  the release velocity, a tapering exit reads as slow — `selfhost/portal/web/src/sheet/`) — off-the-shelf sheet libraries were tried and rejected, so
   extend ours rather than swapping in another; terminal = plain full-screen page; per-card actions = one primary button + a "More"
   action sheet, never a wall of buttons; nothing optimistic — a toggle's spinner stays until the
   server reports the new state; never native `alert()`/`confirm()` — notices are toasts
