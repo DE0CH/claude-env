@@ -11,8 +11,16 @@ export HOME=/home/claude
 # make the environment's secrets available to claude + every Bash tool it spawns
 [ -f "$HOME/.secrets" ] && { set -a; . "$HOME/.secrets"; set +a; }
 
-# Pre-accept the workspace trust dialog for the dirs claude may open, so the
-# interactive (tmux TTY) remote-control host doesn't block on "trust this folder?".
+# Pre-accept two interactive dialogs that would otherwise block the tmux-TTY remote-control
+# host forever (a blocked host never writes its session registry, so the dashboard shows
+# "booting…" indefinitely, no bridge session appears in the app, and the first prompt is
+# never sent):
+#   1. the per-folder "Do you trust the files in this folder?" prompt, and
+#   2. the "WARNING: Claude Code running in Bypass Permissions mode … Yes, I accept" dialog
+#      that `--dangerously-skip-permissions` shows on a TTY. In cli 2.1.270 that dialog is
+#      gated by `skipDangerousModePermissionPrompt` in ~/.claude/settings.json (the key the
+#      dialog itself writes on "Yes, I accept"); the legacy ~/.claude.json
+#      `bypassPermissionsModeAccepted` flag does NOT suppress it.
 trust_dirs() {
   python3 - "$WD" <<'PY'
 import json,os,sys
@@ -26,6 +34,13 @@ for path in {wd, os.path.expanduser("~/workspace"), os.path.expanduser("~")}:
     e["hasCompletedProjectOnboarding"]=True
     e.setdefault("allowedTools",[])
 json.dump(d,open(p,"w"))
+# Pre-accept the bypass-permissions warning via the settings key the CLI actually checks.
+sp=os.path.expanduser("~/.claude/settings.json")
+try: s=json.load(open(sp))
+except Exception: s={}
+s["skipDangerousModePermissionPrompt"]=True
+os.makedirs(os.path.dirname(sp),exist_ok=True)
+json.dump(s,open(sp,"w"))
 PY
 }
 

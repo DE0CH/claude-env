@@ -63,6 +63,24 @@ curl -sS -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" -H "CF-Access-Client-Sec
 
 ## Gotchas (all hit on 2026-09-13)
 
+- **A "bypass" session shows "booting…" forever (2026-09-14).** `--dangerously-skip-permissions`
+  on a TTY opens the "WARNING: Claude Code running in Bypass Permissions mode … Yes, I accept"
+  dialog and claude blocks there: no `~/.claude/sessions/*.json` (so no status → "booting…"),
+  no bridge session in the app, and the supervisor's first-prompt loop gives up after ~3 min.
+  **The key that suppresses it is `skipDangerousModePermissionPrompt: true` in
+  `~/.claude/settings.json`** — the userSetting the dialog itself writes on "Yes, I accept"
+  (`$$()` in cli 2.1.270 reads it; verified in the binary). The legacy `~/.claude.json`
+  `bypassPermissionsModeAccepted` that entrypoint.sh has always set does **not** suppress the
+  first-run TTY dialog — that's why sessions still hung. **Do NOT unblock by sending Enter to
+  the dialog: its default focus is "No, exit" (`focus:"cancel"`), so a bare Enter quits claude.**
+  Permanent fix (applied 2026-09-14): `trust_dirs()` in `session-supervisor.sh` writes
+  `skipDangerousModePermissionPrompt: true` to `~/.claude/settings.json` before every claude
+  launch. To rescue an already-stuck machine from any session with the Fly exec API (the
+  `default` env has `FLY_API_TOKEN`): write that settings key and restart claude, e.g.
+  `POST …/machines/<id>/exec {"command":["bash","-lc","su - claude -c 'python3 -c \"import json,os;p=os.path.expanduser(\\\"~/.claude/settings.json\\\");s=json.load(open(p)) if os.path.exists(p) else {};s[\\\"skipDangerousModePermissionPrompt\\\"]=True;json.dump(s,open(p,\\\"w\\\"))\"; tmux -S /tmp/tmux-1001/default kill-session -t claude'"]}`
+  — the supervisor watchdog relaunches claude within ~20 s, now past the dialog. (exec runs as
+  root, so `su - claude`.)
+
 - **Rotating `FLY_API_TOKEN` (the portal's Fly access).** It's an **org** token
   `claude-selfhost-controller` in the **personal** org (the account requires SSO, so
   personal-access tokens can't be minted via the UI — only org tokens at
