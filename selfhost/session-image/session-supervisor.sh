@@ -57,13 +57,31 @@ start() {
     [ -n "$latest" ] && rid="$(basename "$latest" .jsonl)"
   fi
   [ -n "$rid" ] && export SESSION_RESUME_FLAG="--resume $rid"
-  if [ -n "$SESSION_LABEL" ]; then
+  # Remote Control flag placement is the crux of resume:
+  #   * FRESH start (no conversation to resume) -> pass --remote-control to ENABLE Remote
+  #     Control and register a bridge (claude.ai/code) session the phone app attaches to.
+  #   * RESUME (rid set) -> must NOT pass --remote-control. That flag STARTS A NEW bridge
+  #     session (a new entry in the Claude app, showing the conversation as if from the first
+  #     prompt). `claude --resume <id>` instead REATTACHES to the conversation's existing bridge
+  #     session via its stored reconnection record — same entry on the phone — and re-enables
+  #     Remote Control automatically. (Verified: re-passing --remote-control on resume changes
+  #     the claude.ai/code/session_… id across a pause/wake.) The server keeps a bridge session
+  #     ~4h after it stops, so a wake within that window reattaches; a much later wake still
+  #     resumes the conversation locally but appears as a fresh app entry.
+  # --name is display-only (dashboard registry / prompt box), so it is safe on both paths.
+  if [ -n "$rid" ]; then
+    if [ -n "$SESSION_LABEL" ]; then
+      CMD='claude --name "$SESSION_LABEL" --model "$SESSION_MODEL" $SESSION_PERM_FLAG $SESSION_RESUME_FLAG'
+    else
+      CMD='claude --model "$SESSION_MODEL" $SESSION_PERM_FLAG $SESSION_RESUME_FLAG'
+    fi
+  elif [ -n "$SESSION_LABEL" ]; then
     # --remote-control <name> names it in the Claude app; --name sets the local display
     # name (the session registry the dashboard reads), so both start identical.
-    CMD='claude --remote-control "$SESSION_LABEL" --name "$SESSION_LABEL" --model "$SESSION_MODEL" $SESSION_PERM_FLAG $SESSION_RESUME_FLAG'
+    CMD='claude --remote-control "$SESSION_LABEL" --name "$SESSION_LABEL" --model "$SESSION_MODEL" $SESSION_PERM_FLAG'
   else
     # No label => let the Claude session auto-generate (and later refine) its own title.
-    CMD='claude --remote-control --model "$SESSION_MODEL" $SESSION_PERM_FLAG $SESSION_RESUME_FLAG'
+    CMD='claude --remote-control --model "$SESSION_MODEL" $SESSION_PERM_FLAG'
   fi
   # fixed 120x40 window: the dashboard's terminal panel mirrors this pane (tmux capture-pane)
   tmux new-session -d -s "$SESSION" -x 120 -y 40 -c "$WD" "$CMD"
