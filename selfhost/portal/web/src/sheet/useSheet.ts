@@ -5,7 +5,7 @@
 // Coordinates: y = how far the panel is translated DOWN from its fully-open position, in px.
 //   full detent → 0; lower detents → H·(1 − fraction); closed → H (panel height).
 import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
-import { Spring, VelocityTracker, project, rubberBand } from "./physics";
+import { REVEAL_MS, Spring, VelocityTracker, project, rubberBand } from "./physics";
 
 export type Detents = number[];      // fractions of the panel height, ascending, last = 1 (full)
 
@@ -15,12 +15,13 @@ export function useSheet(opts: {
   panel: RefObject<HTMLDivElement | null>; backdrop: RefObject<HTMLDivElement | null>; scroller: RefObject<HTMLDivElement | null>;
 }) {
   const { open, onClose, onClosed, detents, initial, panel, backdrop, scroller } = opts;
-  const [detent, setDetent] = useState(initial);      // resting detent (drives overflow rules)
-  const [atRest, setAtRest] = useState(false);
+  const [detent, setDetent] = useState(initial);      // resting/target detent (drives overflow rules)
   const st = useRef({
     y: 0, v: 0, closing: false, mounted: false,
     spring: new Spring(), raf: 0, vt: new VelocityTracker(),
-    drag: null as null | { id: number; y0: number; py0: number; moved: boolean; decided: boolean; native: boolean },
+    // grabbed: the touch stopped a moving sheet — it always drives the sheet and always settles on release
+    drag: null as null | { id: number; y0: number; py0: number; moved: boolean; decided: boolean; native: boolean; grabbed: boolean },
+    field: null as HTMLElement | null, revealTimer: 0,   // focused field kept in view (see below)
   }).current;
 
   const H = () => panel.current ? panel.current.getBoundingClientRect().height : 0;
@@ -34,11 +35,10 @@ export function useSheet(opts: {
   const animateTo = (target: number, v0: number, then?: () => void) => {
     stopAnim();
     st.spring.start(st.y, target, v0, performance.now());
-    setAtRest(false);
     const step = (now: number) => {
       const { x, v, done } = st.spring.at(now);
       st.y = x; st.v = v; paint();
-      if (done) { st.raf = 0; st.spring.running = false; setAtRest(true); then?.(); }
+      if (done) { st.raf = 0; st.spring.running = false; then?.(); }
       else st.raf = requestAnimationFrame(step);
     };
     st.raf = requestAnimationFrame(step);
@@ -75,15 +75,23 @@ export function useSheet(opts: {
   // ---- gestures ---------------------------------------------------------------------------
   useEffect(() => {
     const p = panel.current, sc = scroller.current; if (!p) return;
-    const isFull = () => detents[detent] === 1 && !st.spring.running;
+    const isFull = () => detents[detent] === 1 && !st.spring.running && Math.abs(st.y) < 1;
     // moves/release are tracked on window for the rest of the gesture: a mouse leaves the handle
     // on its first move, and a finger may leave the panel while the sheet lags behind it
     const down = (e: PointerEvent) => {
       if (st.closing || e.button > 0) return;
       const fromScroller = !!sc && sc.contains(e.target as Node);
-      st.drag = { id: e.pointerId, y0: st.y, py0: e.clientY, moved: false, decided: !fromScroller, native: false };
+      // grab a moving sheet: interruptible. Within a hair of its target (the tail of the spring,
+      // where a "pull up, then scroll" touch lands) it just completes — the touch is then an
+      // ordinary one, so scrolling at full works right away. Further out the gesture takes the
+      // sheet over (and settles it on release even without moving, so it can never strand).
+      let grabbed = false;
+      if (st.spring.running) {
+        stopAnim();
+        if (Math.abs(st.spring.target - st.y) < 24) { st.y = st.spring.target; st.v = 0; paint(); } else grabbed = true;
+      }
+      st.drag = { id: e.pointerId, y0: st.y, py0: e.clientY, moved: false, decided: !fromScroller || grabbed, native: false, grabbed };
       st.vt.reset(); st.vt.push(e.timeStamp, st.y);
-      if (st.spring.running) stopAnim();               // grab a moving sheet: interruptible
       window.addEventListener("pointermove", move); window.addEventListener("pointerup", up); window.addEventListener("pointercancel", up);
     };
     const move = (e: PointerEvent) => {
@@ -106,7 +114,7 @@ export function useSheet(opts: {
       const d = st.drag; if (!d || e.pointerId !== d.id) return;
       st.drag = null;
       window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); window.removeEventListener("pointercancel", up);
-      if (d.native || !d.moved) return;
+      if (d.native || !(d.moved || d.grabbed)) return;
       settle(st.vt.velocity(e.timeStamp));
     };
     // the browser decides scroll-vs-not on the first touchmove: veto it whenever WE are dragging
@@ -116,16 +124,25 @@ export function useSheet(opts: {
     return () => { p.removeEventListener("pointerdown", down); p.removeEventListener("touchmove", tm); window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); window.removeEventListener("pointercancel", up); };
   }, [detent, detents]);
 
-  // typing: a focused field wants the keyboard and a scrollable body → go to full first
+  // typing: a focused field wants the keyboard and a scrollable body → go to full first, then
+  // keep the field in view for as long as it has focus: once the snap is over, and again every
+  // time the scroller changes size — the keyboard shrinks it AFTER focus (iOS: hundreds of ms
+  // later), and a shrinking scroller keeps its top and clips its bottom, field included
   useEffect(() => {
     const sc = scroller.current; if (!sc) return;
+    // state lives on `st`: the snap changes `detent`, which re-registers this effect mid-flight
+    const reveal = () => { const f = st.field; if (f && document.activeElement === f) f.scrollIntoView({ block: "nearest" }); };
     const on = (e: FocusEvent) => {
       const t = e.target as HTMLElement; if (!/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)) return;
+      st.field = t;
       if (detents[detent] !== 1) snapTo(detents.length - 1);
-      setTimeout(() => t.scrollIntoView({ block: "nearest" }), 350);
+      clearTimeout(st.revealTimer); st.revealTimer = window.setTimeout(reveal, REVEAL_MS + 50);
     };
-    sc.addEventListener("focusin", on); return () => sc.removeEventListener("focusin", on);
+    const off = () => { st.field = null; };
+    const ro = new ResizeObserver(reveal); ro.observe(sc);
+    sc.addEventListener("focusin", on); sc.addEventListener("focusout", off);
+    return () => { ro.disconnect(); sc.removeEventListener("focusin", on); sc.removeEventListener("focusout", off); };
   }, [detent, detents]);
 
-  return { detent, isFull: detents[detent] === 1, atRest, snapTo, close: () => snapTo(-1) };
+  return { detent, isFull: detents[detent] === 1, snapTo, close: () => snapTo(-1) };
 }

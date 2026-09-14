@@ -46,6 +46,8 @@ body{margin:0}
 .sheet .head .side.r{justify-content:flex-end}
 .sheet .body{flex:1;min-height:0;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
 .sheet .body-in{padding:8px 16px calc(20px + env(safe-area-inset-bottom))}
+/* a field scrolled into view (focus, keyboard) keeps its focus ring and a little air visible */
+.sheet .body :is(input,textarea,select){scroll-margin:12px}
 .evk{display:flex;gap:8px;align-items:center;margin:6px 0}
 .evk .rt-TextFieldRoot{flex:1;min-width:0}
 .sheet .menu .msg{white-space:pre-line;word-break:break-word}

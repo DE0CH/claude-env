@@ -50,7 +50,9 @@ function SheetPanel({ open, onClose, title, left, right, snap, children, onClose
     syncStatusBar();
     return () => { document.documentElement.style.overflow = prev; window.removeEventListener("keydown", key); requestAnimationFrame(syncStatusBar); };
   }, []);
-  const scrollable = s.isFull && s.atRest;
+  // the content scrolls at the full detent (already while the sheet is on its way there: the
+  // browser fixes touch-action at touch start, so a scroll right after the snap must find it set)
+  const scrollable = s.isFull;
   return (
     <div className="sheet-vp" style={{ top: vv.top, height: vv.height }}>
       <div ref={backdrop} className="sheet-overlay" onClick={() => s.close()} />
