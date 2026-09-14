@@ -129,12 +129,15 @@ send_first_prompt() {
 
 # One-shot session (SESSION_ONE_SHOT=1 from the machine env): the first prompt is the whole
 # job. Once it has been pasted, watch claude's own session registry (~/.claude/sessions/<pid>.json,
-# the same file the dashboard reads) and treat the job as DONE when the host has been busy at
-# least once and is then idle again for a sustained stretch — 60 s with no background jobs, or
-# 15 min when background jobs (child shells of the claude pid) are still around, since a finishing
-# background job re-wakes claude (a `run_in_background` Bash re-invokes it on exit). "waiting"
-# (a question/permission prompt for Deyao) is NOT done: the session stays up so he can answer it
-# from the app; it finishes once the answer's turn ends. Then claude is told to exit (/exit, then
+# the same file the dashboard reads) and treat the job as DONE when the host is idle with a
+# status change (statusUpdatedAt) LATER than the moment the prompt was sent — i.e. a turn ran
+# and ended — and stays idle for a sustained stretch: 60 s with no background jobs, or 15 min
+# when background jobs (child shells of the claude pid) are still around, since a finishing
+# background job re-wakes claude (a `run_in_background` Bash re-invokes it on exit). The
+# timestamp, not "was busy seen", is the evidence: a short job's busy window (a few seconds)
+# can fall entirely between two polls (hit on the first e2e test — a 7 s job never looked busy
+# to a 10 s poll). "waiting" (a question/permission prompt for Deyao) is NOT done: the session
+# stays up so he can answer it from the app; it finishes once the answer's turn ends. Then claude is told to exit (/exit, then
 # the tmux session is killed if it lingers) and the marker ~/.claude/.one-shot-done is written.
 # The PORTAL does the rest: its one-shot loop sees the marker via the registry exec, archives
 # the transcript + ~/artifacts to the Storage Box, and destroys the machine (force: even with
@@ -143,7 +146,7 @@ send_first_prompt() {
 # once the marker exists); nothing here talks to the portal.
 ONE_SHOT_IDLE_S=60
 ONE_SHOT_IDLE_BG_S=900
-one_shot_status() {  # prints "<status> <pid>" for the remote-control host, or nothing
+one_shot_status() {  # prints "<status> <pid> <statusUpdatedAt ms>" for the remote-control host, or nothing
   python3 - <<'PY'
 import glob,json,os
 es=[]
@@ -152,25 +155,27 @@ for f in glob.glob(os.path.expanduser("~/.claude/sessions/*.json")):
     except Exception: pass
 es.sort(key=lambda e: e.get("startedAt") or 0)
 h=next((e for e in es if e.get("bridgeSessionId")), es[0] if es else None)
-if h: print(h.get("status",""), h.get("pid",""))
+if h: print(h.get("status",""), h.get("pid",""), int(h.get("statusUpdatedAt") or h.get("updatedAt") or 0))
 PY
 }
 one_shot_watch() {
   local marker="$HOME/.claude/.one-shot-done" sent="$HOME/.claude/.first-prompt-sent"
-  local seen_busy=0 idle_since=0 st pid bg now need
+  local sent_ms idle_since=0 st pid ts bg now need
   [ "${SESSION_ONE_SHOT:-}" = "1" ] || return 0
   [ -e "$marker" ] && return 0
   while [ ! -e "$sent" ]; do sleep 5; done
+  # the marker is touched right after Enter; a turn that ends after this moment is the job
+  sent_ms=$(( $(stat -c %Y "$sent") * 1000 ))
   echo "[one-shot] prompt sent; watching for completion"
   while true; do
-    sleep 10
-    st=""; pid=""
-    read -r st pid < <(one_shot_status) || true
+    sleep 3
+    st=""; pid=""; ts=0
+    read -r st pid ts < <(one_shot_status) || true
     now=$(date +%s)
     case "$st" in
-      busy) seen_busy=1; idle_since=0 ;;
       idle)
-        [ "$seen_busy" = 1 ] || continue
+        # idle from before the prompt (or re-written without a turn): not done yet
+        [ "${ts:-0}" -gt "$sent_ms" ] || { idle_since=0; continue; }
         [ "$idle_since" = 0 ] && idle_since=$now
         bg=$(pgrep -c -P "${pid:-0}" -f shell-snapshots 2>/dev/null || echo 0)
         need=$ONE_SHOT_IDLE_S; [ "${bg:-0}" -gt 0 ] && need=$ONE_SHOT_IDLE_BG_S
@@ -185,7 +190,7 @@ one_shot_watch() {
           echo "[one-shot] claude exited; waiting for the portal to archive + destroy this machine"
           return 0
         fi ;;
-      *) idle_since=0 ;;   # waiting (needs Deyao) / unknown: not done, not counting
+      *) idle_since=0 ;;   # busy / waiting (needs Deyao) / unknown: not done, not counting
     esac
   done
 }
