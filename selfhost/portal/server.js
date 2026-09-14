@@ -161,9 +161,14 @@ async function setPermissionMode(id, mode) {
     env: { ...(cur.env || {}), SESSION_PERMISSION_MODE: mode },
     metadata: { ...(cur.metadata || {}), permissionMode: mode },
   };
-  await fly.updateMachine(id, config); // Fly may or may not auto-start on a config swap
+  await fly.updateMachine(id, config); // replaces the machine and brings it back up on its own
+  // Only nudge start if Fly actually left it stopped — starting a machine mid-replace 412s
+  // ("machine getting replaced, refusing to start"), which is harmless (the replace starts it).
   const after = await fly.getMachine(id);
-  if (after.state !== "started" && after.state !== "starting") await fly.startMachine(id);
+  if (after.state === "stopped" || after.state === "suspended") {
+    try { await fly.startMachine(id); }
+    catch (e) { if (!/refusing to start|getting replaced/i.test(e.message)) throw e; }
+  }
   return { ok: true, permissionMode: mode, snapshot };
 }
 
