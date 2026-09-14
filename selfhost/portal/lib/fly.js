@@ -47,6 +47,10 @@ module.exports = {
     call("POST", `/apps/${app()}/machines/${id}/exec`, { command, timeout }),
   setMetadata: (id, key, value) =>
     call("POST", `/apps/${app()}/machines/${id}/metadata/${encodeURIComponent(key)}`, { value }),
+  // suspend freezes the whole microVM (running processes + memory + rootfs) to the host and
+  // Start wakes it exactly where it left off; stop halts it and its ephemeral rootfs is reset
+  // on the next Start. For pausing a session we want suspend (see pauseMachine in server.js).
+  suspendMachine: (id) => call("POST", `/apps/${app()}/machines/${id}/suspend`),
   stopMachine: (id) => call("POST", `/apps/${app()}/machines/${id}/stop`),
   startMachine: (id) => call("POST", `/apps/${app()}/machines/${id}/start`),
   destroyMachine: (id) => call("DELETE", `/apps/${app()}/machines/${id}?force=true`),

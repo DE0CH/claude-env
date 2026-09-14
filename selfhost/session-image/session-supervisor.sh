@@ -124,7 +124,10 @@ if [ -x /usr/local/bin/push-claude-credentials ]; then
   echo "[supervisor] credentials write-back running (-> ${PORTAL_URL:-portal default})"
 fi
 while true; do
-  if ! pgrep -u "$(id -u)" -f 'claude --remote-control' >/dev/null 2>&1; then
+  # Liveness by a token present in EVERY launch form (fresh uses --remote-control, resume does
+  # not), so the watchdog never thinks a resumed host is dead and restart-loops it. --model is
+  # always passed; the supervisor/push-creds processes don't contain it.
+  if ! pgrep -u "$(id -u)" -f 'claude .*--model' >/dev/null 2>&1; then
     echo "[supervisor] host gone; restarting"
     start
   fi

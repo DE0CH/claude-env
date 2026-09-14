@@ -125,13 +125,30 @@ async function readRegistry(machineId) {
   return data;
 }
 
+// ---- pausing a session ----------------------------------------------------
+// Pause = SUSPEND the Fly machine, not stop it. Suspend freezes the whole microVM — the running
+// claude process, its memory, AND the rootfs — so Start wakes the SAME conversation and the
+// SAME Remote Control bridge session (same entry in the Claude app), instantly, with no
+// re-launch. Fly STOP resets the machine's ephemeral rootfs on the next Start, which wipes the
+// transcript and any uncommitted ~/workspace changes and forces claude to start a brand-new
+// session (a new app entry, back at the first prompt) — that is exactly the "resume doesn't
+// work" bug. Fall back to stop only if suspend is unavailable (e.g. the machine is too large to
+// snapshot); that session then can't truly resume, but at least the machine is paused.
+async function pauseMachine(id) {
+  try { return await fly.suspendMachine(id); }
+  catch (e) {
+    console.error(`[pause] suspend ${id} failed (${e.message}); falling back to stop (won't resume state)`);
+    return await fly.stopMachine(id);
+  }
+}
+
 // ---- auto-pause idle sessions ---------------------------------------------
 // A started session idle for IDLE_PAUSE_MS (claude status exactly "idle", no background jobs)
-// is stopped to save Fly compute. A stopped machine keeps its rootfs, so ~/workspace and the
-// transcript survive and the session image resumes the SAME conversation on the next Start
-// (see session-supervisor.sh). Opt out per session via metadata autoPause=off (dashboard
-// toggle). idleSince tracks when a machine first looked idle; it is reset the moment it is
-// busy/waiting/unreachable, so only a sustained idle actually pauses.
+// is suspended to save Fly compute; Start wakes the SAME conversation (see pauseMachine).
+// Opt out per session via metadata autoPause=off (dashboard toggle). idleSince tracks when a
+// machine first looked idle; it is reset the moment it is busy/waiting/unreachable, so only a
+// sustained idle actually pauses. A suspended machine has state "suspended" (a stopped one
+// "stopped"); both are != "started" below, so a paused machine is simply skipped.
 const IDLE_PAUSE_MS = 60 * 60 * 1000;
 const AUTOPAUSE_TICK_MS = 2 * 60 * 1000;
 const idleSince = new Map(); // machineId -> ms it first looked idle
@@ -150,8 +167,8 @@ async function autoPauseTick() {
     if (!idleEligible(reg)) { idleSince.delete(m.id); continue; } // booting/busy/needs-you/unreachable
     if (!idleSince.has(m.id)) idleSince.set(m.id, Date.now());
     if (Date.now() - idleSince.get(m.id) >= IDLE_PAUSE_MS) {
-      try { await fly.stopMachine(m.id); idleSince.delete(m.id); console.log(`[autopause] paused idle session ${m.id} (${m.name})`); }
-      catch (e) { console.error(`[autopause] stop ${m.id} failed: ${e.message}`); }
+      try { await pauseMachine(m.id); idleSince.delete(m.id); console.log(`[autopause] paused idle session ${m.id} (${m.name})`); }
+      catch (e) { console.error(`[autopause] pause ${m.id} failed: ${e.message}`); }
     }
   }
   for (const id of [...idleSince.keys()]) if (!alive.has(id)) idleSince.delete(id); // forget gone machines
@@ -461,8 +478,10 @@ app.post("/api/sessions/:id/tty/resize", async (req, res) => {
   catch (e) { res.status(500).json({ error: e.message }); }
 });
 
+// "stop" here means PAUSE the session (the dashboard's Pause button). We suspend rather than
+// stop so Start wakes the same conversation — see pauseMachine.
 app.post("/api/sessions/:id/stop", async (req, res) => {
-  try { res.json(await fly.stopMachine(req.params.id)); } catch (e) { res.status(500).json({ error: e.message }); }
+  try { res.json(await pauseMachine(req.params.id)); } catch (e) { res.status(500).json({ error: e.message }); }
 });
 app.post("/api/sessions/:id/start", async (req, res) => {
   try { res.json(await fly.startMachine(req.params.id)); } catch (e) { res.status(500).json({ error: e.message }); }

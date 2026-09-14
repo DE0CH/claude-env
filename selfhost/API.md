@@ -38,7 +38,7 @@ All bodies are JSON; errors are `{"error": "..."}` with a 4xx/5xx status.
 | GET | `/api/sessions/:id/changes` | pre-destroy check: uncommitted/unpushed work per repo inside the session |
 | DELETE | `/api/sessions/:id` | archives transcripts + `~/artifacts` to the Storage Box, then deletes the machine (`?force=1` = destroy even if the archive failed) |
 | POST | `/api/sessions/:id/relogin` | fix a session stuck on "Login expired · Please run /login": refreshes the stored pair if needed, writes it over the session's `~/.claude/.credentials.json`, then types `continue` + Enter into its terminal. Body `{text?}` overrides the prompt (`false` = write only). **409 `{needLogin:true}`** when the stored login itself is dead |
-| POST | `/api/sessions/:id/stop`, `/start` | stop (pause) / start (wake) the Fly machine. A stopped machine keeps its rootfs; on start the session image resumes the same conversation |
+| POST | `/api/sessions/:id/stop`, `/start` | pause (suspend) / wake (start) the Fly machine. Pause **suspends** the machine — freezing the running claude process, memory, and rootfs — so wake resumes the SAME conversation and Remote Control bridge session. (Fly *stop* would reset the ephemeral rootfs and lose the session; suspend avoids that. Falls back to stop only if suspend is unavailable.) |
 | POST | `/api/sessions/:id/autopause` | `{enabled:bool}` → `{ok,autoPause}`. Toggle auto-pause for this session (metadata `autoPause=on\|off`); resets its idle countdown |
 | GET | `/api/sessions/:id/tty` | SSE stream of the session's tmux screen (`event: frame`) |
 | GET | `/api/sessions/:id/tty/frame` | one snapshot `{screen,x,y,cols,rows,cursor}` (`cursor:false` = the app hid it) |
