@@ -27,14 +27,14 @@ All bodies are JSON; errors are `{"error": "..."}` with a 4xx/5xx status.
 | method | path | notes |
 |---|---|---|
 | GET | `/api/health` | `{ok, version}` — no cluster/Fly calls |
-| GET | `/api/state` | everything the dashboard shows: `environments` (key NAMES only, never values), `repos`, `sessions` (Fly machine + live claude status/title), `sessionImage`, `imageBuild`, `hasCreds`, `creds` (`expiresAt`, `expired`, `stale`, `error`, `subscriptionType`), `auth` |
+| GET | `/api/state` | everything the dashboard shows: `environments` (key NAMES only, never values), `repos`, `sessions` (Fly machine + live claude status/title; `oneShot` and, once its prompt is finished and claude has exited, `oneShotDone`), `sessionImage`, `imageBuild`, `hasCreds`, `creds` (`expiresAt`, `expired`, `stale`, `error`, `subscriptionType`), `auth` |
 | GET | `/api/sizes` | machine sizes (`{sizes:{small,medium,…}, default}`) |
 
 ## Sessions (Fly Machines running `claude --remote-control`)
 
 | method | path | body / notes |
 |---|---|---|
-| POST | `/api/sessions` | `{environment, repos:[name…], label?, permissionMode: "auto"\|"bypass", size?, model?, prompt?, autoPause?}` → `{ok,id,name,label,state,size,model,autoPause,hasPrompt}`. `prompt` (optional, multi-line ok, ≤16000 chars) is pasted into the session as its first message once `claude` is up, so it starts working without waiting for the app. `autoPause` (default `true`): stop the machine after ~1h idle to save compute. Refreshes the stored Claude credentials first; **409 `{needLogin:true}`** when the login is dead (Re-login in Settings) |
+| POST | `/api/sessions` | `{environment, repos:[name…], label?, permissionMode: "auto"\|"bypass", size?, model?, prompt?, autoPause?, oneShot?}` → `{ok,id,name,label,state,size,model,autoPause,hasPrompt,oneShot}`. `prompt` (optional, multi-line ok, ≤16000 chars) is pasted into the session as its first message once `claude` is up, so it starts working without waiting for the app. `autoPause` (default `true`): stop the machine after ~1h idle to save compute. `oneShot: true` (needs `prompt`, else 400): the prompt is the whole job — when it is done the session image exits `claude` and the portal archives + **force-destroys** the machine (uncommitted/unpushed work does not block it; a Discord DM from lobster reports any work that was lost or a failed archive); auto-pause is off for it. Refreshes the stored Claude credentials first; **409 `{needLogin:true}`** when the login is dead (Re-login in Settings) |
 | GET | `/api/sessions/:id/changes` | pre-destroy check: uncommitted/unpushed work per repo inside the session |
 | DELETE | `/api/sessions/:id` | archives transcripts + `~/artifacts` to the Storage Box, then deletes the machine (`?force=1` = destroy even if the archive failed) |
 | POST | `/api/sessions/:id/relogin` | fix a session stuck on "Login expired · Please run /login": refreshes the stored pair if needed, writes it over the session's `~/.claude/.credentials.json`, then types `continue` + Enter into its terminal. Body `{text?}` overrides the prompt (`false` = write only). **409 `{needLogin:true}`** when the stored login itself is dead |

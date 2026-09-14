@@ -12,6 +12,7 @@ const github = require("./lib/github");
 const oauth = require("./lib/oauth");
 const hetzner = require("./lib/hetzner");
 const redroid = require("./lib/redroid");
+const notify = require("./lib/notify");
 
 const PORT = process.env.PORT || 8080;
 const HOST = process.env.HOST || "127.0.0.1";
@@ -90,7 +91,10 @@ function credsStatus(credentials) {
 // claude pid — a session reporting "idle" with such children still has work running.
 const REG_CMD = 'for f in /home/claude/.claude/sessions/*.json; do cat "$f" 2>/dev/null; echo; done; echo __TITLES__; '
   + 'for f in /home/claude/.claude/projects/*/*.jsonl; do t=$(grep -h \'"type":"ai-title"\' "$f" 2>/dev/null | tail -1); [ -n "$t" ] && echo "$t"; done; '
-  + 'echo __BG__; for f in /home/claude/.claude/sessions/*.json; do p=$(grep -o \'"pid":[0-9]*\' "$f" | head -1 | cut -d: -f2); [ -n "$p" ] && echo "$p $(pgrep -c -P "$p" -f shell-snapshots 2>/dev/null || echo 0)"; done; true';
+  + 'echo __BG__; for f in /home/claude/.claude/sessions/*.json; do p=$(grep -o \'"pid":[0-9]*\' "$f" | head -1 | cut -d: -f2); [ -n "$p" ] && echo "$p $(pgrep -c -P "$p" -f shell-snapshots 2>/dev/null || echo 0)"; done; '
+  // __ONESHOT__: the supervisor writes ~/.claude/.one-shot-done when a one-shot session's prompt
+  // is finished and claude has exited (session-supervisor.sh); the one-shot loop below acts on it.
+  + 'echo __ONESHOT__; cat /home/claude/.claude/.one-shot-done 2>/dev/null; true';
 const regCache = new Map();
 async function readRegistry(machineId) {
   const c = regCache.get(machineId);
@@ -102,13 +106,17 @@ async function readRegistry(machineId) {
       new Promise((_, rej) => setTimeout(() => rej(new Error("exec timeout")), 12000)),
     ]);
     const [regPart, rest = ""] = String(r.stdout || "").split("__TITLES__");
-    const [titlePart, bgPart = ""] = rest.split("__BG__");
+    const [titlePart, rest2 = ""] = rest.split("__BG__");
+    const [bgPart, oneShotPart = ""] = rest2.split("__ONESHOT__");
+    const oneShotDone = /^done\b/m.test(oneShotPart.trim());
     const parse = (s) => s.split("\n").filter((l) => l.trim().startsWith("{"))
       .map((l) => { try { return JSON.parse(l); } catch { return null; } }).filter(Boolean);
     const entries = parse(regPart).sort((a, b) => (a.startedAt || 0) - (b.startedAt || 0));
     const titles = Object.fromEntries(parse(titlePart).filter((t) => t.type === "ai-title" && t.aiTitle).map((t) => [t.sessionId, t.aiTitle]));
     const bg = Object.fromEntries(bgPart.split("\n").map((l) => l.trim().split(/\s+/)).filter((a) => a.length === 2).map(([p, n]) => [p, parseInt(n, 10) || 0]));
     const host = entries.find((e) => e.bridgeSessionId) || entries[0] || null;
+    // a finished one-shot has no registry entry any more (claude exited) — still report it
+    if (!host && oneShotDone) data = { oneShotDone: true, status: "", sessionsInside: 0 };
     if (host) {
       data = {
         liveName: host.name || "",
@@ -118,6 +126,7 @@ async function readRegistry(machineId) {
         bgTasks: bg[String(host.pid)] || 0,
         bridgeSessionId: host.bridgeSessionId || "",
         sessionsInside: entries.length,
+        oneShotDone,
       };
     }
   } catch (e) { data = null; }
@@ -229,6 +238,7 @@ app.get("/api/state", async (req, res) => {
           size: m.config?.metadata?.size || "",
           model: m.config?.metadata?.model || "",
           autoPause: m.config?.metadata?.autoPause || "on", // default on (also covers pre-feature sessions)
+          oneShot: m.config?.metadata?.oneShot === "1",
           guest: m.config?.guest ? `${m.config.guest.cpus}×${m.config.guest.cpu_kind} · ${Math.round((m.config.guest.memory_mb || 0) / 1024)} GB` : "",
         }));
         // stable order: newest first, id as tie-break (Fly's list order is not deterministic)
@@ -384,7 +394,7 @@ app.post("/api/sessions", async (req, res) => {
     catch (e) { if (e.needLogin) return res.status(409).json({ error: e.message, needLogin: true }); console.error(`[creds] ${e.message}`); }
     const creds = await store.getClaudeCredentials();
     if (!creds.credentials) return res.status(409).json({ error: "no Claude credentials — Re-login from Settings", needLogin: true });
-    const { environment, repos = [], label, permissionMode, size, model, prompt, autoPause } = req.body || {};
+    const { environment, repos = [], label, permissionMode, size, model, prompt, autoPause, oneShot } = req.body || {};
     const env = cfg.environments[environment];
     if (environment && !env) return res.status(400).json({ error: `unknown environment '${environment}'` });
     const sizeKey = size && SIZES[size] ? size : DEFAULT_SIZE;
@@ -400,7 +410,7 @@ app.post("/api/sessions", async (req, res) => {
     const permMode = permissionMode === "bypass" ? "bypass" : "auto";
     // Auto-pause when idle (default on): stop the machine after ~1h idle to save compute; it
     // resumes the same conversation on Start. Stored in metadata; the auto-pause loop reads it.
-    const autoPauseVal = autoPause === false ? "off" : "on";
+    const autoPauseVal = autoPause === false || oneShot === true ? "off" : "on";
 
     // Session title. If the user typed one, pin it everywhere: dashboard card, Fly machine,
     // AND the Remote Control session name in the Claude app (`claude --remote-control <name>`).
@@ -415,6 +425,11 @@ app.post("/api/sessions", async (req, res) => {
     // starts working right away instead of waiting for the first message from the app. Any
     // text, newlines included; capped so it fits comfortably in the machine env.
     const firstPrompt = String(prompt || "").replace(/\r\n?/g, "\n").trim().slice(0, 16000);
+    // One-shot: the prompt is the whole job. The supervisor exits claude once it is done and the
+    // portal's one-shot loop archives + destroys the machine (force — see oneShotTick). Auto-pause
+    // is pointless for it (a finished one-shot is gone within a minute), so it's off.
+    const isOneShot = oneShot === true;
+    if (isOneShot && !firstPrompt) return res.status(400).json({ error: "a one-shot session needs a prompt" });
 
     const machineEnv = {
       CLAUDE_CREDENTIALS: creds.credentials,
@@ -425,6 +440,7 @@ app.post("/api/sessions", async (req, res) => {
       SESSION_PERMISSION_MODE: permMode,
       SESSION_MODEL: modelId,
       SESSION_PROMPT: firstPrompt, // blank => nothing is typed; the app sends the first message
+      SESSION_ONE_SHOT: isOneShot ? "1" : "",
       PORTAL_URL: PUBLIC_URL, // the session pushes refreshed Claude credentials back here
     };
     const name = `s-${slug(userLabel || base)}-${rand()}`;
@@ -443,17 +459,17 @@ app.post("/api/sessions", async (req, res) => {
         model: modelId,
         autoPause: autoPauseVal,
         hasPrompt: firstPrompt ? "1" : "",
+        oneShot: isOneShot ? "1" : "",
       },
     });
-    res.json({ ok: true, id: machine.id, name, label: userLabel, state: machine.state, size: sizeKey, model: modelId, autoPause: autoPauseVal, hasPrompt: !!firstPrompt });
+    res.json({ ok: true, id: machine.id, name, label: userLabel, state: machine.state, size: sizeKey, model: modelId, autoPause: autoPauseVal, hasPrompt: !!firstPrompt, oneShot: isOneShot });
   } catch (e) { res.status(500).json({ error: e.message }); }
 });
 // Pre-destroy check: uncommitted / unpushed work in each repo inside the session.
-app.get("/api/sessions/:id/changes", async (req, res) => {
+async function repoChanges(id, machine) {
   try {
-    const id = req.params.id;
-    const m = await fly.getMachine(id);
-    if (m.state !== "started") return res.json({ checked: false, reason: `session is ${m.state}`, repos: [] });
+    const m = machine || await fly.getMachine(id);
+    if (m.state !== "started") return { checked: false, reason: `session is ${m.state}`, repos: [] };
     const script = 'cd ~/workspace 2>/dev/null || exit 0; for d in */; do d=${d%/}; [ -d "$d/.git" ] || continue; '
       + 'u=$(git -C "$d" status --porcelain 2>/dev/null | wc -l); '
       + 'if git -C "$d" rev-parse --abbrev-ref @{u} >/dev/null 2>&1; then p=$(git -C "$d" rev-list @{u}..HEAD --count 2>/dev/null || echo 0); else p=-1; fi; '
@@ -464,9 +480,19 @@ app.get("/api/sessions/:id/changes", async (req, res) => {
       return { name, uncommitted: parseInt(u, 10) || 0, unpushed: parseInt(p, 10) };
     });
     const reg = await readRegistry(id);
-    res.json({ checked: true, repos, status: (reg && reg.status) || "" });
-  } catch (e) { res.json({ checked: false, reason: e.message, repos: [] }); }
-});
+    return { checked: true, repos, status: (reg && reg.status) || "" };
+  } catch (e) { return { checked: false, reason: e.message, repos: [] }; }
+}
+// one line per repo with unsaved work ("claude-env: 2 uncommitted file(s), 1 unpushed commit(s)"), [] if clean
+function dirtyLines(changes) {
+  return (changes.repos || []).filter((r) => r.uncommitted > 0 || r.unpushed > 0 || r.unpushed === -1).map((r) => {
+    const parts = [];
+    if (r.uncommitted > 0) parts.push(`${r.uncommitted} uncommitted file(s)`);
+    if (r.unpushed > 0) parts.push(`${r.unpushed} unpushed commit(s)`); else if (r.unpushed === -1) parts.push("branch has no upstream (nothing pushed)");
+    return `${r.name}: ${parts.join(", ")}`;
+  });
+}
+app.get("/api/sessions/:id/changes", async (req, res) => { res.json(await repoChanges(req.params.id)); });
 // Refresh login inside a RUNNING session: write the portal's (freshly refreshed) credentials
 // over the session's ~/.claude/.credentials.json, then type a prompt (default "continue") into
 // its terminal so the stuck claude ("Login expired · Please run /login") picks the new pair up
@@ -540,36 +566,85 @@ app.post("/api/sessions/:id/autopause", async (req, res) => {
 // A running machine archives from its disk (and its stale pause snapshot, if any, is dropped);
 // a PAUSED machine can't be exec'd and its rootfs is gone anyway, so its pause snapshot
 // (claude-records/.paused/<id>/) IS the record and is moved into the normal archive dir.
-app.delete("/api/sessions/:id", async (req, res) => {
-  const id = req.params.id, force = req.query.force === "1";
+// Archive + destroy. Throws an error with .archiveFailed=true (→ 409) when the archive failed and
+// force is off; with force the machine goes anyway and `archived` carries the error. Returns
+// {..., archived, title, envSecrets} so callers can report on it.
+async function destroySession(id, { force = false } = {}) {
   let archived = null;
-  try {
-    const m = await fly.getMachine(id);
-    const md = m.config?.metadata || {};
-    const envSecrets = ((await store.get()).environments[md.environment] || {}).secrets || {};
-    if (m.state === "started") {
-      const reg = await readRegistry(id);
-      const title = (reg && reg.nameSource && reg.nameSource !== "derived" && reg.liveName) || (reg && reg.aiTitle) || md.label || (reg && reg.liveName) || m.name;
-      try {
-        archived = await archive.run(id, { id, machineName: m.name, title, environment: md.environment || "", repos: md.repos || "",
-          permissionMode: md.permissionMode || "", created: m.created_at, bridgeSessionId: (reg && reg.bridgeSessionId) || "" });
-        await archive.clearPaused(envSecrets, id);
-      } catch (e) {
-        if (!force) return res.status(409).json({ error: e.message, archiveFailed: true });
-        archived = { error: e.message };
-      }
-    } else {
-      try {
-        archived = await archive.finalizePaused(envSecrets, { id, machineName: m.name, title: md.label || m.name, environment: md.environment || "",
-          repos: md.repos || "", permissionMode: md.permissionMode || "", created: m.created_at });
-      } catch (e) {
-        if (!force) return res.status(409).json({ error: e.message, archiveFailed: true });
-        archived = { error: e.message };
-      }
+  const m = await fly.getMachine(id);
+  const md = m.config?.metadata || {};
+  const envSecrets = ((await store.get()).environments[md.environment] || {}).secrets || {};
+  const common = { id, machineName: m.name, environment: md.environment || "", repos: md.repos || "", permissionMode: md.permissionMode || "",
+    oneShot: md.oneShot === "1", created: m.created_at };
+  let title = md.label || m.name;
+  if (m.state === "started") {
+    const reg = await readRegistry(id);
+    title = (reg && reg.nameSource && reg.nameSource !== "derived" && reg.liveName) || (reg && reg.aiTitle) || md.label || (reg && reg.liveName) || m.name;
+    try {
+      archived = await archive.run(id, { ...common, title, bridgeSessionId: (reg && reg.bridgeSessionId) || "" });
+      await archive.clearPaused(envSecrets, id);
+    } catch (e) {
+      if (!force) { e.archiveFailed = true; throw e; }
+      archived = { error: e.message };
     }
-    res.json({ ...(await fly.destroyMachine(id)), archived });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } else {
+    try { archived = await archive.finalizePaused(envSecrets, { ...common, title }); }
+    catch (e) {
+      if (!force) { e.archiveFailed = true; throw e; }
+      archived = { error: e.message };
+    }
+  }
+  return { ...(await fly.destroyMachine(id)), archived, title, envSecrets };
+}
+app.delete("/api/sessions/:id", async (req, res) => {
+  try {
+    const { envSecrets: _s, ...r } = await destroySession(req.params.id, { force: req.query.force === "1" });
+    res.json(r);
+  } catch (e) { res.status(e.archiveFailed ? 409 : 500).json({ error: e.message, archiveFailed: !!e.archiveFailed }); }
 });
+
+// ---- one-shot sessions: archive + destroy when the prompt is done ----------------
+// A one-shot session (metadata oneShot=1) runs its first prompt and nothing else: the supervisor
+// inside the machine exits claude when the prompt's work is finished and writes
+// ~/.claude/.one-shot-done (see session-supervisor.sh). This loop notices the marker through the
+// registry exec and destroys the machine FORCEFULLY — archiving the transcript + ~/artifacts to
+// the Storage Box first, but not stopping for uncommitted/unpushed work (the odds of losing
+// something valuable from one prompt are low) nor for a failed archive. Whenever work WAS lost
+// (dirty repos, or the archive failed) Deyao gets a Discord DM saying exactly what. Stateless
+// apart from an in-flight guard, so a portal rollout just delays a destroy by a tick.
+const ONESHOT_TICK_MS = 30 * 1000;
+const oneShotBusy = new Set();
+async function oneShotTick() {
+  if (!process.env.FLY_API_TOKEN) return;
+  let machines;
+  try { machines = await fly.listMachines(); } catch { return; }
+  for (const m of machines) {
+    if (m.state !== "started" || m.config?.metadata?.oneShot !== "1" || oneShotBusy.has(m.id)) continue;
+    let reg = null;
+    try { reg = await readRegistry(m.id); } catch { reg = null; }
+    if (!reg || !reg.oneShotDone) continue;
+    oneShotBusy.add(m.id);
+    finishOneShot(m).catch((e) => console.error(`[oneshot] ${m.id}: ${e.message}`)).finally(() => oneShotBusy.delete(m.id));
+  }
+}
+async function finishOneShot(m) {
+  const id = m.id;
+  console.log(`[oneshot] ${id} (${m.name}) finished its prompt; archiving + destroying`);
+  const changes = await repoChanges(id, m);
+  const lost = dirtyLines(changes);
+  const r = await destroySession(id, { force: true });
+  const where = r.archived && r.archived.dir ? `${r.archived.dir} (${r.archived.files} file(s))` : "NOT archived";
+  const archiveErr = r.archived && r.archived.error ? r.archived.error : null;
+  console.log(`[oneshot] ${id} destroyed; records: ${archiveErr ? "FAILED: " + archiveErr : where}${lost.length ? "; unsaved work lost in " + lost.join("; ") : ""}`);
+  if (lost.length || archiveErr || !changes.checked) {
+    const lines = [`⚠️ One-shot session “${r.title}” was destroyed with work lost:`];
+    for (const l of lost) lines.push(`• ${l}`);
+    if (!changes.checked) lines.push(`• could not check the repos for unsaved work (${changes.reason || "unknown"})`);
+    if (archiveErr) lines.push(`• archive to the Storage Box FAILED — transcript and ~/artifacts are gone: ${archiveErr}`);
+    else lines.push(`Transcript + ~/artifacts were archived to ${where}.`);
+    await notify.discord(lines.join("\n"), { token: r.envSecrets.LOBSTER_TOKEN });
+  }
+}
 
 // ---- redroid cloud-Android box (a Hetzner server, managed via HETZNER_API in the ----
 // default env). The only lifecycle action is Release (delete) — Hetzner bills a powered-off
@@ -614,4 +689,6 @@ app.listen(PORT, HOST, () => {
     .catch((e) => console.error("[portal] cluster read failed (will retry on requests):", e.message));
   // Auto-pause idle sessions (single portal replica, so one timer is enough).
   setInterval(() => autoPauseTick().catch((e) => console.error("[autopause]", e.message)), AUTOPAUSE_TICK_MS);
+  // One-shot sessions: archive + destroy once their prompt is done (marker written by the supervisor).
+  setInterval(() => oneShotTick().catch((e) => console.error("[oneshot]", e.message)), ONESHOT_TICK_MS);
 });

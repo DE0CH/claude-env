@@ -14,7 +14,8 @@ export async function api<T = any>(method: string, path: string, body?: unknown)
 export type Session = {
   id: string; name: string; state: string; status?: string; bgTasks?: number; created?: string; region?: string;
   environment?: string; repos?: string; permissionMode?: string; model?: string; label?: string; liveName?: string;
-  nameSource?: string; aiTitle?: string; guest?: string;
+  nameSource?: string; aiTitle?: string; guest?: string; autoPause?: string; pauseInMs?: number;
+  oneShot?: boolean; oneShotDone?: boolean;
 };
 export type State = {
   environments: Record<string, { keys?: string[] }>;

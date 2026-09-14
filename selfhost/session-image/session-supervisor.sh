@@ -127,8 +127,72 @@ send_first_prompt() {
   echo "[supervisor] first prompt NOT sent: host never became ready"
 }
 
+# One-shot session (SESSION_ONE_SHOT=1 from the machine env): the first prompt is the whole
+# job. Once it has been pasted, watch claude's own session registry (~/.claude/sessions/<pid>.json,
+# the same file the dashboard reads) and treat the job as DONE when the host has been busy at
+# least once and is then idle again for a sustained stretch — 60 s with no background jobs, or
+# 15 min when background jobs (child shells of the claude pid) are still around, since a finishing
+# background job re-wakes claude (a `run_in_background` Bash re-invokes it on exit). "waiting"
+# (a question/permission prompt for Deyao) is NOT done: the session stays up so he can answer it
+# from the app; it finishes once the answer's turn ends. Then claude is told to exit (/exit, then
+# the tmux session is killed if it lingers) and the marker ~/.claude/.one-shot-done is written.
+# The PORTAL does the rest: its one-shot loop sees the marker via the registry exec, archives
+# the transcript + ~/artifacts to the Storage Box, and destroys the machine (force: even with
+# uncommitted/unpushed work — it DMs Deyao on Discord when that was the case). The supervisor
+# therefore keeps the machine alive after claude exits (the watchdog below does not relaunch
+# once the marker exists); nothing here talks to the portal.
+ONE_SHOT_IDLE_S=60
+ONE_SHOT_IDLE_BG_S=900
+one_shot_status() {  # prints "<status> <pid>" for the remote-control host, or nothing
+  python3 - <<'PY'
+import glob,json,os
+es=[]
+for f in glob.glob(os.path.expanduser("~/.claude/sessions/*.json")):
+    try: es.append(json.load(open(f)))
+    except Exception: pass
+es.sort(key=lambda e: e.get("startedAt") or 0)
+h=next((e for e in es if e.get("bridgeSessionId")), es[0] if es else None)
+if h: print(h.get("status",""), h.get("pid",""))
+PY
+}
+one_shot_watch() {
+  local marker="$HOME/.claude/.one-shot-done" sent="$HOME/.claude/.first-prompt-sent"
+  local seen_busy=0 idle_since=0 st pid bg now need
+  [ "${SESSION_ONE_SHOT:-}" = "1" ] || return 0
+  [ -e "$marker" ] && return 0
+  while [ ! -e "$sent" ]; do sleep 5; done
+  echo "[one-shot] prompt sent; watching for completion"
+  while true; do
+    sleep 10
+    st=""; pid=""
+    read -r st pid < <(one_shot_status) || true
+    now=$(date +%s)
+    case "$st" in
+      busy) seen_busy=1; idle_since=0 ;;
+      idle)
+        [ "$seen_busy" = 1 ] || continue
+        [ "$idle_since" = 0 ] && idle_since=$now
+        bg=$(pgrep -c -P "${pid:-0}" -f shell-snapshots 2>/dev/null || echo 0)
+        need=$ONE_SHOT_IDLE_S; [ "${bg:-0}" -gt 0 ] && need=$ONE_SHOT_IDLE_BG_S
+        if [ $((now - idle_since)) -ge "$need" ]; then
+          echo "[one-shot] done (idle ${need}s, background jobs: ${bg:-0}); exiting claude"
+          printf 'done %s idle=%ss bg=%s\n' "$(date -u +%FT%TZ)" "$need" "${bg:-0}" > "$marker"
+          tmux send-keys -t "$SESSION" Escape 2>/dev/null; sleep 1
+          tmux send-keys -t "$SESSION" -l -- '/exit' 2>/dev/null; sleep 1
+          tmux send-keys -t "$SESSION" Enter 2>/dev/null
+          for _ in $(seq 1 15); do pgrep -u "$(id -u)" -f 'claude .*--model' >/dev/null 2>&1 || break; sleep 1; done
+          tmux kill-session -t "$SESSION" 2>/dev/null || true
+          echo "[one-shot] claude exited; waiting for the portal to archive + destroy this machine"
+          return 0
+        fi ;;
+      *) idle_since=0 ;;   # waiting (needs Deyao) / unknown: not done, not counting
+    esac
+  done
+}
+
 start
 send_first_prompt &
+one_shot_watch &
 # Credentials write-back: claude rotates the OAuth refresh token when it refreshes; push the
 # new pair to the portal so sessions created later don't inherit a dead one (see the script).
 if [ -x /usr/local/bin/push-claude-credentials ]; then
@@ -139,7 +203,8 @@ while true; do
   # Liveness by a token present in EVERY launch form (fresh uses --remote-control, resume does
   # not), so the watchdog never thinks a resumed host is dead and restart-loops it. --model is
   # always passed; the supervisor/push-creds processes don't contain it.
-  if ! pgrep -u "$(id -u)" -f 'claude .*--model' >/dev/null 2>&1; then
+  if [ -e "$HOME/.claude/.one-shot-done" ]; then :   # one-shot finished: claude stays down, the portal destroys the machine
+  elif ! pgrep -u "$(id -u)" -f 'claude .*--model' >/dev/null 2>&1; then
     echo "[supervisor] host gone; restarting"
     start
   fi

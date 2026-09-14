@@ -8,6 +8,8 @@
 #   SESSION_LABEL           session title; blank => the Claude session names itself
 #   SESSION_PERMISSION_MODE auto | bypass
 #   SESSION_PROMPT          [optional] first prompt, pasted into the host once it is up (supervisor)
+#   SESSION_ONE_SHOT        "1" = one-shot: claude exits once SESSION_PROMPT is done and the portal
+#                           archives + destroys the machine (see one_shot_watch in the supervisor)
 #   SESSION_MODEL           model id (default claude-opus-4-8, see session-supervisor.sh)
 # Fly itself sets FLY_MACHINE_ID. If the environment carries KUBE_SERVER + KUBE_TOKEN (+ KUBE_CA),
 # a kubeconfig is written so the session can drive the controller cluster with kubectl.

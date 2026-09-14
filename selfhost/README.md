@@ -115,6 +115,21 @@ Destroy: `selfhost/cluster/destroy.sh` (Fly sessions are separate — destroy th
   survive) and presses Enter — once per machine, never re-sent on a host restart/reboot. The
   CLI's positional `claude … "<prompt>"` is silently ignored under `--remote-control`, hence
   the paste. Blank → the first message comes from the Claude app as before.
+- **One-shot** mode (New session → Mode): the prompt is the whole job. The session image's
+  supervisor (`one_shot_watch` in `session-supervisor.sh`) watches claude's own session registry
+  after the prompt is pasted and calls it done once the host has been busy and is then idle for
+  60 s with no background jobs (15 min if background jobs are still around — a finishing one
+  re-wakes claude); "needs you" (a question/permission prompt) is not done, the session waits for
+  the answer from the app. It then exits claude (`/exit`, tmux kill as fallback) and writes
+  `~/.claude/.one-shot-done`. The portal's one-shot loop (30 s tick, `oneShotTick` in
+  `server.js`) sees the marker through the registry exec and **force-destroys** the machine:
+  archive first (transcript + `~/artifacts` → Storage Box, like Destroy), then delete —
+  uncommitted/unpushed work does NOT block it (the odds of losing something valuable from one
+  prompt are low) and neither does a failed archive. Whenever work WAS lost (dirty repos, archive
+  failure, or the repo check itself failed) Deyao gets a Discord DM from lobster (`lib/notify.js`,
+  `LOBSTER_TOKEN` from the portal env or the session's environment) saying what. Auto-pause is
+  off for one-shots; the card shows a `one-shot` pill and `done · archiving…` while it goes.
+  The loop's only state is an in-flight guard, so a portal rollout just delays a destroy by a tick.
 - **Machine size** per session: Small (2 shared vCPU / 2 GB, ~$0.016/h), **Medium (4/4 GB, default, ~$0.033/h)**, Large
   (8/8 GB), XLarge (8/16 GB), Perf (2 dedicated / 4 GB). Presets live in `server.js` (`SIZES`); anything
   else is rejected. 1 GB was too small: `claude` alone is ~400 MB and Chromium got OOM-killed.
@@ -204,7 +219,7 @@ Destroy: `selfhost/cluster/destroy.sh` (Fly sessions are separate — destroy th
   the pair the machine was CREATED with (from its env), so press Refresh login after a restart too.
   This applies to **auto-pause wakes too**: a session woken after a long pause may show "Login
   expired" if the shared refresh token rotated meanwhile — press Refresh login on the card.
-- Sessions **auto-pause** (snapshot + Fly stop) on idle to cut compute, but don't auto-destroy
-  (~1–2¢/hour while running; ~free while paused apart from a small rootfs-storage cost). Destroy
-  when done.
+- Interactive sessions **auto-pause** (snapshot + Fly stop) on idle to cut compute, but don't
+  auto-destroy (~1–2¢/hour while running; ~free while paused apart from a small rootfs-storage
+  cost). Destroy when done — or start the job as a **one-shot**, which destroys itself.
 - The terminal mirror has ~1 s latency and no mouse/scrollback; it's for watching and nudging.

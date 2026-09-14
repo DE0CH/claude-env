@@ -132,6 +132,7 @@ async function run(viewport, tag) {
   ok(`${tag}: size default = medium`, (await checked("#ns-size")) === "medium");
   ok(`${tag}: model default = opus 4.8`, (await checked("#ns-model")) === "claude-opus-4-8");
   ok(`${tag}: auto perm default`, (await checked("#ns-perm")) === "auto");
+  ok(`${tag}: mode default = interactive`, (await checked("#ns-mode")) === "interactive");
   const top1 = (await page.locator(".sheet.snap").boundingBox()).y;
   ok(`${tag}: sheet opens part-way (snap point)`, top1 > viewport.height * 0.25, `top ${Math.round(top1)}px of ${viewport.height}`);
   await shot("5-newsession-snap");
@@ -142,6 +143,17 @@ async function run(viewport, tag) {
   ok(`${tag}: handle drag expands to full screen`, top2 < top1 - 50 && top2 < viewport.height * 0.12, `top ${Math.round(top2)}px`);
   ok(`${tag}: header actions visible`, await page.locator('.sheet .head button:has-text("Start")').isVisible());
   await shot("6-newsession-full");
+  // one-shot (at full height — focusing the prompt snaps to full anyway): the idle/auto-pause block
+  // disappears and the prompt becomes required (Start disabled until typed)
+  await page.click('#ns-mode [value="oneshot"]'); await sleep(200);
+  ok(`${tag}: one-shot hides auto-pause`, (await page.locator("#ns-autopause").count()) === 0);
+  ok(`${tag}: one-shot needs a prompt`, await page.locator("#ns-start").isDisabled());
+  await page.fill("#ns-prompt", "do the thing"); await sleep(100);
+  ok(`${tag}: one-shot Start enabled with a prompt`, !(await page.locator("#ns-start").isDisabled()));
+  await shot("6b-newsession-oneshot");
+  await page.fill("#ns-prompt", ""); await page.click('#ns-mode [value="interactive"]'); await sleep(200);
+  ok(`${tag}: interactive Start needs no prompt`, !(await page.locator("#ns-start").isDisabled()) && (await page.locator("#ns-autopause").count()) === 1);
+  await page.keyboard.press("Escape"); await sleep(300);   // drop focus so the flick below starts from a settled sheet
   // flick down: full → half (or closed), flick again → closed
   for (let i = 0; i < 2 && (await page.locator(".sheet.snap").count()); i++) {
     hb = await page.locator(".sheet.snap .handle-wrap").boundingBox();

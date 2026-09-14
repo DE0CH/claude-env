@@ -577,6 +577,11 @@ environment's secrets + repos and runs `claude --remote-control` (default model
 vCPU / 4 GB — chosen per session, plus an optional **first prompt** pasted in as the session's
 first message once `claude` is up) — so it shows
 up in the Claude phone app. Isolated microVM per session (install tools freely).
+**One-shot** sessions (dashboard Mode → One-shot, or `oneShot:true` on `POST /api/sessions`)
+run just that prompt: when it is done the session image exits claude and the portal archives +
+force-destroys the machine (uncommitted work doesn't block; Deyao gets a lobster DM if anything
+was lost). If you are IN a one-shot session, finish the job, push, write `~/artifacts/record.md`,
+and simply end your turn — no `/retire-session` needed.
 
 - **Deploying = `git push` to main.** Portal/cf-tunnel changes: GitHub Actions builds
   `ghcr.io/de0ch/claude-portal` and pins the tag in `selfhost/k8s/kustomization.yaml`; Flux

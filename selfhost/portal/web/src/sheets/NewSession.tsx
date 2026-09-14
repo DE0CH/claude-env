@@ -13,10 +13,13 @@ export function NewSession({ open, onClose, onClosed }: { open: boolean; onClose
   const [perm, setPerm] = useState("auto"), [model, setModel] = useState(MODELS.default), [size, setSize] = useState(SIZES.default), [autoPause, setAutoPause] = useState<string[]>(["on"]);
   const [label, setLabel] = useState(""), [prompt, setPrompt] = useState("");
   const [busy, run] = useBusy();
+  // interactive (default) or one-shot: the prompt is the whole job, then the session is archived + destroyed
+  const [mode, setMode] = useState<"interactive" | "oneshot">("interactive");
+  const oneShot = mode === "oneshot", canStart = !busy && !(oneShot && !prompt.trim());
   async function start() {
     await run("Starting…", async () => {
       try {
-        const r = await api("POST", "api/sessions", { environment: env, repos: picked, label: label.trim(), permissionMode: perm, size, model, prompt: prompt.trim(), autoPause: autoPause.includes("on") });
+        const r = await api("POST", "api/sessions", { environment: env, repos: picked, label: label.trim(), permissionMode: perm, size, model, prompt: prompt.trim(), autoPause: !oneShot && autoPause.includes("on"), oneShot });
         onClose();
         await refresh(false);                                 // card appears in its REAL state (creating…)
         settle((s) => { const m = (s.sessions || []).find((x) => x.id === r.id); return !!(m && m.state === "started" && m.status); }); // fast-poll until claude is actually up
@@ -27,7 +30,12 @@ export function NewSession({ open, onClose, onClosed }: { open: boolean; onClose
   return (
     <Sheet open={open} onClose={onClose} onClosed={onClosed} title="New session" snap
       left={<Button variant="ghost" onClick={onClose}>Cancel</Button>}
-      right={<Button id="ns-start" disabled={!!busy} onClick={start}>{busy ? <><Spinner size="1" />{busy}</> : "Start"}</Button>}>
+      right={<Button id="ns-start" disabled={!canStart} onClick={start}>{busy ? <><Spinner size="1" />{busy}</> : "Start"}</Button>}>
+      <Lbl>Mode</Lbl>
+      <RadioCards.Root id="ns-mode" columns="1" gap="2" size="1" value={mode} onValueChange={(v) => setMode(v as "interactive" | "oneshot")}>
+        <RadioCards.Item value="interactive"><Item t="Interactive" sub="Stays up for a conversation in the Claude app until you destroy it." /></RadioCards.Item>
+        <RadioCards.Item value="oneshot"><Item t="One-shot" sub="Runs the prompt below, then Claude exits and the session is archived + destroyed automatically — even with uncommitted work (you get a Discord DM if any was lost)." /></RadioCards.Item>
+      </RadioCards.Root>
       <Lbl>Environment</Lbl>
       {envs.length ? <RadioCards.Root id="ns-env" columns="1" gap="2" size="1" value={env} onValueChange={setEnv}>{envs.map((n) => <RadioCards.Item key={n} value={n}><Item t={n} sub={`${(st.environments[n].keys || []).length} keys`} /></RadioCards.Item>)}</RadioCards.Root> : <Muted>No environments yet — add one in the Environments tab.</Muted>}
       <Lbl>Repos</Lbl>
@@ -41,13 +49,14 @@ export function NewSession({ open, onClose, onClosed }: { open: boolean; onClose
       <RadioCards.Root id="ns-model" columns="1" gap="2" size="1" value={model} onValueChange={setModel}>{Object.entries(MODELS.models || {}).map(([k, v]) => <RadioCards.Item key={k} value={k}><Item t={v.label || k} sub={k} /></RadioCards.Item>)}</RadioCards.Root>
       <Lbl>Machine size</Lbl>
       <RadioCards.Root id="ns-size" columns="1" gap="2" size="1" value={size} onValueChange={setSize}>{Object.entries(SIZES.sizes || {}).map(([k, v]) => <RadioCards.Item key={k} value={k}><Item t={k[0].toUpperCase() + k.slice(1)} sub={v.label} /></RadioCards.Item>)}</RadioCards.Root>
-      <Lbl>Idle</Lbl>
-      <CheckboxCards.Root id="ns-autopause" columns="1" gap="2" size="1" value={autoPause} onValueChange={setAutoPause}><CheckboxCards.Item value="on"><Item t="Auto-pause when idle" sub="Stops the machine after ~1h with nothing running to save compute. Wake it with Start — the conversation and your files are kept." /></CheckboxCards.Item></CheckboxCards.Root>
+      {!oneShot && <><Lbl>Idle</Lbl>
+      <CheckboxCards.Root id="ns-autopause" columns="1" gap="2" size="1" value={autoPause} onValueChange={setAutoPause}><CheckboxCards.Item value="on"><Item t="Auto-pause when idle" sub="Stops the machine after ~1h with nothing running to save compute. Wake it with Start — the conversation and your files are kept." /></CheckboxCards.Item></CheckboxCards.Root></>}
       <Lbl>Session title (optional)</Lbl>
       <TextField.Root id="ns-title" type="text" name="session-topic" autoComplete="off" autoCorrect="off" autoCapitalize="sentences" spellCheck={false} placeholder="e.g. refactor billing module" value={label} onChange={(e) => setLabel(e.target.value)} />
       <Muted mt="1">Shows as the session title in the Claude app too. Leave blank and the Claude session names itself.</Muted>
-      <Lbl>First prompt (optional)</Lbl>
-      <TextArea id="ns-prompt" rows={4} name="session-first-prompt" autoComplete="off" autoCapitalize="sentences" spellCheck placeholder="Typed into the session as its first message once Claude is up — leave blank to start it yourself from the app." value={prompt} onChange={(e) => setPrompt(e.target.value)} />
+      <Lbl>{oneShot ? "Prompt" : "First prompt (optional)"}</Lbl>
+      <TextArea id="ns-prompt" rows={4} name="session-first-prompt" autoComplete="off" autoCapitalize="sentences" spellCheck placeholder={oneShot ? "The one job for this session. Claude runs it, then the session is archived and destroyed." : "Typed into the session as its first message once Claude is up — leave blank to start it yourself from the app."} value={prompt} onChange={(e) => setPrompt(e.target.value)} />
+      {oneShot && <Muted mt="1">Needs a prompt. If Claude asks you something, the session waits (“needs you”) until you answer from the app, then finishes.</Muted>}
     </Sheet>
   );
 }

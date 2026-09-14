@@ -11,6 +11,7 @@ function SessionPill({ m }: { m: Session }) {
   if (m.state === "created" || m.state === "starting") return <Pill kind="wait"><Spinner size="1" />creating…</Pill>;
   if (m.state === "stopped" || m.state === "suspended") return <Pill kind="dim">paused</Pill>;
   if (m.state === "started") {
+    if (m.oneShotDone) return <Pill kind="wait"><Spinner size="1" />done · archiving…</Pill>;
     if (!m.status) return <Pill kind="wait"><Spinner size="1" />booting…</Pill>;
     if (m.status === "busy") return <Pill kind="wait">working</Pill>;
     if (m.status === "waiting") return <Pill kind="bad">needs you</Pill>;
@@ -111,12 +112,13 @@ export function Sessions({ onTerminal }: { onTerminal: (id: string, title: strin
         const paused = isPaused(m);
         // auto-pause status line: off / counting down / generic; paused sessions explain Start
         const apInfo = paused ? "Paused — Start resumes the same conversation."
+          : m.oneShot ? (m.state === "started" ? "One-shot — archived and destroyed automatically once its prompt is done." : "")
           : m.state === "started" ? (m.autoPause === "off" ? "Auto-pause off — stays running while idle."
             : (m.pauseInMs != null ? `Pauses in ~${Math.max(1, Math.round(m.pauseInMs / 60000))} min if still idle.` : "Auto-pauses after ~1h idle.")) : "";
         return (
           <Card size="2" mb="3" className="scard" key={m.id} style={{ opacity: busy ? .75 : 1 }}>
             <Flex justify="between" align="start" gap="2" mb="1"><Heading size="3" style={{ wordBreak: "break-word" }}>{title}</Heading><SessionPill m={m} /></Flex>
-            <Muted>{m.environment ? "env: " + m.environment : ""}{repos ? " · " + repos : ""}{m.permissionMode === "bypass" ? <> · <Pill kind="bad">skip perms</Pill></> : (m.permissionMode ? " · auto" : "")}</Muted>
+            <Muted>{m.environment ? "env: " + m.environment : ""}{repos ? " · " + repos : ""}{m.permissionMode === "bypass" ? <> · <Pill kind="bad">skip perms</Pill></> : (m.permissionMode ? " · auto" : "")}{m.oneShot && <> · <Pill kind="dim">one-shot</Pill></>}</Muted>
             <Muted>{REGION[m.region] || m.region || ""}{m.guest ? " · " + m.guest : ""}{modelName ? " · " + modelName : ""}{m.created ? " · created " + ago(m.created) : ""}</Muted>
             {apInfo && <Muted mt="1">{apInfo}</Muted>}
             <Flex gap="2" mt="3" className="actions">
@@ -138,7 +140,7 @@ function menuItems(m: any) {
   const items = [] as { label: string; sub?: string; danger?: boolean; onClick: () => void }[];
   if (m.state === "started") {
     items.push({ label: "Refresh login", sub: "Write fresh Claude credentials into the session and send “continue”", onClick: () => reloginSession(m.id) });
-    items.push(m.autoPause === "off"
+    if (!m.oneShot) items.push(m.autoPause === "off"
       ? { label: "Turn auto-pause on", sub: "Pause automatically after ~1h idle", onClick: () => toggleAutoPause(m.id, true) }
       : { label: "Turn auto-pause off", sub: "Keep the machine running while idle", onClick: () => toggleAutoPause(m.id, false) });
     items.push({ label: "Pause", sub: "Stop the machine now; the conversation and files are kept", onClick: () => pauseSession(m.id) });
