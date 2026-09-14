@@ -39,10 +39,10 @@ export function toggleAutoPause(id: string, enabled: boolean) {
 // in progress; confirm first. Stays pending until Fly reports the new mode and the session is up.
 export async function switchPermissionMode(id: string, mode: "auto" | "bypass") {
   const toBypass = mode === "bypass";
-  const msg = toBypass
-    ? "Switch this session to Bypass Permissions mode?\n\nThe machine RESTARTS (the conversation and files are snapshotted and resumed — nothing is lost). Claude then runs every tool WITHOUT asking — no permission prompts, no classifier. Any work in progress is interrupted by the restart."
-    : "Switch this session back to approval mode?\n\nThe machine RESTARTS (conversation and files are resumed). Claude runs under the permission classifier again.";
-  if (!confirm(msg)) return;
+  const ok = await ask(toBypass
+    ? { title: "Switch to Bypass Permissions mode?", detail: "The machine RESTARTS (the conversation and files are snapshotted and resumed — nothing is lost). Claude then runs every tool WITHOUT asking — no permission prompts, no classifier. Work in progress is interrupted by the restart.", action: "Switch to skip-permissions", danger: true }
+    : { title: "Switch back to approval mode?", detail: "The machine RESTARTS (conversation and files are resumed). Claude runs under the permission classifier again.", action: "Switch to approval mode" });
+  if (!ok) return;
   return pendUntil("s:" + id, toBypass ? "Switching to skip-perms…" : "Switching to approval…",
     () => api("POST", "api/sessions/" + id + "/permission-mode", { mode }),
     (s) => { const m: any = find(s, id); return !!m && m.permissionMode === mode && m.state === "started"; }, 120000)
