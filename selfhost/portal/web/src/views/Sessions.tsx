@@ -74,8 +74,11 @@ export async function destroySession(id: string) {
     } else msg += "⚠️ Could not check for unsaved changes (" + (c.reason || "unknown") + ").\n";
   } catch { msg += "⚠️ Could not check for unsaved changes.\n"; }
   msg += "\nTranscripts and ~/artifacts are archived to the Storage Box first; then the container is deleted. Your repos on GitHub are not affected.";
+  // Keep the "Checking…" spinner up until the confirm sheet is fully presented and answered:
+  // clearing it before ask() leaves a gap while the sheet slides in, which reads as broken.
+  const ok = await ask({ title: "Destroy this session?", detail: msg, action: "Destroy session", danger: true });
   pend("s:" + id, null);
-  if (!(await ask({ title: "Destroy this session?", detail: msg, action: "Destroy session", danger: true }))) return;
+  if (!ok) return;
   pend("s:" + id, "Archiving…");
   try {
     let r;
