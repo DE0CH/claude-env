@@ -162,21 +162,25 @@ Destroy: `selfhost/cluster/destroy.sh` (Fly sessions are separate — destroy th
   in-memory "idle since" map, so a rollout just resets the idle clocks (a session runs a little
   longer, nothing lost); during the brief two-pod overlap the fresh pod's empty map means it
   won't pause anything, so there's no double-stop.
-- **Pause / Start** each session, and **auto-pause** idle ones (default on, per-session toggle):
-  the portal pauses a machine after ~1h idle (claude status idle + no background jobs) to cut
-  compute. Pause = **`fly machine suspend`, not stop** (`pauseMachine` in `server.js`): suspend
-  freezes the whole microVM — the running claude process, its memory, AND the rootfs — so **Start
-  wakes the SAME running session**: same conversation, same Remote Control bridge (same entry in
-  the Claude app), instantly, with no re-launch. This is deliberate: Fly **stop** resets the
-  machine's ephemeral rootfs on the next Start, which wipes ~/workspace (incl. uncommitted work)
-  and the transcript and forces claude to start a brand-new session — so pausing must suspend.
-  (The portal falls back to stop only if suspend is unavailable, e.g. a machine too large to
-  snapshot; that session then can't truly resume.) A suspended machine has Fly state
-  `suspended` (the dashboard shows it as *paused*, same as `stopped`). Pausing is NOT destroying;
-  unsaved work is safe across a pause. NOTE: the session image's `session-supervisor.sh` still
-  has `--resume` logic (used only when the rootfs is fresh yet a transcript is present — a
-  cross-machine move via `SESSION_RESUME_ID`, or a stop-fallback); on a normal suspend/wake the
-  process is never re-launched, so that path is not exercised. **Only Destroy** (not pause) runs the pre-destroy uncommitted/unpushed check. **Destroy archives
+- **Pause / Start** each session (Fly stop/start), and **auto-pause** idle ones (default on,
+  per-session toggle): the portal pauses a machine after ~1h idle (claude status idle + no
+  background jobs) to cut compute. **Fly stop resets the machine's ephemeral rootfs on the next
+  Start** (verified — after a stop/start every transcript was gone), so Pause = snapshot, then
+  stop (`pauseMachine` in `server.js`): the in-machine uploader (`lib/archive.js`, `snapshot`)
+  puts every transcript + `~/.claude.json` + a manifest into
+  `claude-records/.paused/<machine-id>/` on the Storage Box; if that upload fails the machine is
+  left running (a 500 from `/stop`; auto-pause retries next tick). On Start, `entrypoint.sh`
+  finds the snapshot by `FLY_MACHINE_ID`, restores `~/.claude.json` (same machineID → same
+  Remote Control target) and drops the transcripts under the project slug, sets the
+  first-prompt marker (so the first prompt isn't pasted again), and `session-supervisor.sh`
+  launches `claude --resume <newest id>` **without `--remote-control`** — re-passing that flag
+  would start a NEW bridge session (new app entry); plain `--resume` reattaches to the
+  conversation's existing bridge via its reconnection record while the server still holds it,
+  otherwise Claude opens a replacement bridge session with the conversation intact. Only the
+  conversation survives a pause: **`~/workspace` is wiped — commit/push before pausing** (only
+  Destroy runs the uncommitted/unpushed check). Destroying a *paused* session moves its snapshot
+  into the normal `claude-records/<date> <title>/` archive (`finalizePaused`); destroying a
+  running one archives from disk and drops the stale snapshot. **Only Destroy** (not pause) runs the pre-destroy uncommitted/unpushed check. **Destroy archives
   first, with no AI involved**: the portal runs an uploader inside the machine that puts every
   transcript (`~/.claude/projects/**/*.jsonl`), everything under `~/artifacts/` (the mark — files or
   symlinks, subfolders kept) and a `session.json` on the Hetzner Storage Box at
@@ -199,7 +203,7 @@ Destroy: `selfhost/cluster/destroy.sh` (Fly sessions are separate — destroy th
   the pair the machine was CREATED with (from its env), so press Refresh login after a restart too.
   This applies to **auto-pause wakes too**: a session woken after a long pause may show "Login
   expired" if the shared refresh token rotated meanwhile — press Refresh login on the card.
-- Sessions **auto-pause** (Fly suspend) on idle to cut compute, but don't auto-destroy (~1–2¢/hour
-  while running; while suspended you pay only for stored rootfs + memory snapshot, no CPU/RAM
-  runtime). Destroy when done.
+- Sessions **auto-pause** (snapshot + Fly stop) on idle to cut compute, but don't auto-destroy
+  (~1–2¢/hour while running; ~free while paused apart from a small rootfs-storage cost). Destroy
+  when done.
 - The terminal mirror has ~1 s latency and no mouse/scrollback; it's for watching and nudging.

@@ -594,15 +594,13 @@ up in the Claude phone app. Isolated microVM per session (install tools freely).
   `K8S_ADMIN_TOKEN_FILE`, `HETZNER_API`, `HETZNER_S3_*`) / `destroy.sh`. Rebuild = destroy +
   create; everything returns from git. First time only: make the GHCR package public (no API).
 - Cost: box ~€6.59/mo fixed; Fly sessions ~1–2¢/session-hour. Idle sessions **auto-pause**
-  (after ~1h idle — claude status idle + no background jobs) to cut compute; a paused machine
-  is **suspended** (`fly machine suspend`, NOT stop), which freezes the whole microVM — the
-  running claude process, its memory, and the rootfs — so Start wakes the SAME running session,
-  same conversation, same Remote Control bridge (same entry in the Claude app), instantly. (Fly
-  **stop** resets the ephemeral rootfs on the next Start — wiping the transcript and any
-  uncommitted ~/workspace changes and forcing a brand-new session — so pausing must suspend, not
-  stop; suspend was verified to preserve disk + process across a pause/wake. The portal falls
-  back to stop only if suspend is unavailable, e.g. a machine too large to snapshot.)
-  Auto-pause is per-session (default on,
+  (Fly stop after ~1h idle — claude status idle + no background jobs) to cut compute. **A Fly
+  stop resets the machine's ephemeral rootfs on the next Start** (verified: every transcript
+  gone), so Pause first snapshots the transcript(s) + `~/.claude.json` to the Storage Box
+  (`claude-records/.paused/<machine-id>/`, done by the portal inside the machine) and Start
+  restores them (entrypoint) so the session image `--resume`s the SAME conversation. Only the
+  conversation survives a pause — **`~/workspace` is wiped: commit/push before pausing** (the
+  pre-destroy uncommitted check runs only on Destroy). Auto-pause is per-session (default on,
   toggle on the card; checkbox in New session); the portal runs the pause loop, so it works
   whether or not the dashboard is open. Pausing is NOT destroying — still Destroy sessions from
   the dashboard when done (no idle auto-destroy). Dashboard rules Deyao set: name optional

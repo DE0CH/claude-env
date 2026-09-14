@@ -9,27 +9,66 @@
 #   SESSION_PERMISSION_MODE auto | bypass
 #   SESSION_PROMPT          [optional] first prompt, pasted into the host once it is up (supervisor)
 #   SESSION_MODEL           model id (default claude-opus-4-8, see session-supervisor.sh)
-#   SESSION_RESUME_ID       [optional] resume this Claude session id instead of starting fresh;
-#   SESSION_RESUME_PATH     its transcript .jsonl, as a WebDAV path on the Storage Box
-#                           (fetched with STORAGEBOX_* from the environment; see below)
-# If the environment carries KUBE_SERVER + KUBE_TOKEN (+ KUBE_CA), a kubeconfig is written so
-# the session can drive the controller cluster with kubectl.
+# Fly itself sets FLY_MACHINE_ID. If the environment carries KUBE_SERVER + KUBE_TOKEN (+ KUBE_CA),
+# a kubeconfig is written so the session can drive the controller cluster with kubectl.
+#
+# Boots are NOT all fresh: a paused session is a Fly-stopped machine, and Fly resets the ephemeral
+# rootfs on the next start. Before stopping, the portal snapshots the transcript(s) + ~/.claude.json
+# to claude-records/.paused/<FLY_MACHINE_ID>/ on the Storage Box (portal/lib/archive.js); this
+# script restores that snapshot so session-supervisor.sh can `claude --resume` the same
+# conversation. ~/workspace is NOT snapshotted — commit/push before pausing.
 set -uo pipefail
 HOME=/home/claude; cd "$HOME"
 # ~/artifacts: anything the session puts (or symlinks) here is archived to the Storage Box by
 # the portal when the session is destroyed (alongside the transcripts) — see CLAUDE.md.
 mkdir -p "$HOME/.claude" "$HOME/workspace" "$HOME/artifacts"
 
+# --- environment secrets ---------------------------------------------------
+# Written shell-quoted so values with spaces/quotes/newlines (Fly tokens, PEM certs) survive
+# `. ~/.secrets`. The old KEY=VALUE format silently dropped any value containing a space.
+# First, because the pause-snapshot restore below needs the STORAGEBOX_* creds.
+if [ -n "${SESSION_SECRETS_JSON:-}" ]; then
+  python3 - <<'PY'
+import json,os,shlex
+d=json.loads(os.environ["SESSION_SECRETS_JSON"])
+p=os.path.expanduser("~/.secrets")
+with open(p,"w") as f:
+    for k,v in d.items():
+        if k.replace("_","").isalnum(): f.write(f"{k}={shlex.quote(str(v))}\n")
+os.chmod(p,0o600)
+PY
+  set -a; . "$HOME/.secrets"; set +a
+fi
+
+# --- restore the pause snapshot (if this machine was paused) -----------------
+# Fetches manifest.txt from claude-records/.paused/<FLY_MACHINE_ID>/; if it exists, downloads
+# ~/.claude.json (before the machineID merge below, so the same Remote Control target identity
+# is kept) and every listed transcript into a staging dir — they are placed under the project
+# slug once the working dir is known (further down). Any failure => fresh session.
+RESTORE_DIR="$HOME/.paused-restore"; rm -rf "$RESTORE_DIR"
+if [ -n "${FLY_MACHINE_ID:-}" ] && [ -n "${STORAGEBOX_HOST:-}" ] && [ -n "${STORAGEBOX_USER:-}" ] && [ -n "${STORAGEBOX_PASSWORD:-}" ]; then
+  SNAP="https://${STORAGEBOX_HOST}/claude-records/.paused/${FLY_MACHINE_ID}"
+  sbget() { curl -fsS -m 300 -u "${STORAGEBOX_USER}:${STORAGEBOX_PASSWORD}" "$SNAP/$1" -o "$2"; }
+  mkdir -p "$RESTORE_DIR"
+  if sbget manifest.txt "$RESTORE_DIR/manifest.txt" 2>/dev/null; then
+    sbget claude.json "$HOME/.claude.json" 2>/dev/null || true
+    while IFS= read -r name; do
+      case "$name" in *.jsonl) sbget "$name" "$RESTORE_DIR/$name" && echo "[entrypoint] restored transcript $name ($(wc -c < "$RESTORE_DIR/$name") bytes)" || echo "[entrypoint] WARN restore of $name failed";; esac
+    done < "$RESTORE_DIR/manifest.txt"
+  else
+    echo "[entrypoint] no pause snapshot for $FLY_MACHINE_ID; fresh session"
+  fi
+fi
+
 # --- Claude auth -----------------------------------------------------------
 if [ -n "${CLAUDE_CREDENTIALS:-}" ]; then
   printf '%s' "$CLAUDE_CREDENTIALS" > "$HOME/.claude/.credentials.json"
   chmod 600 "$HOME/.claude/.credentials.json"
 fi
-# machineID: reuse the one already on disk (the rootfs persists across a stop/start, so a
-# paused-then-woken machine keeps the SAME Remote Control identity in the Claude app instead
-# of showing up as a new target); only mint a fresh one on a brand-new machine. Existing
-# ~/.claude.json fields (projects trust, etc.) are preserved, then the account + fixed flags
-# are merged on top.
+# machineID: reuse the one in ~/.claude.json when it was restored from a pause snapshot (same
+# Remote Control identity in the Claude app instead of a new target); mint a fresh one on a
+# brand-new machine. Existing ~/.claude.json fields (projects trust, etc.) are preserved, then
+# the account + fixed flags are merged on top.
 MID="$(tr -d - < /proc/sys/kernel/random/uuid)"
 python3 - "$MID" <<'PY'
 import json,os,sys
@@ -44,22 +83,6 @@ existing.update({"machineID":mid,"hasCompletedOnboarding":True,"hasUsedRemoteCon
           "bypassPermissionsModeAccepted":True,"autoUpdates":False})
 json.dump(existing,open(p,"w"))
 PY
-
-# --- environment secrets ---------------------------------------------------
-# Written shell-quoted so values with spaces/quotes/newlines (Fly tokens, PEM certs) survive
-# `. ~/.secrets`. The old KEY=VALUE format silently dropped any value containing a space.
-if [ -n "${SESSION_SECRETS_JSON:-}" ]; then
-  python3 - <<'PY'
-import json,os,shlex
-d=json.loads(os.environ["SESSION_SECRETS_JSON"])
-p=os.path.expanduser("~/.secrets")
-with open(p,"w") as f:
-    for k,v in d.items():
-        if k.replace("_","").isalnum(): f.write(f"{k}={shlex.quote(str(v))}\n")
-os.chmod(p,0o600)
-PY
-  set -a; . "$HOME/.secrets"; set +a
-fi
 
 # --- kubeconfig for the controller cluster ----------------------------------
 if [ -n "${KUBE_SERVER:-}" ] && [ -n "${KUBE_TOKEN:-}" ]; then
@@ -110,20 +133,17 @@ WD="$HOME/workspace"
 mapfile -t DIRS < <(find "$HOME/workspace" -mindepth 1 -maxdepth 1 -type d 2>/dev/null)
 [ "${#DIRS[@]}" = "1" ] && WD="${DIRS[0]}"
 
-# --- resume a previous session (move a session to a new machine) -------------
-# Drops the transcript where claude looks for it (~/.claude/projects/<cwd slug>/<id>.jsonl)
-# so session-supervisor.sh can start `claude --resume $SESSION_RESUME_ID`. On any failure
-# the id is unset and the machine starts a fresh session instead.
-if [ -n "${SESSION_RESUME_ID:-}" ] && [ -n "${SESSION_RESUME_PATH:-}" ]; then
+# --- place restored transcripts where claude looks for them ------------------
+# ~/.claude/projects/<cwd slug>/<id>.jsonl — session-supervisor.sh then starts
+# `claude --resume <newest id>`. The first-prompt marker is set so the supervisor does not paste
+# SESSION_PROMPT into the resumed conversation again.
+if compgen -G "$RESTORE_DIR/*.jsonl" >/dev/null 2>&1; then
   PDIR="$HOME/.claude/projects/$(printf '%s' "$WD" | sed 's#[^A-Za-z0-9]#-#g')"
   mkdir -p "$PDIR"
-  if curl -fsSL -u "${STORAGEBOX_USER:-}:${STORAGEBOX_PASSWORD:-}" \
-       "https://${STORAGEBOX_HOST:-}/${SESSION_RESUME_PATH#/}" -o "$PDIR/$SESSION_RESUME_ID.jsonl"; then
-    echo "[entrypoint] resume transcript for $SESSION_RESUME_ID: $(wc -c < "$PDIR/$SESSION_RESUME_ID.jsonl") bytes"
-  else
-    echo "[entrypoint] WARN resume transcript download failed; starting fresh"
-    unset SESSION_RESUME_ID
-  fi
+  mv "$RESTORE_DIR"/*.jsonl "$PDIR"/
+  touch "$HOME/.claude/.first-prompt-sent"
+  echo "[entrypoint] resume ready: $(ls "$PDIR"/*.jsonl | wc -l) transcript(s) in $PDIR"
 fi
+rm -rf "$RESTORE_DIR"
 
 exec /usr/local/bin/session-supervisor.sh "$WD"

@@ -126,29 +126,26 @@ async function readRegistry(machineId) {
 }
 
 // ---- pausing a session ----------------------------------------------------
-// Pause = SUSPEND the Fly machine, not stop it. Suspend freezes the whole microVM — the running
-// claude process, its memory, AND the rootfs — so Start wakes the SAME conversation and the
-// SAME Remote Control bridge session (same entry in the Claude app), instantly, with no
-// re-launch. Fly STOP resets the machine's ephemeral rootfs on the next Start, which wipes the
-// transcript and any uncommitted ~/workspace changes and forces claude to start a brand-new
-// session (a new app entry, back at the first prompt) — that is exactly the "resume doesn't
-// work" bug. Fall back to stop only if suspend is unavailable (e.g. the machine is too large to
-// snapshot); that session then can't truly resume, but at least the machine is paused.
+// Pause = snapshot, then Fly stop. A stopped machine's ephemeral rootfs is RESET on the next
+// Start (verified: after a stop/start every transcript was gone), so stopping alone would lose
+// the conversation and claude would come up as a brand-new session (a new entry in the Claude
+// app, back at the first prompt). So before stopping, the transcript(s) + ~/.claude.json are
+// uploaded to claude-records/.paused/<machineId>/ on the Storage Box (archive.snapshot, run
+// inside the machine); on Start the session image's entrypoint pulls them back and the
+// supervisor `claude --resume`s the conversation. If the snapshot fails the machine is left
+// running — pausing without it would destroy the session's state.
 async function pauseMachine(id) {
-  try { return await fly.suspendMachine(id); }
-  catch (e) {
-    console.error(`[pause] suspend ${id} failed (${e.message}); falling back to stop (won't resume state)`);
-    return await fly.stopMachine(id);
-  }
+  const snap = await archive.snapshot(id);
+  const r = await fly.stopMachine(id);
+  return { ...r, snapshot: snap };
 }
 
 // ---- auto-pause idle sessions ---------------------------------------------
 // A started session idle for IDLE_PAUSE_MS (claude status exactly "idle", no background jobs)
-// is suspended to save Fly compute; Start wakes the SAME conversation (see pauseMachine).
-// Opt out per session via metadata autoPause=off (dashboard toggle). idleSince tracks when a
-// machine first looked idle; it is reset the moment it is busy/waiting/unreachable, so only a
-// sustained idle actually pauses. A suspended machine has state "suspended" (a stopped one
-// "stopped"); both are != "started" below, so a paused machine is simply skipped.
+// is paused (snapshot + stop, see pauseMachine) to save Fly compute; Start resumes the same
+// conversation. Opt out per session via metadata autoPause=off (dashboard toggle). idleSince
+// tracks when a machine first looked idle; it is reset the moment it is busy/waiting/unreachable,
+// so only a sustained idle actually pauses. A failed snapshot just logs; the next tick retries.
 const IDLE_PAUSE_MS = 60 * 60 * 1000;
 const AUTOPAUSE_TICK_MS = 2 * 60 * 1000;
 const idleSince = new Map(); // machineId -> ms it first looked idle
@@ -478,8 +475,9 @@ app.post("/api/sessions/:id/tty/resize", async (req, res) => {
   catch (e) { res.status(500).json({ error: e.message }); }
 });
 
-// "stop" here means PAUSE the session (the dashboard's Pause button). We suspend rather than
-// stop so Start wakes the same conversation — see pauseMachine.
+// "stop" here means PAUSE the session (the dashboard's Pause button): snapshot the transcript,
+// then stop — see pauseMachine. A 500 here means the snapshot failed and the machine is still
+// running (nothing was lost).
 app.post("/api/sessions/:id/stop", async (req, res) => {
   try { res.json(await pauseMachine(req.params.id)); } catch (e) { res.status(500).json({ error: e.message }); }
 });
@@ -498,18 +496,31 @@ app.post("/api/sessions/:id/autopause", async (req, res) => {
 });
 // Destroy = archive first (transcripts + ~/artifacts -> Storage Box, done by the portal, no AI),
 // then delete the machine. If archiving fails the machine is kept unless ?force=1.
+// A running machine archives from its disk (and its stale pause snapshot, if any, is dropped);
+// a PAUSED machine can't be exec'd and its rootfs is gone anyway, so its pause snapshot
+// (claude-records/.paused/<id>/) IS the record and is moved into the normal archive dir.
 app.delete("/api/sessions/:id", async (req, res) => {
   const id = req.params.id, force = req.query.force === "1";
   let archived = null;
   try {
     const m = await fly.getMachine(id);
+    const md = m.config?.metadata || {};
+    const envSecrets = ((await store.get()).environments[md.environment] || {}).secrets || {};
     if (m.state === "started") {
       const reg = await readRegistry(id);
-      const md = m.config?.metadata || {};
       const title = (reg && reg.nameSource && reg.nameSource !== "derived" && reg.liveName) || (reg && reg.aiTitle) || md.label || (reg && reg.liveName) || m.name;
       try {
         archived = await archive.run(id, { id, machineName: m.name, title, environment: md.environment || "", repos: md.repos || "",
           permissionMode: md.permissionMode || "", created: m.created_at, bridgeSessionId: (reg && reg.bridgeSessionId) || "" });
+        await archive.clearPaused(envSecrets, id);
+      } catch (e) {
+        if (!force) return res.status(409).json({ error: e.message, archiveFailed: true });
+        archived = { error: e.message };
+      }
+    } else {
+      try {
+        archived = await archive.finalizePaused(envSecrets, { id, machineName: m.name, title: md.label || m.name, environment: md.environment || "",
+          repos: md.repos || "", permissionMode: md.permissionMode || "", created: m.created_at });
       } catch (e) {
         if (!force) return res.status(409).json({ error: e.message, archiveFailed: true });
         archived = { error: e.message };

@@ -44,18 +44,15 @@ start() {
     bypass) export SESSION_PERM_FLAG="--dangerously-skip-permissions" ;;
     *)      export SESSION_PERM_FLAG="" ;;
   esac
-  # Resume the conversation. Priority: (1) a cross-machine move — entrypoint.sh placed the
-  # transcript and set SESSION_RESUME_ID (unset if that failed). (2) Otherwise the newest
-  # transcript already on this machine's rootfs: set on a stop/start WAKE (rootfs persists
-  # while paused) or a host crash, so the same conversation continues instead of starting
-  # blank. (3) Nothing on a brand-new machine -> a fresh session. All ids are uuids, so the
-  # unquoted expansion below is safe.
+  # Resume the conversation if there is a transcript on disk: on a pause/Start wake the
+  # entrypoint restored the pause snapshot into ~/.claude/projects/ (a Fly stop wipes the rootfs,
+  # so that is the only way one gets here), and on a host-crash restart of the claude process the
+  # transcript is simply still there. Newest transcript wins. Nothing on disk -> fresh session.
+  # All ids are uuids, so the unquoted expansion below is safe.
   export SESSION_RESUME_FLAG=""
-  local rid="${SESSION_RESUME_ID:-}"
-  if [ -z "$rid" ]; then
-    local latest; latest="$(ls -t "$HOME"/.claude/projects/*/*.jsonl 2>/dev/null | head -1)"
-    [ -n "$latest" ] && rid="$(basename "$latest" .jsonl)"
-  fi
+  local rid="" latest
+  latest="$(ls -t "$HOME"/.claude/projects/*/*.jsonl 2>/dev/null | head -1)"
+  [ -n "$latest" ] && rid="$(basename "$latest" .jsonl)"
   [ -n "$rid" ] && export SESSION_RESUME_FLAG="--resume $rid"
   # Remote Control flag placement is the crux of resume:
   #   * FRESH start (no conversation to resume) -> pass --remote-control to ENABLE Remote
