@@ -3,10 +3,11 @@ import { App } from "./App";
 import "@radix-ui/themes/styles.css";
 import "./styles.css";
 import "./store";
+import { syncStatusBar } from "./statusBar";
 
 // Radix Themes reads a `light`/`dark` class from an ancestor when appearance="inherit" — follow the OS
 const mq = matchMedia("(prefers-color-scheme: dark)");
-const theme = () => { document.documentElement.classList.toggle("dark", mq.matches); document.documentElement.classList.toggle("light", !mq.matches); };
+const theme = () => { document.documentElement.classList.toggle("dark", mq.matches); document.documentElement.classList.toggle("light", !mq.matches); syncStatusBar(); };
 theme(); mq.addEventListener("change", theme);
 
 // iOS Safari ignores user-scalable=no in a normal tab (honoured only when added to the Home

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button, Callout, Flex, Heading, IconButton, Tabs } from "@radix-ui/themes";
 import { api } from "./api";
 import { useStore, setTab, refresh, pend, type Tab } from "./store";
@@ -12,6 +12,7 @@ import { NewSession } from "./sheets/NewSession";
 import { EnvEditor } from "./sheets/EnvEditor";
 import { Relogin } from "./sheets/Relogin";
 import { TerminalPage } from "./Terminal";
+import { syncStatusBar } from "./statusBar";
 
 type SheetSpec = { kind: "new" } | { kind: "env"; name: string } | { kind: "relogin"; url: string } | { kind: "term"; id: string; title: string };
 const TABS: [Tab, string][] = [["sessions", "Sessions"], ["android", "Android"], ["envs", "Envs"], ["repos", "Repos"], ["settings", "Settings"]];
@@ -33,6 +34,7 @@ export function App() {
   const tab = useStore((s) => s.tab);
   const refreshing = useStore((s) => s.refreshing);
   const [root, setRoot] = useState<HTMLElement | null>(null);
+  useEffect(() => { if (root) syncStatusBar(); }, [root]);
   // one sheet at a time; `open` flips false first so vaul can play its exit animation, then
   // onClosed unmounts it
   const [sheet, setSheet] = useState<SheetSpec | null>(null);

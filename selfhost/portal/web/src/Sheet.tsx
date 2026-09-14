@@ -10,6 +10,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Button, Heading, Text, Flex, Box, Separator } from "@radix-ui/themes";
 import { useSheet } from "./sheet/useSheet";
+import { syncStatusBar } from "./statusBar";
 
 const SNAP = [0.62, 1], CONTENT = [1];
 
@@ -40,12 +41,14 @@ function SheetPanel({ open, onClose, title, left, right, snap, children, onClose
   const panel = useRef<HTMLDivElement>(null), backdrop = useRef<HTMLDivElement>(null), scroller = useRef<HTMLDivElement>(null);
   const vv = useVisualViewport();
   const s = useSheet({ open, onClose, onClosed, detents: snap ? SNAP : CONTENT, initial: 0, panel, backdrop, scroller });
-  // nothing behind the sheet scrolls; Escape closes
+  // nothing behind the sheet scrolls; Escape closes; the browser's status-bar strip dims with the
+  // overlay (and lightens again once the panel is gone from the DOM)
   useEffect(() => {
     const prev = document.documentElement.style.overflow; document.documentElement.style.overflow = "hidden";
     const key = (e: KeyboardEvent) => { if (e.key === "Escape") s.close(); };
     window.addEventListener("keydown", key);
-    return () => { document.documentElement.style.overflow = prev; window.removeEventListener("keydown", key); };
+    syncStatusBar();
+    return () => { document.documentElement.style.overflow = prev; window.removeEventListener("keydown", key); requestAnimationFrame(syncStatusBar); };
   }, []);
   const scrollable = s.isFull && s.atRest;
   return (

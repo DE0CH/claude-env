@@ -8,7 +8,9 @@ body{margin:0}
 /* post-layout-shift cooldown: destructive buttons are inert + faded for 250ms */
 .cool{opacity:.3 !important;pointer-events:none;transition:opacity .15s}
 .visually-hidden{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
-.wrap{max-width:820px;margin:0 auto;padding:0 16px}
+/* sides only: a `padding` shorthand here would beat Radix's `py` utility classes (same specificity,
+   this sheet loads later) and zero the top bar's vertical padding */
+.wrap{max-width:820px;margin:0 auto;padding-left:16px;padding-right:16px}
 .tablist{overflow-x:auto;scrollbar-width:none;margin-left:-16px;margin-right:-16px;padding:0 16px}
 .tablist::-webkit-scrollbar{display:none}
 .topbar{position:sticky;top:0;z-index:5;background:var(--color-background);border-bottom:1px solid var(--gray-a5);padding-top:env(safe-area-inset-top)}
