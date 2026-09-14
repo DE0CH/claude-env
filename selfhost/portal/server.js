@@ -129,11 +129,12 @@ async function readRegistry(machineId) {
 // Pause = snapshot, then Fly stop. A stopped machine's ephemeral rootfs is RESET on the next
 // Start (verified: after a stop/start every transcript was gone), so stopping alone would lose
 // the conversation and claude would come up as a brand-new session (a new entry in the Claude
-// app, back at the first prompt). So before stopping, the transcript(s) + ~/.claude.json are
-// uploaded to claude-records/.paused/<machineId>/ on the Storage Box (archive.snapshot, run
-// inside the machine); on Start the session image's entrypoint pulls them back and the
-// supervisor `claude --resume`s the conversation. If the snapshot fails the machine is left
-// running — pausing without it would destroy the session's state.
+// app, back at the first prompt). So before stopping, the transcript(s) + ~/.claude.json +
+// ~/workspace and ~/artifacts (as tarballs) are uploaded to claude-records/.paused/<machineId>/
+// on the Storage Box (archive.snapshot, run inside the machine); on Start the session image's
+// entrypoint pulls them back and the supervisor `claude --resume`s the conversation with the
+// working tree as it was. If the snapshot fails the machine is left running — pausing without
+// it would destroy the session's state.
 async function pauseMachine(id) {
   const snap = await archive.snapshot(id);
   const r = await fly.stopMachine(id);

@@ -42,7 +42,7 @@ export function NewSession({ open, onClose, onClosed }: { open: boolean; onClose
       <Lbl>Machine size</Lbl>
       <RadioCards.Root id="ns-size" columns="1" gap="2" size="1" value={size} onValueChange={setSize}>{Object.entries(SIZES.sizes || {}).map(([k, v]) => <RadioCards.Item key={k} value={k}><Item t={k[0].toUpperCase() + k.slice(1)} sub={v.label} /></RadioCards.Item>)}</RadioCards.Root>
       <Lbl>Idle</Lbl>
-      <CheckboxCards.Root id="ns-autopause" columns="1" gap="2" size="1" value={autoPause} onValueChange={setAutoPause}><CheckboxCards.Item value="on"><Item t="Auto-pause when idle" sub="Stops the machine after ~1h with nothing running to save compute. Wake it with Start — the conversation is kept (commit your files first; the workspace is not)." /></CheckboxCards.Item></CheckboxCards.Root>
+      <CheckboxCards.Root id="ns-autopause" columns="1" gap="2" size="1" value={autoPause} onValueChange={setAutoPause}><CheckboxCards.Item value="on"><Item t="Auto-pause when idle" sub="Stops the machine after ~1h with nothing running to save compute. Wake it with Start — the conversation and your files are kept." /></CheckboxCards.Item></CheckboxCards.Root>
       <Lbl>Session title (optional)</Lbl>
       <TextField.Root id="ns-title" type="text" name="session-topic" autoComplete="off" autoCorrect="off" autoCapitalize="sentences" spellCheck={false} placeholder="e.g. refactor billing module" value={label} onChange={(e) => setLabel(e.target.value)} />
       <Muted mt="1">Shows as the session title in the Claude app too. Leave blank and the Claude session names itself.</Muted>

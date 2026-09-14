@@ -13,10 +13,10 @@
 # a kubeconfig is written so the session can drive the controller cluster with kubectl.
 #
 # Boots are NOT all fresh: a paused session is a Fly-stopped machine, and Fly resets the ephemeral
-# rootfs on the next start. Before stopping, the portal snapshots the transcript(s) + ~/.claude.json
-# to claude-records/.paused/<FLY_MACHINE_ID>/ on the Storage Box (portal/lib/archive.js); this
-# script restores that snapshot so session-supervisor.sh can `claude --resume` the same
-# conversation. ~/workspace is NOT snapshotted — commit/push before pausing.
+# rootfs on the next start. Before stopping, the portal snapshots the transcript(s), ~/.claude.json,
+# ~/workspace and ~/artifacts to claude-records/.paused/<FLY_MACHINE_ID>/ on the Storage Box
+# (portal/lib/archive.js); this script restores that snapshot so session-supervisor.sh can
+# `claude --resume` the same conversation with the working tree exactly as it was.
 set -uo pipefail
 HOME=/home/claude; cd "$HOME"
 # ~/artifacts: anything the session puts (or symlinks) here is archived to the Storage Box by
@@ -55,6 +55,15 @@ if [ -n "${FLY_MACHINE_ID:-}" ] && [ -n "${STORAGEBOX_HOST:-}" ] && [ -n "${STOR
     while IFS= read -r name; do
       case "$name" in *.jsonl) sbget "$name" "$RESTORE_DIR/$name" && echo "[entrypoint] restored transcript $name ($(wc -c < "$RESTORE_DIR/$name") bytes)" || echo "[entrypoint] WARN restore of $name failed";; esac
     done < "$RESTORE_DIR/manifest.txt"
+    # ~/workspace (repos with uncommitted work, node_modules, …) and ~/artifacts, as tarred at
+    # pause time. Extracted before the repo clone below, which then skips repos already present.
+    for d in workspace artifacts; do
+      if sbget "$d.tar.gz" "$RESTORE_DIR/$d.tar.gz" 2>/dev/null; then
+        if tar -C "$HOME" -xzf "$RESTORE_DIR/$d.tar.gz"; then echo "[entrypoint] restored ~/$d ($(stat -c %s "$RESTORE_DIR/$d.tar.gz") bytes compressed)"
+        else echo "[entrypoint] WARN extracting $d.tar.gz failed"; fi
+        rm -f "$RESTORE_DIR/$d.tar.gz"
+      fi
+    done
   else
     echo "[entrypoint] no pause snapshot for $FLY_MACHINE_ID; fresh session"
   fi
@@ -115,6 +124,7 @@ if [ -n "${SESSION_REPOS:-}" ]; then
   for url in "${REPOS[@]}"; do
     url="$(echo "$url" | xargs)"; [ -z "$url" ] && continue
     name="$(basename "$url" .git)"
+    if [ -d "$HOME/workspace/$name/.git" ]; then echo "[entrypoint] $name restored from the pause snapshot; not cloning"; continue; fi
     clone_url="$url"
     if [ -n "${GITHUB_TOKEN:-}" ] && [[ "$url" == https://github.com/* ]]; then
       clone_url="${url/https:\/\//https://x-access-token:${GITHUB_TOKEN}@}"

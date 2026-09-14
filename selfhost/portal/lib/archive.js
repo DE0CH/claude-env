@@ -9,8 +9,9 @@
 //       session.json                   id, title, environment, repos, created/destroyed timestamps
 //     into  claude-records/<yyyy-mm-dd> <title>/  (the naming convention from CLAUDE.md).
 //  2. snapshot(): the PAUSE snapshot. Fly `stop` resets a machine's ephemeral rootfs on the next
-//     start, so pausing would lose the conversation. Before stopping, the same in-machine
-//     uploader puts the transcript(s) + ~/.claude.json into  claude-records/.paused/<machineId>/
+//     start, so pausing would lose everything. Before stopping, the same in-machine uploader
+//     puts the transcript(s) + ~/.claude.json + workspace.tar.gz (~/workspace, uncommitted work
+//     included) + artifacts.tar.gz (~/artifacts) into  claude-records/.paused/<machineId>/
 //     (plus manifest.txt listing the transcripts); on Start the session image's entrypoint pulls
 //     them back (it knows FLY_MACHINE_ID and has the Storage Box creds) and `--resume`s.
 //     finalizePaused()/clearPaused() tidy that folder up when the session is destroyed: a
@@ -57,6 +58,15 @@ if [ "$MODE" = snapshot ]; then
   : > /tmp/manifest.txt
   for f in "$HOME"/.claude/projects/*/*.jsonl; do [ -f "$f" ] || continue; n=$((n+1)); put "$f" "$(basename "$f")" || bad=$((bad+1)); basename "$f" >> /tmp/manifest.txt; done
   [ -f "$HOME/.claude.json" ] && { n=$((n+1)); put "$HOME/.claude.json" claude.json || bad=$((bad+1)); }
+  # ~/workspace (repos incl. uncommitted work, node_modules, everything) and ~/artifacts as
+  # gzip tarballs (gzip: present in every image a session may be running). Symlinks kept as-is.
+  for d in workspace artifacts; do
+    [ -d "$HOME/$d" ] || continue
+    rm -f "/tmp/$d.tar.gz"
+    if tar -C "$HOME" -czf "/tmp/$d.tar.gz" "$d" 2>/tmp/tar.err; then n=$((n+1)); put "/tmp/$d.tar.gz" "$d.tar.gz" || bad=$((bad+1)); echo "size $d.tar.gz $(stat -c %s "/tmp/$d.tar.gz")"
+    else echo "FAIL $d.tar.gz tar: $(head -c 200 /tmp/tar.err)"; bad=$((bad+1)); fi
+    rm -f "/tmp/$d.tar.gz"
+  done
   n=$((n+1)); put /tmp/manifest.txt manifest.txt || bad=$((bad+1))
 else
   for f in "$HOME"/.claude/projects/*/*.jsonl; do [ -f "$f" ] || continue; n=$((n+1)); put "$f" "transcript-$(basename "$f")" || bad=$((bad+1)); done
@@ -124,6 +134,9 @@ async function finalizePaused(secrets, meta) {
   await d.mkcols(dir);
   const uploaded = [];
   for (const n of names) if (await d.move(`${src}/${n}`, `${dir}/transcript-${n}`)) uploaded.push(`transcript-${n}`);
+  // ~/artifacts is part of the archive convention; a running destroy uploads it as files, a
+  // paused one can only hand over the pause tarball (extract it to browse).
+  if (await d.move(`${src}/artifacts.tar.gz`, `${dir}/artifacts.tar.gz`)) uploaded.push("artifacts.tar.gz");
   const metaJson = JSON.stringify({ ...meta, archiveDir: dir, destroyedAt: new Date().toISOString(), fromPauseSnapshot: true });
   await d.put(`${dir}/session.json`, metaJson); uploaded.push("session.json");
   await d.del(src);

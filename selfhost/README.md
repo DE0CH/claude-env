@@ -167,20 +167,21 @@ Destroy: `selfhost/cluster/destroy.sh` (Fly sessions are separate — destroy th
   background jobs) to cut compute. **Fly stop resets the machine's ephemeral rootfs on the next
   Start** (verified — after a stop/start every transcript was gone), so Pause = snapshot, then
   stop (`pauseMachine` in `server.js`): the in-machine uploader (`lib/archive.js`, `snapshot`)
-  puts every transcript + `~/.claude.json` + a manifest into
+  puts every transcript + `~/.claude.json` + `workspace.tar.gz` (all of `~/workspace`,
+  uncommitted work and node_modules included) + `artifacts.tar.gz` + a manifest into
   `claude-records/.paused/<machine-id>/` on the Storage Box; if that upload fails the machine is
   left running (a 500 from `/stop`; auto-pause retries next tick). On Start, `entrypoint.sh`
   finds the snapshot by `FLY_MACHINE_ID`, restores `~/.claude.json` (same machineID → same
-  Remote Control target) and drops the transcripts under the project slug, sets the
+  Remote Control target), extracts the two tarballs (the repo clone step then skips repos that
+  are already there) and drops the transcripts under the project slug, sets the
   first-prompt marker (so the first prompt isn't pasted again), and `session-supervisor.sh`
   launches `claude --resume <newest id>` **without `--remote-control`** — re-passing that flag
   would start a NEW bridge session (new app entry); plain `--resume` reattaches to the
   conversation's existing bridge via its reconnection record while the server still holds it,
-  otherwise Claude opens a replacement bridge session with the conversation intact. Only the
-  conversation survives a pause: **`~/workspace` is wiped — commit/push before pausing** (only
-  Destroy runs the uncommitted/unpushed check). Destroying a *paused* session moves its snapshot
-  into the normal `claude-records/<date> <title>/` archive (`finalizePaused`); destroying a
-  running one archives from disk and drops the stale snapshot. **Only Destroy** (not pause) runs the pre-destroy uncommitted/unpushed check. **Destroy archives
+  otherwise Claude opens a replacement bridge session with the conversation intact. Destroying
+  a *paused* session moves its snapshot into the normal `claude-records/<date> <title>/`
+  archive (`finalizePaused`: transcripts as `transcript-<id>.jsonl`, the artefacts as
+  `artifacts.tar.gz`); destroying a running one archives from disk and drops the stale snapshot. **Only Destroy** (not pause) runs the pre-destroy uncommitted/unpushed check. **Destroy archives
   first, with no AI involved**: the portal runs an uploader inside the machine that puts every
   transcript (`~/.claude/projects/**/*.jsonl`), everything under `~/artifacts/` (the mark — files or
   symlinks, subfolders kept) and a `session.json` on the Hetzner Storage Box at

@@ -127,7 +127,7 @@ function menuItems(m: any) {
     items.push(m.autoPause === "off"
       ? { label: "Turn auto-pause on", sub: "Pause automatically after ~1h idle", onClick: () => toggleAutoPause(m.id, true) }
       : { label: "Turn auto-pause off", sub: "Keep the machine running while idle", onClick: () => toggleAutoPause(m.id, false) });
-    items.push({ label: "Pause", sub: "Stop the machine now; the conversation is kept (commit first — files are not)", onClick: () => pauseSession(m.id) });
+    items.push({ label: "Pause", sub: "Stop the machine now; the conversation and files are kept", onClick: () => pauseSession(m.id) });
   }
   if (isPaused(m)) items.push({ label: "Start", sub: "Resume the same conversation", onClick: () => wakeSession(m.id) });
   items.push({ label: "Destroy", sub: "Archive transcripts + ~/artifacts, then delete the machine", danger: true, onClick: () => destroySession(m.id) });
