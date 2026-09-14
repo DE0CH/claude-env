@@ -1,6 +1,6 @@
 import { Button, Card, Flex, Heading, Text } from "@radix-ui/themes";
 import { api } from "../api";
-import { useStore, pend, refresh } from "../store";
+import { useStore, pend, refresh, ask, toast } from "../store";
 import { PButton, Muted, useCoolAfterShift } from "../ui";
 
 export function Envs({ onEdit }: { onEdit: (name: string) => void }) {
@@ -9,9 +9,9 @@ export function Envs({ onEdit }: { onEdit: (name: string) => void }) {
   const names = Object.keys(envs).sort();
   const cool = useCoolAfterShift(names.join("|"));
   async function del(n: string) {
-    if (!confirm(`Delete environment "${n}" and its saved secret values?\n\nRemoved from the cluster and from git — nothing outside is affected.`)) return;
+    if (!(await ask({ title: `Delete environment "${n}"?`, detail: "Its saved secret values are removed from the cluster and from git — nothing outside is affected.", action: "Delete environment", danger: true }))) return;
     pend("env:" + n, "Deleting…");
-    try { await api("DELETE", "api/environments/" + encodeURIComponent(n)); } catch (e: any) { alert(e.message); }
+    try { await api("DELETE", "api/environments/" + encodeURIComponent(n)); } catch (e: any) { toast(e.message, "error"); }
     pend("env:" + n, null); await refresh(false);
   }
   return (

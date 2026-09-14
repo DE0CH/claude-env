@@ -73,16 +73,17 @@ function SheetPanel({ open, onClose, title, left, right, snap, children, onClose
 
 // Action sheet: a list of actions + Cancel.
 export type MenuItem = { label: string; sub?: string; danger?: boolean; disabled?: boolean; onClick: () => void };
-export function ActionSheet({ open, onClose, onClosed, title, items }: { open: boolean; onClose: () => void; onClosed?: () => void; title?: string; items: MenuItem[] }) {
+export function ActionSheet({ open, onClose, onClosed, title, message, items }: { open: boolean; onClose: () => void; onClosed?: () => void; title?: string; message?: ReactNode; items: MenuItem[] }) {
   return (
     <Sheet open={open} onClose={onClose} onClosed={onClosed} className="menu-sheet">
       <Box className="menu" pb="2">
         {title && <Text as="div" size="1" color="gray" align="center" mb="2" truncate>{title}</Text>}
+        {message && <Text as="div" size="2" align="center" mb="3" className="msg">{message}</Text>}
         <Flex direction="column" mb="3" className="mlist">
           {items.map((it, i) => (
             <Box key={i}>
               {i > 0 && <Separator size="4" />}
-              <button type="button" className="mi" disabled={it.disabled} onClick={() => { onClose(); it.onClick(); }}>
+              <button type="button" className="mi" disabled={it.disabled} onClick={() => { it.onClick(); onClose(); }}>
                 <Text as="div" size="3" weight="medium" color={it.danger ? "red" : undefined}>{it.label}</Text>
                 {it.sub && <Text as="div" size="1" color="gray">{it.sub}</Text>}
               </button>

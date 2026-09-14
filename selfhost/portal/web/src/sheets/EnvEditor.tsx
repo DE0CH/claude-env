@@ -1,9 +1,9 @@
 // Secret values never reach the browser: the editor lists key names and lets you set a new
 // value (blank = unchanged), delete a key, or add keys. Only the changes are sent.
 import { useState } from "react";
-import { Button, IconButton, TextArea, TextField } from "@radix-ui/themes";
+import { Button, IconButton, Text, TextArea, TextField } from "@radix-ui/themes";
 import { api } from "../api";
-import { useStore, refresh } from "../store";
+import { useStore, refresh, ask } from "../store";
 import { Sheet } from "../Sheet";
 import { Lbl, Muted, Spinner, useBusy } from "../ui";
 
@@ -17,22 +17,23 @@ export function EnvEditor({ name, open, onClose, onClosed }: { name: string; ope
   const [del, setDel] = useState<Set<string>>(new Set());
   const [add, setAdd] = useState("");
   const [busy, run] = useBusy();
+  const [err, setErr] = useState("");
   async function save() {
-    const nm = id.trim();
-    if (!nm) { alert("name required"); return; }
+    const nm = id.trim(); setErr("");
+    if (!nm) { setErr("Environment id required."); return; }
     const secrets: Record<string, any> = {};
     for (const k of keys) { if (del.has(k)) secrets[k] = ""; else if (vals[k]) secrets[k] = parseVal(vals[k]); }
     for (const line of add.split("\n")) {
       const i = line.indexOf("="); if (i < 1) continue;
       const k = line.slice(0, i).trim(), v = line.slice(i + 1);
-      if (!v) { alert(`"${k}": empty value (to delete an existing key use its ✕ button)`); return; }
+      if (!v) { setErr(`"${k}": empty value (to delete an existing key use its ✕ button).`); return; }
       secrets[k] = parseVal(v);
     }
     if (!Object.keys(secrets).length && name) { onClose(); return; }
-    if (del.size && !confirm(`Delete ${[...del].join(", ")} from "${nm}"?`)) return;
+    if (del.size && !(await ask({ title: `Delete ${[...del].join(", ")} from "${nm}"?`, action: "Delete and save", danger: true }))) return;
     await run("Saving…", async () => {
       try { await api("POST", "api/environments", { name: nm, secrets }); onClose(); await refresh(false); }
-      catch (e: any) { alert(e.message); }
+      catch (e: any) { setErr(e.message); }
     });
   }
   return (
@@ -51,6 +52,7 @@ export function EnvEditor({ name, open, onClose, onClosed }: { name: string; ope
       <Lbl>Add keys (KEY=VALUE, one per line)</Lbl>
       <TextArea id="ev-add" rows={3} placeholder="NEW_KEY=value" value={add} onChange={(e) => setAdd(e.target.value)} style={{ fontFamily: "var(--code-font-family)" }} />
       <Muted mt="2">Committed to git encrypted (sops), then applied. Values are write-only — the dashboard never shows them. Multi-line values: wrap in JSON quotes ("...\n...").</Muted>
+      {err && <Text as="div" size="2" color="red" mt="3">{err}</Text>}
     </Sheet>
   );
 }

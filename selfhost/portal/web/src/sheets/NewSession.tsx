@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Button, CheckboxCards, RadioCards, Text, TextArea, TextField } from "@radix-ui/themes";
 import { api } from "../api";
-import { useStore, refresh, settle, setTab } from "../store";
+import { useStore, refresh, settle, setTab, toast } from "../store";
 import { Sheet } from "../Sheet";
 import { Lbl, Muted, Spinner, useBusy } from "../ui";
 
@@ -20,7 +20,7 @@ export function NewSession({ open, onClose, onClosed }: { open: boolean; onClose
         onClose();
         await refresh(false);                                 // card appears in its REAL state (creating…)
         settle((s) => { const m = (s.sessions || []).find((x) => x.id === r.id); return !!(m && m.state === "started" && m.status); }); // fast-poll until claude is actually up
-      } catch (e: any) { alert("Start failed: " + e.message); if (/Re-login/.test(e.message)) { onClose(); setTab("settings"); } }
+      } catch (e: any) { toast("Start failed: " + e.message, "error"); if (/Re-login/.test(e.message)) { onClose(); setTab("settings"); } }
     });
   }
   const Item = ({ t, sub }: { t: React.ReactNode; sub?: React.ReactNode }) => <div style={{ minWidth: 0, width: "100%", textAlign: "left" }}><Text as="div" size="2" weight="medium" style={{ wordBreak: "break-word" }}>{t}</Text>{sub && <Text as="div" size="1" color="gray" style={{ wordBreak: "break-all" }}>{sub}</Text>}</div>;

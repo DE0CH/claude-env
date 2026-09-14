@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Button, Text, TextField } from "@radix-ui/themes";
 import { api } from "../api";
-import { refresh } from "../store";
+import { refresh, toast } from "../store";
 import { Sheet } from "../Sheet";
 import { Lbl, Muted, Spinner, useBusy } from "../ui";
 
@@ -11,9 +11,9 @@ export function Relogin({ url, open, onClose, onClosed }: { url: string; open: b
   const [code, setCode] = useState(""), [msg, setMsg] = useState("");
   const [busy, run] = useBusy();
   async function finish() {
-    if (!code.trim()) { alert("paste the code first"); return; }
+    if (!code.trim()) { setMsg("Paste the code first."); return; }
     await run("Signing in…", async () => {
-      try { await api("POST", "api/auth/code", { code: code.trim() }); onClose(); await refresh(false); alert("Signed in. New sessions will use the refreshed credentials."); }
+      try { await api("POST", "api/auth/code", { code: code.trim() }); onClose(); await refresh(false); toast("Signed in. New sessions will use the refreshed credentials.", "ok"); }
       catch (e: any) { setMsg(e.message); }
     });
   }

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Badge, Card, Flex, Heading, Text, TextField } from "@radix-ui/themes";
 import { api, ago, type GhRepo } from "../api";
-import { useStore, pend, refresh } from "../store";
+import { useStore, pend, refresh, ask, toast } from "../store";
 import { Lbl, Muted, PButton, Spinner, useCoolAfterShift } from "../ui";
 
 // ---- GitHub repo picker: search box + dropdown of the repos the portal's token can see ----
@@ -67,16 +67,16 @@ export function Repos() {
   const [url, setUrl] = useState(""), [alias, setAlias] = useState(""), [ph, setPh] = useState("auto from URL");
   const busy = pending.has("repo:add");
   async function del(n: string) {
-    if (!confirm(`Remove "${n}" from this list?\n\nThis only forgets the entry on the dashboard — nothing on GitHub is deleted or changed.`)) return;
+    if (!(await ask({ title: `Remove "${n}" from this list?`, detail: "This only forgets the entry on the dashboard — nothing on GitHub is deleted or changed.", action: "Remove", danger: true }))) return;
     pend("repo:" + n, "Removing…");
-    try { await api("DELETE", "api/repos/" + encodeURIComponent(n)); } catch (e: any) { alert(e.message); }
+    try { await api("DELETE", "api/repos/" + encodeURIComponent(n)); } catch (e: any) { toast(e.message, "error"); }
     pend("repo:" + n, null); await refresh(false);
   }
   async function add() {
-    if (!url.trim()) { alert("url required"); return; }
+    if (!url.trim()) { toast("Repo URL required.", "error"); return; }
     pend("repo:add", "Adding…");
     try { await api("POST", "api/repos", { url: url.trim(), name: alias.trim() }); setUrl(""); setAlias(""); setPh("auto from URL"); }
-    catch (e: any) { alert(e.message); }
+    catch (e: any) { toast(e.message, "error"); }
     pend("repo:add", null); await refresh(false);
   }
   return (

@@ -6,8 +6,11 @@ import { api, type State } from "./api";
 
 export type Tab = "sessions" | "android" | "envs" | "repos" | "settings";
 export type AndroidState = { loading: boolean; server: any; err: string | null; screenTs: number };
+export type Toast = { id: number; text: string; kind: "info" | "ok" | "error" };
+// a pending yes/no question, shown as an action sheet (App renders it); resolve gets the answer
+export type Confirm = { title: string; detail?: string; action: string; danger?: boolean; resolve: (ok: boolean) => void };
 type Store = {
-  state: State; tab: Tab; pending: Map<string, string>; android: AndroidState;
+  state: State; tab: Tab; pending: Map<string, string>; android: AndroidState; toasts: Toast[]; confirm: Confirm | null;
   sizes: { sizes: Record<string, { label: string }>; default: string };
   models: { models: Record<string, { label?: string }>; default: string };
   refreshing: boolean;
@@ -15,7 +18,7 @@ type Store = {
 const S: Store = {
   state: { environments: {}, repos: [], sessions: [], sessionImage: null, flyError: null, hasCreds: true, auth: {} },
   tab: "sessions", pending: new Map(), android: { loading: false, server: null, err: null, screenTs: 0 },
-  sizes: { sizes: {}, default: "medium" }, models: { models: {}, default: "claude-opus-4-8" }, refreshing: false,
+  sizes: { sizes: {}, default: "medium" }, models: { models: {}, default: "claude-opus-4-8" }, refreshing: false, toasts: [], confirm: null,
 };
 const listeners = new Set<() => void>();
 let snap = { ...S };
@@ -27,6 +30,20 @@ export const getStore = () => snap;
 
 export function setTab(t: Tab) { S.tab = t; emit(); if (t === "android" && !S.android.server && !S.android.loading) loadAndroid(); }
 export function pend(key: string, label: string | null) { label ? S.pending.set(key, label) : S.pending.delete(key); S.pending = new Map(S.pending); emit(); }
+
+// ---- notices: no alert()/confirm() — toasts at the bottom of the screen, questions as sheets ----
+let toastSeq = 0;
+export function toast(text: string, kind: Toast["kind"] = "info", ms = kind === "error" ? 8000 : 5000) {
+  const id = ++toastSeq; S.toasts = [...S.toasts, { id, text, kind }]; emit();
+  setTimeout(() => dismissToast(id), ms);
+}
+export function dismissToast(id: number) { if (S.toasts.some((t) => t.id === id)) { S.toasts = S.toasts.filter((t) => t.id !== id); emit(); } }
+/** Ask a yes/no question; resolves true when the action button is tapped, false on Cancel/dismiss. */
+export function ask(q: Omit<Confirm, "resolve">): Promise<boolean> {
+  S.confirm?.resolve(false);
+  return new Promise((resolve) => { S.confirm = { ...q, resolve }; emit(); });
+}
+export function answer(ok: boolean) { const c = S.confirm; if (!c) return; S.confirm = null; emit(); c.resolve(ok); }
 
 // ---- polling: 15s idle, 2s while something is settling ----------------------------------
 let inflight: Promise<void> | null = null, fastUntil = 0;
@@ -53,7 +70,7 @@ export async function pendUntil(key: string, label: string, action: () => Promis
     await action();
     const until = Date.now() + maxMs;
     while (Date.now() < until) { await refresh(false); if (pred(S.state)) break; await new Promise((r) => setTimeout(r, 1000)); }
-  } catch (e: any) { alert(e.message); await refresh(false); }
+  } catch (e: any) { toast(e.message, "error"); await refresh(false); }
   finally { pend(key, null); }
 }
 // poll fast until predicate(state) is true or maxMs elapses

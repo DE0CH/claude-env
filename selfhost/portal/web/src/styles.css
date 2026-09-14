@@ -1,5 +1,5 @@
 /* Radix Themes does the component styling (imported in main.tsx, configured in theme.tsx). Only
-   what it has no component for lives here: the vaul bottom sheets, the terminal, small states. */
+   what it has no component for lives here: our bottom sheets, the terminal, toasts, small states. */
 html{touch-action:manipulation;-webkit-text-size-adjust:100%}
 body{margin:0}
 .wrap.main{padding-bottom:calc(24px + env(safe-area-inset-bottom))}
@@ -48,13 +48,20 @@ body{margin:0}
 .sheet .body-in{padding:8px 16px calc(20px + env(safe-area-inset-bottom))}
 .evk{display:flex;gap:8px;align-items:center;margin:6px 0}
 .evk .rt-TextFieldRoot{flex:1;min-width:0}
+.sheet .menu .msg{white-space:pre-line;word-break:break-word}
+
+/* ---- toasts: transient notices instead of alert() — bottom of the screen, above sheets ---- */
+.toasts{position:fixed;left:16px;right:16px;bottom:calc(16px + env(safe-area-inset-bottom));z-index:1100;display:flex;flex-direction:column;gap:8px;max-width:600px;margin:0 auto;pointer-events:none}
+.toast{pointer-events:auto;background:var(--color-panel-solid);border-radius:var(--radius-4);animation:toast-in .3s cubic-bezier(0.32,0.72,0,1);cursor:pointer}
+.toast .rt-CalloutText{white-space:pre-line;word-break:break-word}
+@keyframes toast-in{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
 
 /* ---- terminal: full-screen, dark always; sized to the VISUAL viewport (Terminal.tsx) ----- */
 .term{position:fixed;left:0;right:0;z-index:1060;outline:none;overflow:hidden}
 .term-in{height:100%;display:flex;flex-direction:column;background:#0b0d11;color:#eee}
-.term .thandle{padding-top:calc(10px + env(safe-area-inset-top));background:#161a22}
-.term [data-vaul-handle]{background:#8a92a6}
-.term .bar{flex:none;display:flex;align-items:center;gap:8px;padding:0 10px 8px;border-bottom:1px solid #222;background:#161a22}
+/* the status-bar strip is tinted to this bar (statusBar.ts), so it reads as the bar's own top
+   margin; the inset only matters when the page really runs under the status bar (standalone) */
+.term .bar{flex:none;display:flex;align-items:center;gap:8px;padding:calc(8px + env(safe-area-inset-top)) 10px 8px;border-bottom:1px solid #222;background:#161a22}
 .term .bar .title{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin:0}
 .term .bar .status{font-size:11px;color:#9aa1ab;white-space:nowrap}
 .term .screen{flex:1;min-height:0;padding:6px;overflow:hidden}

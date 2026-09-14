@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Button, Callout, Flex, Heading, IconButton, Tabs } from "@radix-ui/themes";
 import { api } from "./api";
-import { useStore, setTab, refresh, pend, type Tab } from "./store";
+import { useStore, setTab, refresh, pend, toast, type Tab } from "./store";
 import { THEME, Theme, PortalCtx } from "./theme";
 import { Sessions } from "./views/Sessions";
 import { Android } from "./views/Android";
@@ -12,6 +12,7 @@ import { NewSession } from "./sheets/NewSession";
 import { EnvEditor } from "./sheets/EnvEditor";
 import { Relogin } from "./sheets/Relogin";
 import { TerminalPage } from "./Terminal";
+import { Toasts, ConfirmSheet } from "./ui";
 import { syncStatusBar } from "./statusBar";
 
 type SheetSpec = { kind: "new" } | { kind: "env"; name: string } | { kind: "relogin"; url: string } | { kind: "term"; id: string; title: string };
@@ -35,7 +36,7 @@ export function App() {
   const refreshing = useStore((s) => s.refreshing);
   const [root, setRoot] = useState<HTMLElement | null>(null);
   useEffect(() => { if (root) syncStatusBar(); }, [root]);
-  // one sheet at a time; `open` flips false first so vaul can play its exit animation, then
+  // one sheet at a time; `open` flips false first so the sheet plays its exit animation, then
   // onClosed unmounts it
   const [sheet, setSheet] = useState<SheetSpec | null>(null);
   const [open, setOpen] = useState(false);
@@ -45,7 +46,7 @@ export function App() {
   async function relogin() {
     pend("auth", "Starting…");
     try { const { url } = await api("POST", "api/auth/start"); pend("auth", null); show({ kind: "relogin", url }); }
-    catch (e: any) { pend("auth", null); alert("Could not start login: " + e.message); }
+    catch (e: any) { pend("auth", null); toast("Could not start login: " + e.message, "error"); }
   }
   return (
     <Theme {...THEME} ref={setRoot}>
@@ -76,6 +77,8 @@ export function App() {
         {sheet?.kind === "env" && <EnvEditor name={sheet.name} open={open} onClose={close} onClosed={closed} />}
         {sheet?.kind === "relogin" && <Relogin url={sheet.url} open={open} onClose={close} onClosed={closed} />}
         {sheet?.kind === "term" && <TerminalPage session={sheet} onClose={closed} />}
+        <ConfirmSheet />
+        <Toasts />
       </PortalCtx.Provider>
     </Theme>
   );

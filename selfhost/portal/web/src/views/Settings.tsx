@@ -1,6 +1,6 @@
 import { Button, Card, Code, Flex, Heading, Text } from "@radix-ui/themes";
 import { api, fromNow } from "../api";
-import { useStore, pend, refresh } from "../store";
+import { useStore, pend, refresh, toast } from "../store";
 import { PButton, Muted } from "../ui";
 
 export function Settings({ onRelogin }: { onRelogin: () => void }) {
@@ -9,8 +9,8 @@ export function Settings({ onRelogin }: { onRelogin: () => void }) {
   const exp = c.expiresAt ? new Date(c.expiresAt) : null;
   async function refreshCreds() {
     pend("credrefresh", "Refreshing…");
-    try { const r = await api("POST", "api/credentials/refresh"); alert(r.refreshed ? "Token refreshed. Valid until " + new Date(r.expiresAt).toLocaleString() : "Token was still fresh (valid until " + new Date(r.expiresAt).toLocaleString() + ")."); }
-    catch (e: any) { alert(e.message); }
+    try { const r = await api("POST", "api/credentials/refresh"); toast(r.refreshed ? "Token refreshed. Valid until " + new Date(r.expiresAt).toLocaleString() + "." : "Token was still fresh (valid until " + new Date(r.expiresAt).toLocaleString() + ").", "ok"); }
+    catch (e: any) { toast(e.message, "error"); }
     pend("credrefresh", null); await refresh(false);
   }
   return (

@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Button, Card, Flex, Heading, Text } from "@radix-ui/themes";
 import { api, ago, REGION, sessionTitle, type Session } from "../api";
-import { useStore, pendUntil, pend, refresh, settle, setTab } from "../store";
+import { useStore, pendUntil, pend, refresh, settle, setTab, ask, toast } from "../store";
 import { PButton, Pill, Spinner, Muted, useCoolAfterShift } from "../ui";
 import { ActionSheet } from "../Sheet";
 
@@ -38,13 +38,13 @@ export function toggleAutoPause(id: string, enabled: boolean) {
 // token): write the portal's current pair into the session and type "continue" so it resumes.
 export async function reloginSession(id: string) {
   pend("s:" + id, "Refreshing login…");
-  try { const r = await api("POST", "api/sessions/" + id + "/relogin", { text: "continue" }); alert("Fresh credentials written into the session" + (r.prompted ? " and “" + r.text + "” sent" : "") + ". Valid until " + new Date(r.expiresAt).toLocaleString() + "."); }
-  catch (e: any) { alert("Refresh login failed: " + e.message); if (/Re-login/.test(e.message)) setTab("settings"); }
+  try { const r = await api("POST", "api/sessions/" + id + "/relogin", { text: "continue" }); toast("Fresh credentials written into the session" + (r.prompted ? " and “" + r.text + "” sent" : "") + ". Valid until " + new Date(r.expiresAt).toLocaleString() + ".", "ok"); }
+  catch (e: any) { toast("Refresh login failed: " + e.message, "error"); if (/Re-login/.test(e.message)) setTab("settings"); }
   pend("s:" + id, null); await refresh(false);
 }
 export async function destroySession(id: string) {
   pend("s:" + id, "Checking…");
-  let msg = "Destroy this session?\n\n";
+  let msg = "";
   try {
     const c = await api("GET", `api/sessions/${id}/changes`);
     if (c.checked) {
@@ -60,18 +60,18 @@ export async function destroySession(id: string) {
   } catch { msg += "⚠️ Could not check for unsaved changes.\n"; }
   msg += "\nTranscripts and ~/artifacts are archived to the Storage Box first; then the container is deleted. Your repos on GitHub are not affected.";
   pend("s:" + id, null);
-  if (!confirm(msg)) return;
+  if (!(await ask({ title: "Destroy this session?", detail: msg, action: "Destroy session", danger: true }))) return;
   pend("s:" + id, "Archiving…");
   try {
     let r;
     try { r = await api("DELETE", "api/sessions/" + id); }
     catch (e: any) {
       if (!/archive/i.test(e.message)) throw e;
-      if (!confirm("Archiving to the Storage Box FAILED:\n" + e.message + "\n\nDestroy anyway (records will be lost)?")) { pend("s:" + id, null); return; }
+      if (!(await ask({ title: "Archiving to the Storage Box failed", detail: e.message + "\n\nDestroy anyway? The records will be lost.", action: "Destroy anyway", danger: true }))) { pend("s:" + id, null); return; }
       pend("s:" + id, "Destroying…"); r = await api("DELETE", "api/sessions/" + id + "?force=1");
     }
     if (r && r.archived && r.archived.dir) console.log("archived", r.archived.files, "file(s) to", r.archived.dir);
-  } catch (e: any) { alert(e.message); }
+  } catch (e: any) { toast(e.message, "error"); }
   pend("s:" + id, null);
   await refresh(false);                                   // card shows destroying/destroyed until Fly drops it
   settle((st) => !(st.sessions || []).some((x) => x.id === id), 60000);

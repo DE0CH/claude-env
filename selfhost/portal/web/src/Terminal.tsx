@@ -13,6 +13,7 @@ import { FitAddon } from "@xterm/addon-fit";
 import "@xterm/xterm/css/xterm.css";
 import { api } from "./api";
 import { THEME, Theme } from "./theme";
+import { syncStatusBar } from "./statusBar";
 
 function useVisualViewport() {
   const read = () => { const v = window.visualViewport; return v ? { top: Math.round(v.offsetTop), height: Math.round(v.height), kb: window.innerHeight - v.height > 120 } : { top: 0, height: window.innerHeight, kb: false }; };
@@ -28,6 +29,8 @@ function useVisualViewport() {
 const KEYS: [string, string][] = [["Enter", "Enter"], ["Esc", "Escape"], ["Tab", "Tab"], ["⇧Tab", "S-Tab"], ["↑", "Up"], ["↓", "Down"], ["←", "Left"], ["→", "Right"], ["⌫", "BSpace"], ["^C", "C-c"], ["^D", "C-d"], ["^L", "C-l"], ["^U", "C-u"]];
 
 export function TerminalPage({ session, onClose }: { session: { id: string; title: string }; onClose: () => void }) {
+  // the browser's status-bar strip takes the bar's colour while the page is up
+  useEffect(() => { syncStatusBar(); return () => { requestAnimationFrame(syncStatusBar); }; }, []);
   const vv = useVisualViewport();
   const [screen, setScreen] = useState<HTMLDivElement | null>(null); // callback ref: xterm opens once the element exists
   const [status, setStatus] = useState("connecting…");

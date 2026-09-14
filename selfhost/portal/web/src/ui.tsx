@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { Badge, Button, Spinner, Text } from "@radix-ui/themes";
-import { useStore } from "./store";
+import { Badge, Button, Callout, Spinner, Text } from "@radix-ui/themes";
+import { useStore, dismissToast, answer, type Confirm } from "./store";
+import { ActionSheet } from "./Sheet";
 
 export { Spinner };
 
@@ -30,6 +31,30 @@ export function useCoolAfterShift(signature: string) {
 export function useBusy(): [string | null, (label: string, fn: () => Promise<void>) => Promise<void>] {
   const [busy, setBusy] = useState<string | null>(null);
   return [busy, async (label, fn) => { setBusy(label); try { await fn(); } finally { setBusy(null); } }];
+}
+
+// transient notices (store.toast); tap to dismiss early
+export function Toasts() {
+  const toasts = useStore((s) => s.toasts);
+  return (
+    <div className="toasts" aria-live="polite">
+      {toasts.map((t) => (
+        <div key={t.id} className="toast" onClick={() => dismissToast(t.id)}>
+          <Callout.Root size="1" variant="surface" color={t.kind === "error" ? "red" : t.kind === "ok" ? "green" : "gray"} role="status"><Callout.Text>{t.text}</Callout.Text></Callout.Root>
+        </div>
+      ))}
+    </div>
+  );
+}
+// the pending store.ask() question as an action sheet: one (usually destructive) action + Cancel.
+// Keeps the last question mounted while the sheet animates closed.
+export function ConfirmSheet() {
+  const c = useStore((s) => s.confirm);
+  const [live, setLive] = useState<Confirm | null>(null);
+  useEffect(() => { if (c) setLive(c); }, [c]);
+  if (!live) return null;
+  return <ActionSheet open={!!c} onClose={() => answer(false)} onClosed={() => setLive(null)} title={live.title} message={live.detail}
+    items={[{ label: live.action, danger: live.danger, onClick: () => answer(true) }]} />;
 }
 
 export function Pill({ kind, children }: { kind: "ok" | "dim" | "wait" | "bad"; children: React.ReactNode }) {

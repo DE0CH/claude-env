@@ -4,7 +4,7 @@
 import { useState } from "react";
 import { Card, Code, Flex, Heading, Text } from "@radix-ui/themes";
 import { api, ago } from "../api";
-import { useStore, pend, settle, loadAndroid, setAndroid } from "../store";
+import { useStore, pend, settle, loadAndroid, setAndroid, ask, toast } from "../store";
 import { PButton, Pill, Spinner, Muted } from "../ui";
 
 function RdPill({ st }: { st: string }) {
@@ -20,9 +20,9 @@ export function Android() {
   const s = a.server;
   if (!s) return <Text as="div" align="center" color="gray" my="8">{a.loading ? <><Spinner size="1" /> Loading…</> : a.err ? `Cloud Android: ${a.err}` : <>No redroid box found.<br />Provision one with <Code>redroid/provision.sh</Code>.</>}</Text>;
   async function release() {
-    if (!confirm("Release (DELETE) the cloud-Android box?\n\nThis permanently deletes the VM and everything on it — apps, logins, data. It stops the monthly cost. Rebuild later with redroid/provision.sh. This cannot be undone.")) return;
+    if (!(await ask({ title: "Release the cloud-Android box?", detail: "This permanently deletes the VM and everything on it — apps, logins, data. It stops the monthly cost. Rebuild later with redroid/provision.sh. This cannot be undone.", action: "Delete the box", danger: true }))) return;
     pend("rd:release", "Releasing…");
-    try { await api("DELETE", "api/redroid"); setAndroid({ server: null, screenTs: 0 }); } catch (e: any) { alert(e.message); }
+    try { await api("DELETE", "api/redroid"); setAndroid({ server: null, screenTs: 0 }); } catch (e: any) { toast(e.message, "error"); }
     pend("rd:release", null); settle(() => !a.server, 30000); await loadAndroid();
   }
   async function debug() {
