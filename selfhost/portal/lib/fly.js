@@ -47,6 +47,10 @@ module.exports = {
     call("POST", `/apps/${app()}/machines/${id}/exec`, { command, timeout }),
   setMetadata: (id, key, value) =>
     call("POST", `/apps/${app()}/machines/${id}/metadata/${encodeURIComponent(key)}`, { value }),
+  // Replace a machine's config (Fly restarts the machine to apply it). Round-trip the config
+  // from getMachine with the fields you want changed. NOTE: a restart resets the ephemeral
+  // rootfs, same as a stop/start — snapshot the transcript first if the machine was running.
+  updateMachine: (id, config) => call("POST", `/apps/${app()}/machines/${id}`, { config }),
   // NOTE: a stopped machine's ephemeral rootfs is reset on the next start — pausing a session
   // must snapshot its transcript first (see pauseMachine in server.js).
   stopMachine: (id) => call("POST", `/apps/${app()}/machines/${id}/stop`),

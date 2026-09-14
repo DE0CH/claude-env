@@ -141,6 +141,32 @@ async function pauseMachine(id) {
   return { ...r, snapshot: snap };
 }
 
+// ---- switching a session's permission mode --------------------------------
+// "auto" (classifier auto-approve) <-> "bypass" (--dangerously-skip-permissions). The mode is a
+// machine env var (SESSION_PERMISSION_MODE) the supervisor reads at claude launch, so changing it
+// means restarting the machine — which resets the ephemeral rootfs. We therefore reuse the
+// pause/resume machinery: snapshot + stop (so the conversation + working tree survive), update the
+// machine config's env + metadata, then start. The entrypoint restores the snapshot and the
+// supervisor `claude --resume`s in the new mode (the session image pre-accepts the bypass dialog,
+// so a bypass restart doesn't hang on "booting"). A running machine whose snapshot fails is left
+// as-is (pauseMachine throws), so nothing is lost.
+async function setPermissionMode(id, mode) {
+  const m = await fly.getMachine(id);
+  const cur = m.config || {};
+  if ((cur.metadata?.permissionMode || "") === mode) return { ok: true, permissionMode: mode, unchanged: true };
+  let snapshot = null;
+  if (m.state === "started") ({ snapshot } = await pauseMachine(id)); // snapshot + stop; throws if snapshot fails
+  const config = {
+    ...cur,
+    env: { ...(cur.env || {}), SESSION_PERMISSION_MODE: mode },
+    metadata: { ...(cur.metadata || {}), permissionMode: mode },
+  };
+  await fly.updateMachine(id, config); // Fly may or may not auto-start on a config swap
+  const after = await fly.getMachine(id);
+  if (after.state !== "started" && after.state !== "starting") await fly.startMachine(id);
+  return { ok: true, permissionMode: mode, snapshot };
+}
+
 // ---- auto-pause idle sessions ---------------------------------------------
 // A started session idle for IDLE_PAUSE_MS (claude status exactly "idle", no background jobs)
 // is paused (snapshot + stop, see pauseMachine) to save Fly compute; Start resumes the same
@@ -484,6 +510,15 @@ app.post("/api/sessions/:id/stop", async (req, res) => {
 });
 app.post("/api/sessions/:id/start", async (req, res) => {
   try { res.json(await fly.startMachine(req.params.id)); } catch (e) { res.status(500).json({ error: e.message }); }
+});
+// Switch a session between "auto" and "bypass" (--dangerously-skip-permissions), restarting it
+// on the same conversation (see setPermissionMode). A 500 means the pre-restart snapshot failed
+// and the machine is untouched.
+app.post("/api/sessions/:id/permission-mode", async (req, res) => {
+  try {
+    const mode = req.body && req.body.mode === "bypass" ? "bypass" : "auto";
+    res.json(await setPermissionMode(req.params.id, mode));
+  } catch (e) { res.status(500).json({ error: e.message }); }
 });
 // Toggle auto-pause for one session (metadata autoPause=on|off). Default is on; turning it
 // off keeps the machine running through idle periods. Resets the idle countdown either way.

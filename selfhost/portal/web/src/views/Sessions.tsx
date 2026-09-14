@@ -34,6 +34,20 @@ export function toggleAutoPause(id: string, enabled: boolean) {
   return pendUntil("s:" + id, enabled ? "Enabling auto-pause…" : "Disabling auto-pause…", () => api("POST", "api/sessions/" + id + "/autopause", { enabled }),
     (s) => { const m: any = find(s, id); return !!m && (m.autoPause === "off") === !enabled; });
 }
+// Switch permission mode: "bypass" = --dangerously-skip-permissions, "auto" = classifier approval.
+// The machine restarts on the same conversation (snapshot + resume), so this interrupts any work
+// in progress; confirm first. Stays pending until Fly reports the new mode and the session is up.
+export async function switchPermissionMode(id: string, mode: "auto" | "bypass") {
+  const toBypass = mode === "bypass";
+  const msg = toBypass
+    ? "Switch this session to Bypass Permissions mode?\n\nThe machine RESTARTS (the conversation and files are snapshotted and resumed — nothing is lost). Claude then runs every tool WITHOUT asking — no permission prompts, no classifier. Any work in progress is interrupted by the restart."
+    : "Switch this session back to approval mode?\n\nThe machine RESTARTS (conversation and files are resumed). Claude runs under the permission classifier again.";
+  if (!confirm(msg)) return;
+  return pendUntil("s:" + id, toBypass ? "Switching to skip-perms…" : "Switching to approval…",
+    () => api("POST", "api/sessions/" + id + "/permission-mode", { mode }),
+    (s) => { const m: any = find(s, id); return !!m && m.permissionMode === mode && m.state === "started"; }, 120000)
+    .then(() => settle((s) => { const m: any = find(s, id); return !!(m && m.state === "started" && m.status); }));
+}
 // Session says "Login expired · Please run /login" (another session rotated the shared refresh
 // token): write the portal's current pair into the session and type "continue" so it resumes.
 export async function reloginSession(id: string) {
@@ -128,6 +142,11 @@ function menuItems(m: any) {
       ? { label: "Turn auto-pause on", sub: "Pause automatically after ~1h idle", onClick: () => toggleAutoPause(m.id, true) }
       : { label: "Turn auto-pause off", sub: "Keep the machine running while idle", onClick: () => toggleAutoPause(m.id, false) });
     items.push({ label: "Pause", sub: "Stop the machine now; the conversation and files are kept", onClick: () => pauseSession(m.id) });
+  }
+  if (m.state === "started" || isPaused(m)) {
+    items.push(m.permissionMode === "bypass"
+      ? { label: "Switch to approval mode", sub: "Restart on the same conversation under the permission classifier", onClick: () => switchPermissionMode(m.id, "auto") }
+      : { label: "Switch to skip-permissions", sub: "Restart on the same conversation with --dangerously-skip-permissions", danger: true, onClick: () => switchPermissionMode(m.id, "bypass") });
   }
   if (isPaused(m)) items.push({ label: "Start", sub: "Resume the same conversation", onClick: () => wakeSession(m.id) });
   items.push({ label: "Destroy", sub: "Archive transcripts + ~/artifacts, then delete the machine", danger: true, onClick: () => destroySession(m.id) });
