@@ -603,8 +603,10 @@ and simply end your turn — no `/retire-session` needed.
   stop resets the machine's ephemeral rootfs on the next Start** (verified: every transcript
   gone), so Pause first snapshots the transcript(s) + `~/.claude.json` + `~/workspace` +
   `~/artifacts` (tarballs) to the Storage Box (`claude-records/.paused/<machine-id>/`, done by
-  the portal inside the machine) and Start restores them (entrypoint) so the session image
-  `--resume`s the SAME conversation with the working tree as it was, uncommitted work included.
+  the portal inside the machine) and Start injects the current Claude
+  credentials into the machine env and restores them (entrypoint) so the session image
+  `--resume`s the SAME conversation (same Remote Control entry in the app) with the working
+  tree as it was, uncommitted work included.
   Auto-pause is per-session (default on,
   toggle on the card; checkbox in New session); the portal runs the pause loop, so it works
   whether or not the dashboard is open. Pausing is NOT destroying — still Destroy sessions from

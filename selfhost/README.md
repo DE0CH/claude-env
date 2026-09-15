@@ -190,10 +190,15 @@ Destroy: `selfhost/cluster/destroy.sh` (Fly sessions are separate — destroy th
   Remote Control target), extracts the two tarballs (the repo clone step then skips repos that
   are already there) and drops the transcripts under the project slug, sets the
   first-prompt marker (so the first prompt isn't pasted again), and `session-supervisor.sh`
-  launches `claude --resume <newest id>` **without `--remote-control`** — re-passing that flag
-  would start a NEW bridge session (new app entry); plain `--resume` reattaches to the
-  conversation's existing bridge via its reconnection record while the server still holds it,
-  otherwise Claude opens a replacement bridge session with the conversation intact. Destroying
+  launches `claude --remote-control … --resume <newest id>`: with the transcript's recorded
+  bridge session the CLI reattaches to the SAME app entry / `claude.ai/code/session_…` id
+  (verified ~10 h after a pause) and only mints a replacement bridge session if the server no
+  longer holds it. **Start injects the current Claude credentials** (`wakeMachine` in
+  `server.js`: refresh the stored pair if needed, patch `CLAUDE_CREDENTIALS`/`CLAUDE_ACCOUNT`
+  into the stopped machine's env with `skip_launch`, then start) — a machine's env is fixed at
+  creation, and the pair it was created with is dead by wake time (rotated refresh token), which
+  left resumed sessions at "Not logged in" with Remote Control off. A dead stored pair makes
+  Start return 409 `needLogin` (Re-login from Settings), like session creation.
   a *paused* session moves its snapshot into the normal `claude-records/<date> <title>/`
   archive (`finalizePaused`: transcripts as `transcript-<id>.jsonl`, the artefacts as
   `artifacts.tar.gz`); destroying a running one archives from disk and drops the stale snapshot. **Only Destroy** (not pause) runs the pre-destroy uncommitted/unpushed check. **Destroy archives

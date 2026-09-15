@@ -52,3 +52,25 @@ keeps the traps and non-obvious facts a future session must still know.
   requestedAt`), not only the Kustomization — the latter re-applies the last fetched revision.
 - The sops secret key name must be `age.agekey`; the `.sops.yaml` rule matches the file's
   path, so write the plaintext manifest at its final path before `sops --encrypt --in-place`.
+
+## Resumed (woken) sessions came back "Not logged in" with Remote Control off (2026-09-15)
+
+A Fly machine's env is fixed at creation. A session woken from Pause hours later re-ran the
+entrypoint with the `CLAUDE_CREDENTIALS` it was created with — an OAuth pair whose refresh token
+had long been rotated (claude rotates it on every refresh; the portal and other sessions refresh
+the shared pair too). Claude's refresh then fails, it wipes `~/.claude/.credentials.json`
+(`expiresAt` 0), the TUI shows "Not logged in · Run /login", and `--debug-file` logs "Remote
+Control requires a claude.ai subscription … --rc flag ignored" / "[bridge:repl] Skipping: bridge
+not enabled". Fix: the portal's Start path (`wakeMachine`) refreshes the stored pair and patches it
+into the stopped machine's env (Fly update with `skip_launch: true`) before starting. For a running
+machine in that state, `POST /api/sessions/<id>/relogin {"text":false}` writes the current pair in
+and a host relaunch picks it up.
+
+Also learned: `claude --remote-control --resume <id>` REATTACHES to the bridge session recorded in
+the transcript (`{"type":"bridge-session","bridgeSessionId":"cse_…"}` records) — same app entry,
+same `session_…` id, even ~10 h later — and only mints a fresh one when the server no longer has
+it. So pass `--remote-control` on every launch form (plus `remoteControlAtStartup: true` in
+`~/.claude/settings.json`); the earlier belief that re-passing the flag on resume creates a new
+entry came from testing with dead credentials. `claude --debug-file /tmp/x.log` is the way to see
+the bridge decision (`[bridge:repl] Reattaching to persisted bridge session …`).
+

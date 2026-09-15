@@ -150,35 +150,51 @@ async function pauseMachine(id) {
   return { ...r, snapshot: snap };
 }
 
-// ---- switching a session's permission mode --------------------------------
-// "auto" (classifier auto-approve) <-> "bypass" (--dangerously-skip-permissions). The mode is a
-// machine env var (SESSION_PERMISSION_MODE) the supervisor reads at claude launch, so changing it
-// means restarting the machine — which resets the ephemeral rootfs. We therefore reuse the
-// pause/resume machinery: snapshot + stop (so the conversation + working tree survive), update the
-// machine config's env + metadata, then start. The entrypoint restores the snapshot and the
-// supervisor `claude --resume`s in the new mode (the session image pre-accepts the bypass dialog,
-// so a bypass restart doesn't hang on "booting"). A running machine whose snapshot fails is left
-// as-is (pauseMachine throws), so nothing is lost.
-async function setPermissionMode(id, mode) {
+// ---- starting (waking) a session -------------------------------------------
+// Every Start goes through here, because a machine's env is fixed at creation: woken as-is, a
+// paused session comes back with the OAuth pair it was CREATED with, which is dead by then
+// (claude rotates the refresh token on every refresh, and the shared pair gets refreshed by the
+// portal / other sessions meanwhile). Claude then fails to refresh, wipes the pair, and the
+// resumed session sits at "Not logged in" with Remote Control off (`--rc flag ignored`) — seen
+// 2026-09-15 on a session woken ~9h after its auto-pause. So: refresh the stored pair if it
+// needs it (409 needLogin, like session creation), write it — plus any env/metadata patch —
+// into the stopped machine's config with skip_launch, then start. Fly applies a config change to
+// a RUNNING machine by restarting it (rootfs reset), so a running machine is snapshotted +
+// stopped first (pauseMachine; throws if the snapshot fails, leaving it untouched).
+async function wakeMachine(id, { env = {}, metadata = {} } = {}) {
+  try { await ensureFreshCredentials(); }
+  catch (e) { if (e.needLogin) throw e; console.error(`[creds] ${e.message}`); }
+  const creds = await store.getClaudeCredentials();
+  if (!creds.credentials) throw needLogin("no Claude credentials — Re-login from Settings");
   const m = await fly.getMachine(id);
   const cur = m.config || {};
-  if ((cur.metadata?.permissionMode || "") === mode) return { ok: true, permissionMode: mode, unchanged: true };
   let snapshot = null;
   if (m.state === "started") ({ snapshot } = await pauseMachine(id)); // snapshot + stop; throws if snapshot fails
   const config = {
     ...cur,
-    env: { ...(cur.env || {}), SESSION_PERMISSION_MODE: mode },
-    metadata: { ...(cur.metadata || {}), permissionMode: mode },
+    env: { ...(cur.env || {}), CLAUDE_CREDENTIALS: creds.credentials, CLAUDE_ACCOUNT: creds.account || "{}", ...env },
+    metadata: { ...(cur.metadata || {}), ...metadata },
   };
-  await fly.updateMachine(id, config); // replaces the machine and brings it back up on its own
-  // Only nudge start if Fly actually left it stopped — starting a machine mid-replace 412s
-  // ("machine getting replaced, refusing to start"), which is harmless (the replace starts it).
-  const after = await fly.getMachine(id);
-  if (after.state === "stopped" || after.state === "suspended") {
-    try { await fly.startMachine(id); }
-    catch (e) { if (!/refusing to start|getting replaced/i.test(e.message)) throw e; }
-  }
-  return { ok: true, permissionMode: mode, snapshot };
+  await fly.updateMachine(id, config, { skipLaunch: true });
+  // Only tolerate the 412 Fly gives while it is still replacing the machine itself (the replace
+  // starts it) — anything else is a real start failure.
+  try { await fly.startMachine(id); }
+  catch (e) { if (!/refusing to start|getting replaced/i.test(e.message)) throw e; }
+  return { ok: true, snapshot };
+}
+
+// ---- switching a session's permission mode --------------------------------
+// "auto" (classifier auto-approve) <-> "bypass" (--dangerously-skip-permissions). The mode is a
+// machine env var (SESSION_PERMISSION_MODE) the supervisor reads at claude launch, so changing it
+// is a wake with an env + metadata patch (snapshot + stop + config update + start, see
+// wakeMachine). The entrypoint restores the snapshot and the supervisor `claude --resume`s in
+// the new mode (the session image pre-accepts the bypass dialog, so a bypass restart doesn't
+// hang on "booting").
+async function setPermissionMode(id, mode) {
+  const m = await fly.getMachine(id);
+  if ((m.config?.metadata?.permissionMode || "") === mode) return { ok: true, permissionMode: mode, unchanged: true };
+  const r = await wakeMachine(id, { env: { SESSION_PERMISSION_MODE: mode }, metadata: { permissionMode: mode } });
+  return { ...r, permissionMode: mode };
 }
 
 // ---- auto-pause idle sessions ---------------------------------------------
@@ -539,8 +555,11 @@ app.post("/api/sessions/:id/tty/resize", async (req, res) => {
 app.post("/api/sessions/:id/stop", async (req, res) => {
   try { res.json(await pauseMachine(req.params.id)); } catch (e) { res.status(500).json({ error: e.message }); }
 });
+// Start = wake with the CURRENT Claude credentials (see wakeMachine); 409 + needLogin when the
+// stored pair is dead and only a Re-login can fix it.
 app.post("/api/sessions/:id/start", async (req, res) => {
-  try { res.json(await fly.startMachine(req.params.id)); } catch (e) { res.status(500).json({ error: e.message }); }
+  try { res.json(await wakeMachine(req.params.id)); }
+  catch (e) { res.status(e.needLogin ? 409 : 500).json({ error: e.message, needLogin: !!e.needLogin }); }
 });
 // Switch a session between "auto" and "bypass" (--dangerously-skip-permissions), restarting it
 // on the same conversation (see setPermissionMode). A 500 means the pre-restart snapshot failed
@@ -549,7 +568,7 @@ app.post("/api/sessions/:id/permission-mode", async (req, res) => {
   try {
     const mode = req.body && req.body.mode === "bypass" ? "bypass" : "auto";
     res.json(await setPermissionMode(req.params.id, mode));
-  } catch (e) { res.status(500).json({ error: e.message }); }
+  } catch (e) { res.status(e.needLogin ? 409 : 500).json({ error: e.message, needLogin: !!e.needLogin }); }
 });
 // Toggle auto-pause for one session (metadata autoPause=on|off). Default is on; turning it
 // off keeps the machine running through idle periods. Resets the idle countdown either way.

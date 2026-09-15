@@ -50,7 +50,10 @@ module.exports = {
   // Replace a machine's config (Fly restarts the machine to apply it). Round-trip the config
   // from getMachine with the fields you want changed. NOTE: a restart resets the ephemeral
   // rootfs, same as a stop/start — snapshot the transcript first if the machine was running.
-  updateMachine: (id, config) => call("POST", `/apps/${app()}/machines/${id}`, { config }),
+  // skipLaunch: true leaves a STOPPED machine stopped after the update (Fly's skip_launch), so
+  // the caller starts it explicitly — used to patch env (fresh Claude credentials) before a Start.
+  updateMachine: (id, config, { skipLaunch = false } = {}) =>
+    call("POST", `/apps/${app()}/machines/${id}`, { config, ...(skipLaunch ? { skip_launch: true } : {}) }),
   // NOTE: a stopped machine's ephemeral rootfs is reset on the next start — pausing a session
   // must snapshot its transcript first (see pauseMachine in server.js).
   stopMachine: (id) => call("POST", `/apps/${app()}/machines/${id}/stop`),

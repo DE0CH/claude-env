@@ -34,11 +34,15 @@ for path in {wd, os.path.expanduser("~/workspace"), os.path.expanduser("~")}:
     e["hasCompletedProjectOnboarding"]=True
     e.setdefault("allowedTools",[])
 json.dump(d,open(p,"w"))
-# Pre-accept the bypass-permissions warning via the settings key the CLI actually checks.
+# Pre-accept the bypass-permissions warning via the settings key the CLI actually checks, and
+# make every launch a Remote Control one (remoteControlAtStartup: "Start Remote Control bridge
+# automatically each session"), so a host started by any path — fresh, resume, watchdog
+# restart — has the bridge on even if a launch form ever drops the flag.
 sp=os.path.expanduser("~/.claude/settings.json")
 try: s=json.load(open(sp))
 except Exception: s={}
 s["skipDangerousModePermissionPrompt"]=True
+s["remoteControlAtStartup"]=True
 os.makedirs(os.path.dirname(sp),exist_ok=True)
 json.dump(s,open(sp,"w"))
 PY
@@ -69,31 +73,23 @@ start() {
   latest="$(ls -t "$HOME"/.claude/projects/*/*.jsonl 2>/dev/null | head -1)"
   [ -n "$latest" ] && rid="$(basename "$latest" .jsonl)"
   [ -n "$rid" ] && export SESSION_RESUME_FLAG="--resume $rid"
-  # Remote Control flag placement is the crux of resume:
-  #   * FRESH start (no conversation to resume) -> pass --remote-control to ENABLE Remote
-  #     Control and register a bridge (claude.ai/code) session the phone app attaches to.
-  #   * RESUME (rid set) -> must NOT pass --remote-control. That flag STARTS A NEW bridge
-  #     session (a new entry in the Claude app, showing the conversation as if from the first
-  #     prompt). `claude --resume <id>` instead REATTACHES to the conversation's existing bridge
-  #     session via its stored reconnection record — same entry on the phone — and re-enables
-  #     Remote Control automatically. (Verified: re-passing --remote-control on resume changes
-  #     the claude.ai/code/session_… id across a pause/wake.) The server keeps a bridge session
-  #     ~4h after it stops, so a wake within that window reattaches; a much later wake still
-  #     resumes the conversation locally but appears as a fresh app entry.
-  # --name is display-only (dashboard registry / prompt box), so it is safe on both paths.
-  if [ -n "$rid" ]; then
-    if [ -n "$SESSION_LABEL" ]; then
-      CMD='claude --name "$SESSION_LABEL" --model "$SESSION_MODEL" $SESSION_PERM_FLAG $SESSION_RESUME_FLAG'
-    else
-      CMD='claude --model "$SESSION_MODEL" $SESSION_PERM_FLAG $SESSION_RESUME_FLAG'
-    fi
-  elif [ -n "$SESSION_LABEL" ]; then
-    # --remote-control <name> names it in the Claude app; --name sets the local display
-    # name (the session registry the dashboard reads), so both start identical.
-    CMD='claude --remote-control "$SESSION_LABEL" --name "$SESSION_LABEL" --model "$SESSION_MODEL" $SESSION_PERM_FLAG'
+  # --remote-control on EVERY launch form, resume included. With a resumed transcript the CLI
+  # reads the bridge session it recorded there ({"type":"bridge-session",...}) and REATTACHES to
+  # it — same entry in the Claude app, same claude.ai/code/session_… id (verified 2026-09-15 with
+  # --debug-file: "[bridge:repl] Reattaching to persisted bridge session cse_… (fresh-mint
+  # fallback, restored_owner_match)" → "[remote-bridge] Reattaching to session cse_…", ~10 h
+  # after the pause). Only if the server no longer holds that session does it mint a fresh one
+  # (a new app entry with the conversation intact) — still Remote Control, never off. What DOES
+  # leave Remote Control off on a resume is dead OAuth credentials ("Remote Control requires a
+  # claude.ai subscription … --rc flag ignored", TUI "Not logged in"): the portal injects the
+  # current pair into the machine env on every Start (wakeMachine in portal/server.js).
+  # --remote-control <name> names it in the Claude app; --name sets the local display name (the
+  # session registry the dashboard reads), so both start identical. No label => let the Claude
+  # session auto-generate (and later refine) its own title.
+  if [ -n "$SESSION_LABEL" ]; then
+    CMD='claude --remote-control "$SESSION_LABEL" --name "$SESSION_LABEL" --model "$SESSION_MODEL" $SESSION_PERM_FLAG $SESSION_RESUME_FLAG'
   else
-    # No label => let the Claude session auto-generate (and later refine) its own title.
-    CMD='claude --remote-control --model "$SESSION_MODEL" $SESSION_PERM_FLAG'
+    CMD='claude --remote-control --model "$SESSION_MODEL" $SESSION_PERM_FLAG $SESSION_RESUME_FLAG'
   fi
   # fixed 120x40 window: the dashboard's terminal panel mirrors this pane (tmux capture-pane)
   tmux new-session -d -s "$SESSION" -x 120 -y 40 -c "$WD" "$CMD"
@@ -205,9 +201,8 @@ if [ -x /usr/local/bin/push-claude-credentials ]; then
   echo "[supervisor] credentials write-back running (-> ${PORTAL_URL:-portal default})"
 fi
 while true; do
-  # Liveness by a token present in EVERY launch form (fresh uses --remote-control, resume does
-  # not), so the watchdog never thinks a resumed host is dead and restart-loops it. --model is
-  # always passed; the supervisor/push-creds processes don't contain it.
+  # Liveness by a token present in every launch form (--model is always passed; the
+  # supervisor/push-creds processes don't contain it).
   if [ -e "$HOME/.claude/.one-shot-done" ]; then :   # one-shot finished: claude stays down, the portal destroys the machine
   elif ! pgrep -u "$(id -u)" -f 'claude .*--model' >/dev/null 2>&1; then
     echo "[supervisor] host gone; restarting"
