@@ -22,7 +22,14 @@ Task: price/time for CX LHR–HKG business (Aria Suite) 23–28 Aug 2027, ~11 mo
   loads, `api.cathaypacific.com/tsp-svc/v1.0/create-session` / `air-calendar` return 403 AkamaiGHost
   (surfaces in the console as a CORS "No Access-Control-Allow-Origin" error — read the real status via
   CDP `Network.responseReceivedExtraInfo`). Tried: headless + headed Xvfb Chromium, Fly IP and Evomi UK
-  datacenter proxy, playwright-stealth + human mouse warm-up + reload. All 403. The `_abck` cookie stays
-  `~-1~` (sensor never validates).
+  datacenter proxy, playwright-stealth + human mouse warm-up + reload, nodriver. All 403. The `_abck`
+  cookie stays `~-1~` (sensor never validates). **A Browserbase session passes cleanly** (GB residential
+  proxy, `solveCaptchas`, Playwright `connect_over_cdp`): the page renders the full fare list in ~30 s.
+- **The Cathay results page carries a ±7-day price strip** ("Mon 16 Aug GBP5,435.14 … Mon 30 Aug") above
+  the flight list, so ONE page load answers "cheapest day in a range" — no need to load each date.
+- **Kayak and Trip.com reach ~360 days out** (both priced 23–28 Aug 2027 on 2026-09-15 while Google
+  Flights stopped at 10 Aug). Kayak URL: `kayak.co.uk/flights/LHR-HKG/2027-08-23/business?sort=price_a&fs=airlines=CX`
+  (renders in a headed pod Chromium, no bot wall); Trip.com: `uk.trip.com/flights/showfarefirst?dcity=lon&acity=hkg&ddate=…&triptype=ow&class=c`.
+  Skyscanner throws a PerimeterX captcha at pod Chromium. Kayak's OTA fares ran ~£550 below cathaypacific.com.
 - Reading the app's flow: the sessionStorage keys `tsp:bookingStore` etc. show the zustand state
   (`initialized`, `createSessionFinish`, `flightSearchData`) — a quick way to see where it stalled.
