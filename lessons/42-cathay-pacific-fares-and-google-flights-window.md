@@ -33,3 +33,8 @@ Task: price/time for CX LHR–HKG business (Aria Suite) 23–28 Aug 2027, ~11 mo
   Skyscanner throws a PerimeterX captcha at pod Chromium. Kayak's OTA fares ran ~£550 below cathaypacific.com.
 - Reading the app's flow: the sessionStorage keys `tsp:bookingStore` etc. show the zustand state
   (`initialized`, `createSessionFinish`, `flightSearchData`) — a quick way to see where it stalled.
+- **Fly-and-ferry through-tickets are priced as a different market and can be far cheaper**: on 2026-09-15 the
+  one-way business LHR→ZYK (Shekou Cruise Home Port, HKIA SkyPier ferry leg CX98xx operated by Chu Kong
+  Passenger Transport) was GBP 3,516.84 vs GBP 5,435.14 for LHR→HKG on the same day — same CX250 flight.
+  Use `d=ZYK` (or FYG/NSZ/PFT/ZTI/ZGN/ZUI/XZM) in the `tsp` flight-selection URL; Google Flights and Kayak
+  return nothing for these ferry codes, only Cathay's own site prices them.
