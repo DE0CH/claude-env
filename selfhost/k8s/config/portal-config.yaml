@@ -7,6 +7,6 @@
   },
   "data": {
     "repos.json": "[{\"name\":\"claude-env\",\"url\":\"https://github.com/de0ch/claude-env.git\"},{\"name\":\"dissertation\",\"url\":\"https://github.com/DE0CH/dissertation.git\"}]",
-    "sessionImage": "ghcr.io/de0ch/claude-sessions:sha-6e0d9769ec9f"
+    "sessionImage": "ghcr.io/de0ch/claude-sessions:sha-4145335c7cce"
   }
 }
