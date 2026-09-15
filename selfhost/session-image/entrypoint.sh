@@ -144,6 +144,10 @@ fi
 WD="$HOME/workspace"
 mapfile -t DIRS < <(find "$HOME/workspace" -mindepth 1 -maxdepth 1 -type d 2>/dev/null)
 [ "${#DIRS[@]}" = "1" ] && WD="${DIRS[0]}"
+# Several repos: claude only discovers CLAUDE.md / skills / settings / hooks from the cwd and
+# its ancestors, so generate a workspace-level layer that links to every repo's own
+# (see workspace-layer.sh). Regenerated on every boot, including resumes.
+[ "$WD" = "$HOME/workspace" ] && [ "${#DIRS[@]}" -gt 1 ] && /usr/local/bin/workspace-layer.sh "$WD"
 
 # --- place restored transcripts where claude looks for them ------------------
 # ~/.claude/projects/<cwd slug>/<id>.jsonl — session-supervisor.sh then starts

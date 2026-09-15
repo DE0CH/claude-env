@@ -74,8 +74,9 @@ RUN useradd -m -s /bin/bash claude \
  && chmod 0440 /etc/sudoers.d/90-claude
 COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 COPY session-supervisor.sh /usr/local/bin/session-supervisor.sh
+COPY workspace-layer.sh /usr/local/bin/workspace-layer.sh
 COPY push-claude-credentials /usr/local/bin/push-claude-credentials
-RUN chmod +x /usr/local/bin/entrypoint.sh /usr/local/bin/session-supervisor.sh /usr/local/bin/push-claude-credentials
+RUN chmod +x /usr/local/bin/entrypoint.sh /usr/local/bin/session-supervisor.sh /usr/local/bin/workspace-layer.sh /usr/local/bin/push-claude-credentials
 USER claude
 WORKDIR /home/claude
 # Native claude binary for the claude user

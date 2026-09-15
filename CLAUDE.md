@@ -603,6 +603,12 @@ environment's secrets + repos and runs `claude --remote-control` (default model
 vCPU / 4 GB — chosen per session, plus an optional **first prompt** pasted in as the session's
 first message once `claude` is up) — so it shows
 up in the Claude phone app. Isolated microVM per session (install tools freely).
+**Several repos selected** → they sit side by side under `~/workspace` and that is the cwd.
+Claude Code discovers CLAUDE.md, skills, settings and hooks only from the cwd and its
+ancestors, so the entrypoint runs `workspace-layer.sh` (session-image) which generates at
+`~/workspace` a CLAUDE.md importing every repo's, symlinks to every repo's skills/commands, and
+a merged `.claude/settings.json` (hooks and file rules re-anchored to each repo's path). Don't
+hand-edit that layer; it is regenerated on every boot.
 **One-shot** sessions (dashboard Mode → One-shot, or `oneShot:true` on `POST /api/sessions`)
 run just that prompt: when it is done the session image exits claude and the portal archives +
 force-destroys the machine (uncommitted work doesn't block; Deyao gets a lobster DM if anything
