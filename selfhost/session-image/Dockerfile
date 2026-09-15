@@ -40,7 +40,7 @@ RUN npm install -g vercel
 # pyotp generates TOTP 2FA codes from a setup key (lessons/40 — Google login/security review);
 # pillow for tiling screenshots into contact sheets (reviewing UI test shots, video frames).
 RUN pip3 install --no-cache-dir --break-system-packages \
-      requests beautifulsoup4 lxml pymupdf pyotp pillow
+      requests beautifulsoup4 lxml pymupdf pyotp pillow boto3
 # Browser tooling. Playwright for Node is GLOBAL because every scripts/*.js and skill does
 # `require('playwright')` via NODE_PATH; the Python package is pinned to the same version so
 # both share ONE Chromium build under /opt/pw-browsers (the path the skills reference).

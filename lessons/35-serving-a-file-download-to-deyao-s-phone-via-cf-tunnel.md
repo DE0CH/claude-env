@@ -1,4 +1,11 @@
-## Serving a file download to Deyao's phone via cf-tunnel (2026-08-29, follow-up)
+## Serving a file download to Deyao's phone (2026-08-29, follow-up)
+
+**Current method (2026-09-15): use Hetzner S3 + a presigned URL, NOT the cf-tunnel.**
+See CLAUDE.md "Sending me a file to download". S3 gives `Content-Length` + `Accept-Ranges`
+(206) so the phone shows a real progress bar and can resume, and the link outlives the
+session — whereas the cf-tunnel relays a chunked stream (no `Content-Length` → no
+progress bar) and dies when the session idles. The cf-tunnel notes below are kept only
+as pitfalls if you ever must serve a file through it anyway.
 
 The first attempt at the 76MB mp4 link "just stuck loading" on the phone for two
 reasons on top of the WS-message-size fix above:

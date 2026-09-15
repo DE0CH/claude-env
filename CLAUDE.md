@@ -336,10 +336,36 @@ ship a "wide but short" map strip on desktop. Verify BOTH viewports before sendi
 the link: screenshot the deployed page at a phone size (~390 px) AND a desktop size
 (~1600 px) with ScrapingBee's screenshot API (`screenshot=true`, `window_width=…`).
 
+## Sending me a file to download — Hetzner S3 presigned URL
+
+When you need to hand me a FILE to download (a video, a big export, any binary/blob —
+as opposed to an HTML page to view), upload it to **Hetzner S3** and discord me a
+**presigned GET URL**. This is the default for file downloads now — NOT the cf-tunnel
+(that relays a chunked stream, so the browser gets no `Content-Length` → no progress
+bar, and the link dies when the session ends). S3 gives a real download: `Content-Length`
++ `Accept-Ranges` (HTTP 206) so my browser shows a proper **progress bar** and can
+resume, and the URL keeps working after the session is gone.
+
+Use the `hetzner-s3` skill (bucket `de0ch-claude-6fdff6`, creds in `HETZNER_S3_*`;
+boto3). Upload with the right `ContentType` (boto3 `upload_file` auto-multiparts big
+files), then mint the link with `generate_presigned_url('get_object', …)` passing
+`ResponseContentDisposition='attachment; filename="…"'` (forces download, not inline
+play) and `ResponseContentType`. Max presign lifetime is 7 days (`ExpiresIn=604800`) —
+say so when you send it.
+
+The bucket is **private**, so the presigned (signed, expiring) URL IS the access
+control — right for private/sensitive files. A non-sensitive file (e.g. a YouTube video
+I asked for) goes through the exact same flow; the signed URL is just the delivery
+mechanism, nothing to hide. Send the URL as its own bare Discord message (per the
+copyable-value rule). Don't leave large one-off files in the bucket forever — delete
+them once I've grabbed them if they're big and disposable.
+
 ## Cloudflare tunnel + local HTML content / private data drops
 
-When you need to hand me content too sensitive for a public Vercel page, or need
-me to hand you data that must
+The cf-tunnel is for **interactive HTML** (content too sensitive for a public Vercel
+page, or a form that collects private data from me) — for plain file downloads use the
+S3 flow above instead. When you need to hand me content too sensitive for a public
+Vercel page, or need me to hand you data that must
 not end up in the chat transcript: build the content as local files under
 `~/tunnel-share`, serve it with `scripts/content-server.py`, and expose it through
 the **cf-tunnel** Cloudflare Worker. Each session gets its OWN tunnel URL
