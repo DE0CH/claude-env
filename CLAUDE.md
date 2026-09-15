@@ -63,13 +63,13 @@ one-line revert.
 
 If claude-in-chrome is avaliable and it's running on mac, use it and normal tools.
 
-**Browserbase is gone (Deyao, 2026-09-13: no credits, not renewing) — never use it.** For
-page/content fetches use ScrapingBee (JS rendering, premium proxies, screenshots) or `exa
-contents`; for interactive browsing use claude-in-chrome on the Mac, or a mobilerun cloud
-phone's Chrome driven over CDP (see the mobilerun section). Direct connections from a pod
-(curl, yt-dlp, Playwright with the container's Chromium) are an acceptable fallback when
-ScrapingBee can't do it — datacenter IPs may get bot-blocked, so try ScrapingBee's premium
-proxy first.
+**Browserbase is back (Deyao, 2026-09-15; skill + `browserbase.md` restored).** It needs
+`BROWSERBASE_API_KEY` in the session environment (missing on 2026-09-15 — discord Deyao if
+it is absent) and an account plan with credits. Use it for interactive browsing and for sites
+whose bot walls (Akamai/PerimeterX) reject a pod's Chromium; otherwise ScrapingBee / `exa
+contents` for fetches, claude-in-chrome on the Mac, or a mobilerun cloud phone's Chrome over
+CDP. Direct connections from a pod (curl, yt-dlp, Playwright with the container's Chromium)
+remain a fallback — datacenter IPs may get bot-blocked.
 
 **Web search: use the `serpapi` skill by default** (SerpApi — real Google SERP data
 as JSON: organic results, answer box, knowledge graph, news/images/maps/scholar
