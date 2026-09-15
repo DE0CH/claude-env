@@ -23,6 +23,6 @@ Task: price/time for CX LHR–HKG business (Aria Suite) 23–28 Aug 2027, ~11 mo
   (surfaces in the console as a CORS "No Access-Control-Allow-Origin" error — read the real status via
   CDP `Network.responseReceivedExtraInfo`). Tried: headless + headed Xvfb Chromium, Fly IP and Evomi UK
   datacenter proxy, playwright-stealth + human mouse warm-up + reload. All 403. The `_abck` cookie stays
-  `~-1~` (sensor never validates). A real device (mobilerun/MobileNext phone Chrome) is the remaining route.
+  `~-1~` (sensor never validates).
 - Reading the app's flow: the sessionStorage keys `tsp:bookingStore` etc. show the zustand state
   (`initialized`, `createSessionFinish`, `flightSearchData`) — a quick way to see where it stalled.
