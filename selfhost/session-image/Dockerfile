@@ -35,6 +35,8 @@ RUN curl -fsSL https://fly.io/install.sh | FLYCTL_INSTALL=/usr/local sh \
  && test -x /usr/local/bin/flyctl
 # vercel CLI: deploy HTML reports/demos for Deyao (vercel skill — never Claude Artifacts)
 RUN npm install -g vercel
+# browse: the Browserbase CLI (skill: browserbase); needs BROWSERBASE_API_KEY at runtime
+RUN npm install -g browse
 # Common Python libs used across scripts/skills (Ubuntu 24.04 pip is externally-managed).
 # requests/bs4/lxml are ubiquitous; pymupdf is the preferred PDF parser (lessons/36);
 # pyotp generates TOTP 2FA codes from a setup key (lessons/40 — Google login/security review);
