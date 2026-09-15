@@ -46,3 +46,15 @@ Notes:
   me the `debuggerFullscreenUrl` so I can log in by hand.
 - Release sessions when done (`browse cloud sessions update <id>` / let them expire)
   so the context isn't locked.
+
+## Account / usage check (2026-09-15)
+
+`GET https://api.browserbase.com/v1/projects` (header `X-BB-API-Key: $BROWSERBASE_API_KEY`) lists the
+project (id `8f2c3e0b-53ae-4425-828e-79e5fd52a180`, "Production project", concurrency 25);
+`GET /v1/projects/<id>/usage` returns `{browserMinutes, proxyBytes}` for the billing period. The plan
+tier / remaining quota is NOT exposed by the API — the only test is creating a session (a 402 means
+recharge/upgrade; ping Deyao per the Tools policy). Session creation from a pod:
+`POST /v1/sessions {"projectId":…, "timeout":900, "proxies":[{"type":"browserbase","geolocation":{"country":"GB"}}],
+"browserSettings":{"solveCaptchas":true}}` → `connectUrl` for Playwright `connect_over_cdp`; release with
+`POST /v1/sessions/<id> {"projectId":…,"status":"REQUEST_RELEASE"}`. Passed Cathay Pacific's Akamai wall
+that blocks every pod-local browser (lessons/42).
