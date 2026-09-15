@@ -30,6 +30,12 @@ RUN mkdir -p -m 755 /etc/apt/keyrings \
 # yt-dlp: YouTube audio-download fallback when no transcript exists (CLAUDE.md YouTube section)
 RUN curl -fsSL -o /usr/local/bin/yt-dlp "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp" \
  && chmod +x /usr/local/bin/yt-dlp
+# typst: compile the dissertation (notes/dissertation builds, phone-site/build.py)
+RUN curl -fsSL -o /tmp/typst.tar.xz "https://github.com/typst/typst/releases/download/v0.15.1/typst-x86_64-unknown-linux-musl.tar.xz" \
+ && tar -xJf /tmp/typst.tar.xz -C /tmp \
+ && install -m 755 /tmp/typst-x86_64-unknown-linux-musl/typst /usr/local/bin/typst \
+ && rm -rf /tmp/typst.tar.xz /tmp/typst-x86_64-unknown-linux-musl \
+ && typst --version
 # flyctl: drive Fly (manage the sessions app / rebuild the session image)
 RUN curl -fsSL https://fly.io/install.sh | FLYCTL_INSTALL=/usr/local sh \
  && test -x /usr/local/bin/flyctl
