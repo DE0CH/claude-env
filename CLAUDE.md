@@ -73,8 +73,8 @@ proxy first.
 
 **Web search: use the `serpapi` skill by default** (SerpApi — real Google SERP data
 as JSON: organic results, answer box, knowledge graph, news/images/maps/scholar
-engines; key in env var `SERPAPI_KEY`, free plan = 250 searches/month so budget
-credits). SerpApi returns links/snippets, not page content — fetch the winning URLs
+engines; key in env var `SERPAPI_KEY`, Starter plan = 1,000 searches/month, still
+budget credits). SerpApi returns links/snippets, not page content — fetch the winning URLs
 with `exa contents` / ScrapingBee when you need the text. Fall back to the `exa`
 skill (direct Exa API — content-with-search, find-similar; key `EXA_API`) when SerpApi's
 quota is out or the task needs semantic search over page content, then to the

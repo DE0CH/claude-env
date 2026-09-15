@@ -26,8 +26,8 @@ or ScrapingBee).
 ## Auth & quota
 
 - **Env var `SERPAPI_KEY`** (session env var, verified present 2026-08-19).
-  Account: chendeyao000@gmail.com, **Free Plan — 250 searches/month** (renews
-  monthly, 250/hour rate limit).
+  Account: chendeyao000@gmail.com, **Starter Plan — 1,000 searches/month** (renews
+  monthly; upgraded 2026-09-15).
 - **Budget accordingly**: a search = 1 credit. **Identical searches within ~1 h are
   served from cache and are FREE** (verified: repeat calls didn't increment usage).
   Don't burn credits on speculative variations; if the plan runs out mid-task,
