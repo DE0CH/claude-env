@@ -38,3 +38,13 @@ Task: price/time for CX LHR–HKG business (Aria Suite) 23–28 Aug 2027, ~11 mo
   Passenger Transport) was GBP 3,516.84 vs GBP 5,435.14 for LHR→HKG on the same day — same CX250 flight.
   Use `d=ZYK` (or FYG/NSZ/PFT/ZTI/ZGN/ZUI/XZM) in the `tsp` flight-selection URL; Google Flights and Kayak
   return nothing for these ferry codes, only Cathay's own site prices them.
+- **Which 777 has Aria on a given day (Google Flights):** the "Individual suite" extension appears only in
+  business-class results, and Google lists no business result at all when the cabin is sold out. Fallback that
+  works: Google's per-flight CO₂ estimate — refitted (Aria) 777-300ERs show 642 kg (economy) / 963 kg (premium
+  economy) LHR→HKG, un-refitted ones 676 / 1,014 (different seat counts). Verified against the tag on every day
+  it was present. Aria rotations change daily; don't assume one fixed flight number.
+- **Agent prices per exact flight:** SerpApi `google_flights` with `booking_token=<token from the search result>`
+  returns `booking_options[].together.{book_with,price}` — the full Google "Booking options" list (agents +
+  the airline). Near departure the agents undercut cathaypacific.com by up to ~40% in business.
+- **Cathay's results page rows carry all three cabin fares + seats-left** ("from GBP x | 3 seats left | Not
+  available") — load the economy page (`ca=Y`) once per date and read every cabin from the row.
