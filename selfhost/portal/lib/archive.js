@@ -147,4 +147,35 @@ async function clearPaused(secrets, machineId) {
   try { await dav(secrets).del(pausedDir(machineId)); } catch { /* best effort */ }
 }
 
-module.exports = { run, snapshot, finalizePaused, clearPaused, dirName, pausedDir };
+// Roll a PAUSED machine's snapshot transcript(s) back, in place on the Storage Box: drop every
+// JSONL entry from the first line containing `dropFromMarker` onward, so the session `--resume`s
+// without those turns (the clean version of hand-editing the .jsonl — e.g. to remove injected
+// cross-session messages that confused the agent). The machine must already be paused (its
+// snapshot present); removing a contiguous suffix keeps the parentUuid chain valid. Returns
+// { machineId, transcripts: [{name, before, after, dropped}] }.
+async function editSnapshotTranscript(secrets, machineId, { dropFromMarker } = {}) {
+  if (!dropFromMarker) throw new Error("editSnapshotTranscript needs a dropFromMarker");
+  const d = dav(secrets), src = pausedDir(machineId);
+  const manifest = await d.get(`${src}/manifest.txt`);
+  if (manifest == null) throw new Error(`no pause snapshot for ${machineId} (manifest.txt missing) — pause the machine first`);
+  const names = manifest.split("\n").map((s) => s.trim()).filter(Boolean);
+  const transcripts = [];
+  for (const n of names) {
+    const body = await d.get(`${src}/${n}`);
+    if (body == null) { transcripts.push({ name: n, error: "not found" }); continue; }
+    const lines = body.split("\n");
+    const nonEmpty = (a) => a.filter((l) => l.trim()).length;
+    const before = nonEmpty(lines);
+    let cut = -1;
+    for (let i = 0; i < lines.length; i++) { if (lines[i].includes(dropFromMarker)) { cut = i; break; } }
+    if (cut < 0) { transcripts.push({ name: n, before, after: before, dropped: 0 }); continue; }
+    const kept = lines.slice(0, cut);
+    const out = kept.join("\n") + (kept.length ? "\n" : "");
+    await d.put(`${src}/${n}`, out);
+    const after = nonEmpty(kept);
+    transcripts.push({ name: n, before, after, dropped: before - after });
+  }
+  return { machineId, transcripts };
+}
+
+module.exports = { run, snapshot, finalizePaused, clearPaused, editSnapshotTranscript, dirName, pausedDir };

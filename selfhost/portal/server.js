@@ -570,6 +570,49 @@ app.post("/api/sessions/:id/start", async (req, res) => {
   try { res.json(await wakeMachine(req.params.id)); }
   catch (e) { res.status(e.needLogin ? 409 : 500).json({ error: e.message, needLogin: !!e.needLogin }); }
 });
+// Keep only VALID_NAME=stringifiable-value pairs from a request body's env object. Reject array
+// values / null; coerce the rest to strings (Fly machine env is string→string).
+function normalizeEnv(env) {
+  if (!env || typeof env !== "object" || Array.isArray(env)) return {};
+  const out = {};
+  for (const [k, v] of Object.entries(env)) {
+    if (/^[A-Za-z_][A-Za-z0-9_]*$/.test(k) && v != null && typeof v !== "object") out[k] = String(v);
+  }
+  return out;
+}
+// Inject/patch environment variables into a session and restart it on the SAME conversation.
+// wakeMachine writes them into the machine config env (so they persist across every future
+// restart) and the supervisor `claude --resume`s with them present — the non-hacky way to hand a
+// running session a secret it didn't boot with (e.g. a newly added API key). Body: {env:{K:V,…}}.
+app.post("/api/sessions/:id/env", async (req, res) => {
+  try {
+    const env = normalizeEnv(req.body && req.body.env);
+    if (!Object.keys(env).length) return res.status(400).json({ error: "body.env must be a non-empty object of string values" });
+    res.json({ ...(await wakeMachine(req.params.id, { env })), env: Object.keys(env) });
+  } catch (e) { res.status(e.needLogin ? 409 : 500).json({ error: e.message, needLogin: !!e.needLogin }); }
+});
+// Restart a session, optionally patching env and/or rolling its transcript back. Body:
+// {env?:{K:V}, rollback?:{dropFromMarker:string}}. With a rollback the machine is paused first
+// (so the snapshot exists) and its snapshot transcript is truncated — every entry from the first
+// one containing dropFromMarker onward is dropped — before the resume, so the session comes back
+// without those turns (the clean version of hand-editing the .jsonl). API only; no dashboard UI.
+app.post("/api/sessions/:id/restart", async (req, res) => {
+  try {
+    const id = req.params.id;
+    const env = normalizeEnv(req.body && req.body.env);
+    const rollback = req.body && req.body.rollback;
+    let rolledBack = null;
+    if (rollback && rollback.dropFromMarker) {
+      const m = await fly.getMachine(id);
+      const md = m.config?.metadata || {};
+      const envSecrets = ((await store.get()).environments[md.environment] || {}).secrets || {};
+      if (m.state === "started") await pauseMachine(id); // snapshot + stop so the snapshot exists to edit
+      rolledBack = await archive.editSnapshotTranscript(envSecrets, id, { dropFromMarker: String(rollback.dropFromMarker) });
+    }
+    const woke = await wakeMachine(id, { env });
+    res.json({ ...woke, env: Object.keys(env), rolledBack });
+  } catch (e) { res.status(e.needLogin ? 409 : 500).json({ error: e.message, needLogin: !!e.needLogin }); }
+});
 // Switch a session between "auto" and "bypass" (--dangerously-skip-permissions), restarting it
 // on the same conversation (see setPermissionMode). A 500 means the pre-restart snapshot failed
 // and the machine is untouched.
