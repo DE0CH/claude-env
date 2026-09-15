@@ -176,10 +176,19 @@ async function wakeMachine(id, { env = {}, metadata = {} } = {}) {
     metadata: { ...(cur.metadata || {}), ...metadata },
   };
   await fly.updateMachine(id, config, { skipLaunch: true });
-  // Only tolerate the 412 Fly gives while it is still replacing the machine itself (the replace
-  // starts it) — anything else is a real start failure.
-  try { await fly.startMachine(id); }
-  catch (e) { if (!/refusing to start|getting replaced/i.test(e.message)) throw e; }
+  // The update is a replace that takes a few seconds; a start fired meanwhile gets a 412
+  // ("machine getting replaced, refusing to start") and, with skip_launch, nothing else starts
+  // it (seen 2026-09-15: the machine stayed stopped although /start returned ok). So retry the
+  // start until the replace is over, and fail loudly if it never takes.
+  const deadline = Date.now() + 90 * 1000;
+  for (;;) {
+    try { await fly.startMachine(id); break; }
+    catch (e) {
+      if (!/refusing to start|getting replaced/i.test(e.message)) throw e;
+      if (Date.now() > deadline) throw new Error(`start still refused after the config update: ${e.message}`);
+      await new Promise((r) => setTimeout(r, 1500));
+    }
+  }
   return { ok: true, snapshot };
 }
 
